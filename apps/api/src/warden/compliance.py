@@ -48,7 +48,9 @@ async def _mfa(db: AsyncSession, state: AppState) -> Result:
     return (
         "fail" if missing else "pass",
         ev,
-        f"{len(missing)} of {len(privileged)} owners and admins have no MFA" if missing else "Every owner and admin uses MFA",
+        f"{len(missing)} of {len(privileged)} owners and admins {'has' if len(missing) == 1 else 'have'} no MFA"
+        if missing
+        else "Every owner and admin uses MFA",
     )
 
 
@@ -108,7 +110,13 @@ async def _fw_hygiene(db: AsyncSession, state: AppState) -> Result:
     found = [f for f in await firewall_analysis.findings(db) if f["kind"] in ("shadowed", "permissive_inbound")]
     return (
         "fail" if found else "pass",
-        [{"object": "policy", "fact": f["title"]} for f in found],
+        [
+            {
+                "object": f"policy {f.get('subject', '')}",
+                "fact": f["title"],
+            }
+            for f in found
+        ],
         f"{len(found)} shadowed or overly permissive polic{'y' if len(found) == 1 else 'ies'}"
         if found
         else "No shadowed or permissive inbound policies",
@@ -119,8 +127,14 @@ async def _fw_logging(db: AsyncSession, state: AppState) -> Result:
     found = [f for f in await firewall_analysis.findings(db) if f["kind"] == "block_without_logging"]
     return (
         "fail" if found else "pass",
-        [{"object": "policy", "fact": f["title"]} for f in found],
-        f"{len(found)} blocking policies do not log" if found else "Every blocking policy logs",
+        [
+            {
+                "object": f"policy {f.get('subject', '')}",
+                "fact": f["title"],
+            }
+            for f in found
+        ],
+        f"{len(found)} blocking polic{'y does' if len(found) == 1 else 'ies do'} not log" if found else "Every blocking policy logs",
     )
 
 
@@ -132,7 +146,7 @@ async def _firmware(db: AsyncSession, state: AppState) -> Result:
     return (
         "fail" if old else "pass",
         [{"object": f"device {d.name}", "fact": f"firmware {d.firmware_version}, update available"} for d in old],
-        f"{len(old)} of {len(devices)} devices have a firmware update"
+        f"{len(old)} of {len(devices)} devices {'has' if len(old) == 1 else 'have'} a firmware update"
         if old
         else "All devices run the latest firmware the controller offers",
     )
@@ -146,7 +160,7 @@ async def _online(db: AsyncSession, state: AppState) -> Result:
     return (
         "fail" if off else "pass",
         [{"object": f"device {d.name}", "fact": d.state.lower().replace("_", " ")} for d in off],
-        f"{len(off)} devices are not online" if off else "Every adopted device is online",
+        f"{len(off)} device{' is' if len(off) == 1 else 's are'} not online" if off else "Every adopted device is online",
     )
 
 

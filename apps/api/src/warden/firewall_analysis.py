@@ -23,6 +23,11 @@ from warden.models import FirewallPolicy, FirewallZone, Network, Site
 ALLOWISH = {"ALLOW"}
 BLOCKISH = {"BLOCK", "REJECT"}
 SCOPE_RANK = {"IPV4": 1, "IPV6": 1, "IPV4_AND_IPV6": 2}
+ACRONYMS = {"dmz", "vpn", "iot", "wan", "lan"}
+
+
+def zone_label(name: str) -> str:
+    return ("IoT" if name.lower() == "iot" else name.upper()) if name.lower() in ACRONYMS else name
 
 
 @dataclass
@@ -168,6 +173,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "title": f"“{v.p.name}” never matches: “{a.p.name}” comes first and {a.p.action.lower()}s the same traffic",
                         "detail": f"{v.src} → {v.dst}. Move it above “{a.p.name}” or remove it.",
                         "policy_id": v.p.id,
+                        "subject": v.p.name,
                     }
                 )
             elif v.relation == "redundant":
@@ -180,6 +186,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "title": f"“{v.p.name}” is redundant: “{a.p.name}” already {a.p.action.lower()}s the same traffic",
                         "detail": f"{v.src} → {v.dst}.",
                         "policy_id": v.p.id,
+                        "subject": v.p.name,
                     }
                 )
             if v.p.action in BLOCKISH and not v.p.logging_enabled and v.p.origin != "SYSTEM_DEFINED":
@@ -191,6 +198,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "title": f"“{v.p.name}” blocks without logging",
                         "detail": "Blocked traffic leaves no trace to investigate.",
                         "policy_id": v.p.id,
+                        "subject": v.p.name,
                     }
                 )
             if v.p.action in ALLOWISH and v.match_all and v.src.lower() == "external" and v.dst.lower() not in ("external",):
@@ -202,6 +210,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "title": f"“{v.p.name}” allows all traffic from External to {v.dst}",
                         "detail": "No port, address or application filter.",
                         "policy_id": v.p.id,
+                        "subject": v.p.name,
                     }
                 )
         for v in sa.disabled:
@@ -214,6 +223,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "title": f"“{v.p.name}” is disabled",
                         "detail": "Remove it if it is no longer needed.",
                         "policy_id": v.p.id,
+                        "subject": v.p.name,
                     }
                 )
         referenced = {v.p.source_zone_external_id for v in sa.policies + sa.unordered} | {
@@ -232,7 +242,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "key": f"zone_unused:{z.id}",
                         "kind": "zone_unused",
                         "severity": "info",
-                        "title": f"Zone {z.name} has no networks and no policies",
+                        "title": f"Zone {zone_label(z.name)} has no networks and no policies",
                         "detail": "",
                     }
                 )

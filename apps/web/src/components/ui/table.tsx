@@ -24,6 +24,7 @@ export function DataTable<T extends { id: string }>({
   initialSort,
   caption,
   rowClassName,
+  folds,
 }: {
   rows: T[] | undefined;
   columns: Column<T>[];
@@ -33,6 +34,8 @@ export function DataTable<T extends { id: string }>({
   initialSort?: { key: string; dir: "asc" | "desc" };
   caption?: string;
   rowClassName?: (row: T) => string | undefined;
+  /** Hidden columns fold into the first cell on phones, so there is nothing to scroll to. */
+  folds?: boolean;
 }) {
   const router = useRouter();
   const [sort, setSort] = useState(initialSort ?? null);
@@ -57,7 +60,7 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="relative overflow-x-auto">
-      {columns.length > 4 && (
+      {columns.length > 4 && !folds && (
         <p className="border-b border-rule px-4 py-1.5 text-xs text-ink-3 md:hidden">Scroll sideways for {columns.length - 3} more columns →</p>
       )}
       <table className="w-full border-collapse text-left">

@@ -1,6 +1,6 @@
 # Firewall analysis, configuration history and compliance
 
-**Status: Phase 5a backend implemented** (modules `firewall`, `config-history`, `compliance`, all `available`; web screens in progress). Simulator-validated only.
+**Status: implemented in Phase 5a** (modules `firewall`, `config-history`, `compliance`, all `available`, with web screens under Security). Simulator-validated only.
 
 ## Firewall & Policy Manager (`GET /api/firewall`)
 

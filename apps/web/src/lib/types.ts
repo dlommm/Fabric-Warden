@@ -1036,3 +1036,82 @@ export interface ServerHostDetail extends ServerHost {
   workload_items: ServerWorkload[];
   storage_items: ServerStorage[];
 }
+
+// -- Phase 5a: firewall, config history, compliance ------------------------------------
+
+export interface FwPolicy {
+  id: string;
+  name: string;
+  index: number | null;
+  enabled: boolean;
+  action: "ALLOW" | "BLOCK" | "REJECT" | string;
+  source_zone: string;
+  destination_zone: string;
+  match_all: boolean;
+  filter_summary: string;
+  ip_scope: string | null;
+  logging: boolean;
+  origin: string | null;
+  analysis: "exact" | "not_determined" | "unordered";
+  relation: "shadowed" | "redundant" | null;
+  covered_by: string | null;
+  overlaps: string[];
+  is_demo: boolean;
+}
+
+export interface FwMatrixCell {
+  source: string;
+  destination: string;
+  action: string | null;
+  policy: { id: string; name: string } | null;
+  filtered_before: number;
+  system_policies: number;
+}
+
+export interface FwSite {
+  site: { id: string; name: string; is_demo: boolean };
+  zones: { id: string; name: string; networks: number; origin: string | null }[];
+  policies: FwPolicy[];
+  system_policies: FwPolicy[];
+  disabled: FwPolicy[];
+  matrix: FwMatrixCell[];
+}
+
+export interface SnapshotRow {
+  id: string;
+  site_id: string;
+  site: string | null;
+  taken_at: string;
+  hash: string;
+  summary: Record<string, number>;
+  changes: Record<string, { added: number; removed: number; changed: number }>;
+  change_total: number;
+  trigger: string;
+  source: string;
+  is_baseline: boolean;
+  note: string;
+  is_demo: boolean;
+}
+
+export interface DiffEntry {
+  id: string;
+  name: string | null;
+  value?: Record<string, unknown>;
+  fields?: { field: string; from: unknown; to: unknown }[];
+}
+
+export type ConfigDiff = Record<string, { added: DiffEntry[]; removed: DiffEntry[]; changed: DiffEntry[] }>;
+
+export interface ComplianceControl {
+  id: string;
+  title: string;
+  category: string;
+  rationale: string;
+  status: "pass" | "fail" | "unknown" | "waived";
+  raw_status: string;
+  detail: string;
+  evidence: { object: string; fact: string }[];
+  failing_since: string | null;
+  waiver: { by: string; reason: string; until: string } | null;
+  evaluated_at: string;
+}
