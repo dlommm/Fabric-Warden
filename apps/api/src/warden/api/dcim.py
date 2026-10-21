@@ -401,6 +401,19 @@ async def _item_out(db: AsyncSession, item: RackItem) -> dict[str, Any]:
     return _item(item, devices)
 
 
+@router.get("/items")
+async def list_items(db: DB, principal: Reader, kind: ItemKind | None = None) -> dict:
+    """Every rack item with its rack name, for pickers (cable ends, power links, assets)."""
+    stmt = select(RackItem).order_by(RackItem.name)
+    if kind:
+        stmt = stmt.where(RackItem.kind == kind)
+    racks = {r.id: r.name for r in await db.scalars(select(Rack))}
+    items = list(await db.scalars(stmt))
+    ids = [i.device_id for i in items if i.device_id]
+    devices = {d.id: d for d in await db.scalars(select(Device).where(Device.id.in_(ids)))} if ids else {}
+    return {"items": [{**_item(i, devices), "rack": racks.get(i.rack_id)} for i in items]}
+
+
 @router.post("/items", status_code=status.HTTP_201_CREATED)
 async def create_item(body: ItemCreate, db: DB, principal: Editor) -> dict:
     item = RackItem(**body.model_dump())

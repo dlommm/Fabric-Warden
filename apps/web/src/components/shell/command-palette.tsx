@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Bookmark, CornerDownLeft, Grid3x3, Laptop, Network, Router, Search } from "lucide-react";
+import { BookOpen, Bookmark, Cable, CornerDownLeft, Grid3x3, Laptop, Network, Package, Router, Rows3, Search, Server } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { useEffect, useMemo, useState } from "react";
@@ -12,7 +12,7 @@ import { DemoTag } from "../ui/signs";
 import { NAV } from "./nav";
 
 interface Result {
-  kind: "device" | "client" | "network" | "prefix" | "reservation" | "page";
+  kind: "device" | "client" | "network" | "prefix" | "reservation" | "rack" | "rack_item" | "cable" | "asset" | "doc" | "page";
   id: string;
   title: string;
   subtitle: string;
@@ -20,7 +20,8 @@ interface Result {
   is_demo?: boolean;
 }
 
-const KIND_ICON = { device: Router, client: Laptop, network: Network, prefix: Grid3x3, reservation: Bookmark };
+const KIND_ICON = { device: Router, client: Laptop, network: Network, prefix: Grid3x3, reservation: Bookmark, rack: Rows3, rack_item: Server, cable: Cable, asset: Package, doc: BookOpen };
+const KIND_WORD: Record<string, string> = { rack_item: "rack item", doc: "doc page" };
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
@@ -121,7 +122,7 @@ export function CommandPalette() {
                     <span className="block truncate font-mono text-xs text-ink-3">{r.subtitle}</span>
                   </span>
                   {r.is_demo && <DemoTag />}
-                  <span className="text-xs text-ink-3 capitalize">{r.kind}</span>
+                  <span className="text-xs text-ink-3 capitalize">{KIND_WORD[r.kind] ?? r.kind}</span>
                 </li>
               );
             })}

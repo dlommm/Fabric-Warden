@@ -52,6 +52,8 @@
   --row-pad: 12px;
   --gap: 16px;
   --radius: 4px;
+  /* One rack unit in the elevation drawing. */
+  --u-h: 28px;
 
   color-scheme: light;
 }
@@ -60,6 +62,7 @@
   --row-h: 32px;
   --row-pad: 8px;
   --gap: 12px;
+  --u-h: 24px;
 }
 
 @media (prefers-color-scheme: dark) {

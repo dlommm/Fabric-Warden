@@ -1,4 +1,25 @@
-import { BellRing, Blocks, ChartLine, Gauge, Globe, Grid3x3, Laptop, Layers, Network, Router, ScrollText, Server, Siren, Users } from "lucide-react";
+import {
+  BellRing,
+  Blocks,
+  BookOpen,
+  Cable,
+  ChartLine,
+  Gauge,
+  Globe,
+  Grid3x3,
+  Laptop,
+  Layers,
+  Network,
+  Package,
+  PlugZap,
+  Router,
+  Rows3,
+  ScrollText,
+  Server,
+  Siren,
+  Users,
+  Waypoints,
+} from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -23,9 +44,20 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Devices", href: "/inventory/devices", icon: Router, module: "inventory", permission: "inventory:read" },
       { label: "Clients", href: "/inventory/clients", icon: Laptop, module: "inventory", permission: "inventory:read" },
       { label: "Networks", href: "/inventory/networks", icon: Network, module: "inventory", permission: "inventory:read" },
+      { label: "Topology", href: "/topology", icon: Waypoints, module: "topology", permission: "inventory:read" },
       { label: "WAN", href: "/wan", icon: Globe, module: "wan", permission: "inventory:read" },
       { label: "IP plan", href: "/ipam", icon: Grid3x3, module: "ipam", permission: "inventory:read" },
       { label: "VLANs", href: "/ipam/vlans", icon: Layers, module: "ipam", permission: "inventory:read" },
+    ],
+  },
+  {
+    section: "Infrastructure",
+    items: [
+      { label: "Racks", href: "/dcim", icon: Rows3, module: "dcim", permission: "inventory:read" },
+      { label: "Cabling", href: "/dcim/cables", icon: Cable, module: "cabling", permission: "inventory:read" },
+      { label: "Power", href: "/dcim/power", icon: PlugZap, module: "power", permission: "inventory:read" },
+      { label: "Assets", href: "/assets", icon: Package, module: "asset-lifecycle", permission: "inventory:read" },
+      { label: "Docs", href: "/docs", icon: BookOpen, module: "docs", permission: "inventory:read" },
     ],
   },
   {

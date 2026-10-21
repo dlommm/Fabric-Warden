@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { MetricWidget, RangePicker } from "@/components/analytics";
+import { DevicePhysical } from "@/components/device-physical";
 import { type Hop, RouteSign } from "@/components/route-sign";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
@@ -98,6 +99,8 @@ export default function DevicePage() {
         </div>
 
         <DeviceHistory d={d} />
+
+        <DevicePhysical deviceId={d.id} name={d.name} />
 
         {d.ports.length > 0 && (
           <Panel title={`Ports (${d.ports.filter((p) => p.state === "UP").length} of ${d.ports.length} up)`} id="ports">

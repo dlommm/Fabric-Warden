@@ -18,7 +18,7 @@ from sqlalchemy import select
 
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.api.inventory import _subnets
-from warden.models import Alert, Client, Device, Network, Rack, RackItem
+from warden.models import Alert, Client, Device, FirewallZone, Network, Rack, RackItem
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/topology", tags=["topology"], dependencies=[Depends(require_module("topology"))])
@@ -170,6 +170,7 @@ async def topology(
 
     if layer == "logical":
         gateway = next((d for d in devices if _role(d) == "gateway"), None)
+        zones = {(z.site_id, z.external_id): z.name for z in await db.scalars(select(FirewallZone).where(FirewallZone.present.is_(True)))}
         per_net: dict[str, int] = {}
         for c in all_clients:
             n = net_of(c.ip_address)
@@ -190,6 +191,7 @@ async def topology(
                     "depth": 1,
                     "health": "ok" if n.enabled else "disabled",
                     "highlight": vlan is not None and n.vlan_id == vlan,
+                    "zone": zones.get((n.site_id, n.zone_external_id or "")),
                     "is_demo": n.is_demo,
                 }
             )

@@ -414,6 +414,16 @@ async def backlinks(
     return {"items": await _backlinks(db, type, keys)}
 
 
+class Preview(BaseModel):
+    body: str = Field(max_length=500_000)
+
+
+@router.post("/references")
+async def preview_references(body: Preview, db: DB, principal: Reader) -> dict:
+    """Resolve references in unsaved text, for the editor's live preview. Read-only."""
+    return {"references": await resolve_refs(db, body.body)}
+
+
 @router.get("/references/check")
 async def check_references(db: DB, principal: Reader) -> dict:
     """Unresolved references across all pages (renamed or removed objects)."""

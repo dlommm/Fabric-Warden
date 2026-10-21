@@ -2,7 +2,7 @@
 
 Self-hosted, modular network operations for UniFi: inventory, analytics, configuration history, security investigation, rack/DCIM documentation and optional AI agents in one web interface. The UniFi controller stays the authoritative control plane; Fabric Warden reads it through the **official** Integration API and is **read-only by default**.
 
-> **Status: Phases 1 (core platform), 2 (inventory and IPAM) and 3 (analytics and alerting) implemented.** Most modules in the catalog are declared but *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: Phases 1 (core platform), 2 (inventory and IPAM), 3 (analytics and alerting) and 4a (racks, cabling, power, assets, topology, wiki) implemented.** Most modules in the catalog are declared but *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What works today
 
@@ -20,6 +20,7 @@ Self-hosted, modular network operations for UniFi: inventory, analytics, configu
 - Analytics: metric history sampled on every sync (raw, 5-minute and hourly tiers), dashboards with templates, device history charts
 - Alerts: threshold rules with hold times, acknowledgement and maintenance windows; notifications to webhooks (HMAC-signed), ntfy and email
 - WAN: interfaces, gateway health and an opt-in latency/loss probe
+- Infrastructure: locations and racks with front/rear elevations and occupancy checks; cables traced through patch panels with schedules and labels; power chains with failover headroom and UPS runtime estimates; asset lifecycle with a renewal calendar; topology with a VLAN overlay; a versioned wiki whose `[[device:…]]` references stay live. See [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md)
 - Web UI: customizable Overview (exceptions first), devices, device detail with upstream route, clients, networks + zones, controllers + capability matrix, Module Center, audit, users, account; light/dark, comfortable/compact
 - Deterministic simulated UniFi controller for demos and tests (always labelled *Demo data*)
 
@@ -27,6 +28,7 @@ Self-hosted, modular network operations for UniFi: inventory, analytics, configu
 
 - **No controller writes.** The client refuses non-GET requests unless the (not yet built) change engine issues a write authorization.
 - No SFP optics/FEC, port error counters, DHCP leases, controller fixed-IP reservations, client fingerprints, LLDP or IDS events: the official API does not expose them. See [docs/API_CAPABILITIES.md](docs/API_CAPABILITIES.md).
+- No Proxmox, Unraid, Docker or Linux host integration yet (Phase 4b).
 - No AI features yet (Phase 7+).
 
 ## Quick start (development)

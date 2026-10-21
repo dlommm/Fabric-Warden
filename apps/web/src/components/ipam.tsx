@@ -70,13 +70,13 @@ function findingHref(f: Finding): string | undefined {
 }
 
 function FindingRow({ f, hover }: { f: Finding; hover: string }) {
-  const href = findingHref(f);
+  const href = f.href ?? findingHref(f);
   const body = (
     <>
-      <StateLabel tone={SEVERITY_TONE[f.severity]} className="sm:w-[24rem] sm:shrink-0">
+      <StateLabel tone={SEVERITY_TONE[f.severity]} className={f.detail ? "sm:w-[24rem] sm:shrink-0" : undefined}>
         <span className="text-ink">{f.title}</span>
       </StateLabel>
-      <span className="text-ink-2">{f.detail}</span>
+      {f.detail && <span className="text-ink-2">{f.detail}</span>}
     </>
   );
   const cls = "flex min-h-[var(--row-h)] flex-col gap-0.5 px-3 py-2 sm:flex-row sm:items-center sm:gap-4";
@@ -97,12 +97,24 @@ function FindingRow({ f, hover }: { f: Finding; hover: string }) {
  * Planned-vs-observed findings. Anything critical or warning goes on the yellow
  * attention plate; informational notes sit below it on plain ground.
  */
-export function FindingsPlate({ findings, emptyText, action }: { findings: Finding[]; emptyText: string; action?: ReactNode }) {
+export function FindingsPlate({
+  findings,
+  emptyText,
+  action,
+  label = "Planned versus observed",
+  heading = (n) => `${n} difference${n > 1 ? "s" : ""} between plan and network`,
+}: {
+  findings: Finding[];
+  emptyText: string;
+  action?: ReactNode;
+  label?: string;
+  heading?: (n: number) => string;
+}) {
   const severe = findings.filter((f) => f.severity !== "info");
   const notes = findings.filter((f) => f.severity === "info");
   if (findings.length === 0) {
     return (
-      <section aria-label="Planned versus observed" className="flex items-center gap-3 rounded-[var(--radius)] border border-ok/40 bg-ok-soft px-5 py-4">
+      <section aria-label={label} className="flex items-center gap-3 rounded-[var(--radius)] border border-ok/40 bg-ok-soft px-5 py-4">
         <CircleCheck className="size-5 shrink-0 text-ok" aria-hidden />
         <p className="font-bold">{emptyText}</p>
       </section>
@@ -115,7 +127,7 @@ export function FindingsPlate({ findings, emptyText, action }: { findings: Findi
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 pt-4 pb-2">
             <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
             <h2 id="findings-h" className="text-lg font-bold">
-              {severe.length} difference{severe.length > 1 ? "s" : ""} between plan and network
+              {heading(severe.length)}
             </h2>
           </div>
           <ul className="mx-2 mb-2 rounded-[3px] bg-surface text-ink">

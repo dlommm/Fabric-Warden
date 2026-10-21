@@ -35,14 +35,16 @@ function Marker({ tone, current }: { tone: Tone; current?: boolean }) {
   );
 }
 
-function Label({ hop }: { hop: Hop }) {
+function Label({ hop, vertical }: { hop: Hop; vertical?: boolean }) {
   const tone = hop.tone ?? "ok";
   const patch = tone === "warn" || tone === "crit";
   const body = (
     <span
       className={clsx(
-        "inline-flex max-w-full flex-col rounded-[3px] text-left sm:items-center sm:text-center",
-        patch && "px-2 py-1 sm:-mt-1",
+        "inline-flex max-w-full flex-col rounded-[3px] text-left",
+        !vertical && "sm:items-center sm:text-center",
+        patch && "px-2 py-1",
+        patch && !vertical && "sm:-mt-1",
         tone === "warn" && "bg-[#ffd200] text-[#14171a]",
         tone === "crit" && "bg-white text-[#14171a] ring-2 ring-[#c8102e]",
         !patch && "text-white",
@@ -64,10 +66,13 @@ function Label({ hop }: { hop: Hop }) {
   );
 }
 
-export function RouteSign({ hops, label, footer }: { hops: Hop[]; label: string; footer?: ReactNode }) {
+/** `vertical` keeps the phone layout at every width, for signs inside narrow side panels. */
+export function RouteSign({ hops, label, footer, vertical }: { hops: Hop[]; label: string; footer?: ReactNode; vertical?: boolean }) {
+  // Tailwind needs literal class names, so the horizontal variants are dropped wholesale when vertical.
+  const h = (cls: string) => (vertical ? cls.split(" ").filter((c) => !c.startsWith("sm:")).join(" ") : cls);
   return (
     <figure
-      className="sign rounded-[6px] bg-[#0b3d91] px-5 pt-5 pb-4 text-white sm:pr-12"
+      className={h("sign rounded-[6px] bg-[#0b3d91] px-5 pt-5 pb-4 text-white sm:pr-12")}
       style={{ "--n": hops.length } as CSSProperties}
     >
       <nav aria-label={label}>
@@ -75,19 +80,19 @@ export function RouteSign({ hops, label, footer }: { hops: Hop[]; label: string;
           {/* The route: vertical on phones, horizontal from first to last destination on wider screens. */}
           <span
             aria-hidden
-            className="absolute top-2 bottom-2 left-[8px] w-2 bg-white sm:top-[6px] sm:bottom-auto sm:left-[calc(100%/(2*var(--n)))] sm:h-2 sm:w-auto sm:right-[calc(100%/(2*var(--n))-30px)]"
+            className={h("absolute top-2 bottom-2 left-[8px] w-2 bg-white sm:top-[6px] sm:bottom-auto sm:left-[calc(100%/(2*var(--n)))] sm:h-2 sm:w-auto sm:right-[calc(100%/(2*var(--n))-30px)]")}
           />
           <span
             aria-hidden
-            className="absolute bottom-[-6px] left-[2px] size-0 border-x-[10px] border-t-[14px] border-x-transparent border-t-white sm:top-[-1px] sm:bottom-auto sm:left-auto sm:right-[calc(100%/(2*var(--n))-44px)] sm:border-y-[11px] sm:border-r-0 sm:border-l-[16px] sm:border-y-transparent sm:border-t-transparent sm:border-l-white"
+            className={h("absolute bottom-[-6px] left-[2px] size-0 border-x-[10px] border-t-[14px] border-x-transparent border-t-white sm:top-[-1px] sm:bottom-auto sm:left-auto sm:right-[calc(100%/(2*var(--n))-44px)] sm:border-y-[11px] sm:border-r-0 sm:border-l-[16px] sm:border-y-transparent sm:border-t-transparent sm:border-l-white")}
           />
-        <ol className="relative flex flex-col gap-4 sm:grid sm:gap-0 sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]">
+        <ol className={h("relative flex flex-col gap-4 sm:grid sm:gap-0 sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]")}>
           {hops.map((hop) => (
-            <li key={hop.key} className="relative flex min-w-0 items-start gap-3 sm:flex-col sm:items-center sm:gap-2.5 sm:px-1.5">
-              <span className="flex w-6 justify-center sm:h-5 sm:w-auto sm:items-center">
+            <li key={hop.key} className={h("relative flex min-w-0 items-start gap-3 sm:flex-col sm:items-center sm:gap-2.5 sm:px-1.5")}>
+              <span className={h("flex w-6 justify-center sm:h-5 sm:w-auto sm:items-center")}>
                 <Marker tone={hop.tone ?? "ok"} current={hop.current} />
               </span>
-              <Label hop={hop} />
+              <Label hop={hop} vertical={vertical} />
             </li>
           ))}
         </ol>

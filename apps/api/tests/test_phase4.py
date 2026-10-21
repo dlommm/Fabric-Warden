@@ -234,6 +234,8 @@ async def test_asset_lifecycle_calendar_and_findings(infra, owner):
     kinds = {(f["kind"], f.get("asset_id") or f.get("device_id")) for f in (await owner.get("/api/assets/findings")).json()["items"]}
     assert ("expiring", lic["id"]) in kinds and ("expiring", dev["Gateway"]["id"]) in kinds
     assert {k for k, _ in kinds} == {"expiring", "expired", "low_stock"}
+    titles = [f["title"] for f in (await owner.get("/api/assets/findings")).json()["items"]]
+    assert "Old UPS: warranty ended 5 days ago" in titles
     summary = (await owner.get("/api/assets/summary")).json()
     assert summary["spend"] == {"USD": "49.50"} and summary["due_within_90_days"] == 1
     assert "Spare PSU" in (await owner.get("/api/assets/export.csv")).text
@@ -257,6 +259,7 @@ async def test_topology_layers_and_vlan_overlay(infra, owner):
 
     logical = (await owner.get("/api/topology", params={"layer": "logical"})).json()
     assert {n["type"] for n in logical["nodes"]} == {"device", "network"}
+    assert any(n.get("zone") for n in logical["nodes"] if n["type"] == "network")
     with_clients = (await owner.get("/api/topology", params={"clients": True})).json()
     assert any(n["type"] == "client" for n in with_clients["nodes"])
 
@@ -324,7 +327,7 @@ async def test_demo_layout_seed_and_remove(infra, owner):
     ).json()
     assert [h["cable"]["label"] for h in t["hops"]] == ["C-0004", "C-0003"] and t["b"]["name"] == "Core Aggregation"
     hits = (await owner.get("/api/inventory/search", params={"q": "runbook"})).json()["results"]
-    assert any(h["kind"] == "page" for h in hits)
+    assert any(h["kind"] == "doc" for h in hits)
     assert any(h["kind"] == "rack" for h in (await owner.get("/api/inventory/search", params={"q": "rack a"})).json()["results"])
 
     removed = (await owner.delete("/api/dcim/demo")).json()["removed"]
@@ -346,3 +349,15 @@ async def test_viewer_cannot_edit_and_disabled_module_blocks(app, infra, owner):
     await owner.post("/api/dcim/racks", json={"name": "audit me"})
     actions = {r["action"] for r in (await owner.get("/api/audit")).json()["records"]}
     assert "dcim.rack.create" in actions and rack["name"] == "R1"
+
+
+async def test_item_listing_and_reference_preview(infra, owner):
+    rack = await _rack(owner, name="Rack P")
+    await _item(owner, rack, name="pp", kind="patch_panel", position=1, port_count=12)
+    await _item(owner, rack, name="srv", kind="server", position=2)
+    items = (await owner.get("/api/dcim/items")).json()["items"]
+    assert {(i["name"], i["rack"]) for i in items} == {("pp", "Rack P"), ("srv", "Rack P")}
+    assert [i["name"] for i in (await owner.get("/api/dcim/items", params={"kind": "patch_panel"})).json()["items"]] == ["pp"]
+    refs = (await owner.post("/api/wiki/references", json={"body": "[[rack:Rack P]] and [[device:Nope]]"})).json()["references"]
+    assert [r["resolved"] for r in refs] == [True, False]
+    assert (await owner.get("/api/wiki/pages")).json()["items"] == []  # preview saves nothing

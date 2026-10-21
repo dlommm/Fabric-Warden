@@ -10,6 +10,9 @@ PostgreSQL in deployment, SQLite for development and tests. Schema managed by Al
 
 `clients` and `devices` also carry user-owned fields discovery never overwrites: `labels`, client `alias`/`owner`/`notes`, device `notes` and `asset` (JSON asset record).
 
+## Phase 4 tables
+`dcim_locations`, `dcim_racks`, `dcim_rack_items` (optional unique link to a device), `dcim_cables`, `dcim_cable_ends` (two per cable), `dcim_power_feeds`, `dcim_power_links`, `assets`, `doc_pages`, `doc_versions`. All user-owned with `is_demo`. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
+
 ## Phase 3 tables
 `metric_series`, `metric_samples` (tiered metric history), `dashboards`, `alert_rules`, `alerts`, `maintenance_windows`, `notification_channels` (secrets in `credentials`), `notification_deliveries`. See [ANALYTICS.md](ANALYTICS.md).
 

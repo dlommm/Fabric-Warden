@@ -573,5 +573,5 @@ async def _search_infra(db: DB, state: State, like: str) -> list[dict[str, Any]]
             select(DocPage).where(or_(func.lower(DocPage.title).like(like), func.lower(DocPage.body).like(like))).limit(5)
         )
         for p in pages:
-            out.append(_hit("page", p.id, p.title, f"Docs · v{p.version}", f"/docs/{p.slug}", p.is_demo))
+            out.append(_hit("doc", p.id, p.title, f"Docs · v{p.version}", f"/docs/{p.slug}", p.is_demo))
     return out

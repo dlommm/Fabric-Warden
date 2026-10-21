@@ -358,8 +358,10 @@ export interface Finding {
   kind: string;
   severity: "critical" | "warning" | "info";
   title: string;
-  detail: string;
+  detail?: string;
   refs: { prefix_id?: string; network_id?: string; reservation_id?: string; address?: string };
+  /** Overrides the IPAM link resolution (Phase 4 findings link to racks, cables, assets). */
+  href?: string;
 }
 
 export interface VlanRow {
@@ -577,4 +579,339 @@ export interface WanOverview {
     timeout_ms: number;
     results: { target: string; host: string; port: number; label: string; latency_ms: number | null; loss_pct: number | null; last_ts: string | null; stale: boolean }[];
   };
+}
+
+// -- Phase 4: infrastructure ------------------------------------------------------------
+
+export type RackItemKind = "device" | "server" | "patch_panel" | "pdu" | "ups" | "shelf" | "cable_manager" | "blank" | "other";
+
+export interface InfraFinding {
+  key: string;
+  kind: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail?: string;
+  rack_id?: string;
+  device_id?: string;
+  item_id?: string;
+  cable_id?: string;
+  source_id?: string;
+  asset_id?: string;
+  date?: string;
+}
+
+export interface Location {
+  id: string;
+  parent_id: string | null;
+  site_id: string | null;
+  kind: "site" | "building" | "floor" | "room" | "row" | "cage";
+  name: string;
+  description: string;
+  rack_count: number;
+  is_demo: boolean;
+}
+
+export interface Occupancy {
+  used_u: number;
+  planned_u: number;
+  free_u: number;
+  utilisation_pct: number;
+  documented_draw_w: number;
+}
+
+export interface RackSummary {
+  id: string;
+  name: string;
+  location_id: string | null;
+  location: string | null;
+  u_height: number;
+  descending_units: boolean;
+  width_in: number;
+  depth_mm: number | null;
+  status: "active" | "planned" | "retired";
+  description: string;
+  item_count: number;
+  occupancy: Occupancy;
+  is_demo: boolean;
+}
+
+export interface RackItem {
+  id: string;
+  rack_id: string;
+  name: string;
+  kind: RackItemKind;
+  position: number | null;
+  height_u: number;
+  face: "front" | "rear";
+  full_depth: boolean;
+  status: "installed" | "planned" | "removed";
+  device_id: string | null;
+  device: { id: string; name: string; model: string; state: string; ip_address: string | null; present: boolean } | null;
+  manufacturer: string;
+  model: string;
+  serial: string;
+  port_count: number;
+  connector: string;
+  power_draw_w: number | null;
+  power_capacity_w: number | null;
+  outlet_count: number;
+  runtime_full_load_min: number | null;
+  notes: string;
+  is_demo: boolean;
+}
+
+export interface RackDetail extends RackSummary {
+  units: { unit: number; label: number; front: string | null; rear: string | null }[];
+  items: RackItem[];
+  unplaced: string[];
+  conflicts: { kind: string; items: string[]; detail: string }[];
+}
+
+export interface CableEndView {
+  kind: "device_port" | "panel_port" | "item" | "external";
+  port_idx: number | null;
+  side: "front" | "rear" | null;
+  text: string;
+  device_id?: string;
+  item_id?: string;
+  name: string;
+  rack?: string | null;
+  port?: { state: string; speed_mbps: number | null; connector: string } | null;
+  summary: string;
+  is_demo?: boolean;
+}
+
+export interface CableRow {
+  id: string;
+  label: string;
+  type: string;
+  medium: "copper" | "fiber" | "power";
+  color: string;
+  length_m: number | null;
+  status: "planned" | "installed" | "decommissioned";
+  description: string;
+  a: CableEndView | null;
+  b: CableEndView | null;
+  is_demo: boolean;
+}
+
+export interface TraceHop {
+  cable: { id: string; label: string; type: string; color: string; status: string };
+  from: CableEndView;
+  to: CableEndView;
+}
+
+export interface Trace {
+  hops: TraceHop[];
+  a: CableEndView | null;
+  b: CableEndView | null;
+  complete: boolean;
+}
+
+export interface PanelView {
+  id: string;
+  name: string;
+  rack: string | null;
+  connector: string;
+  used: number;
+  ports: {
+    port: number;
+    front: { cable_id: string; label: string; status: string; far: CableEndView } | null;
+    rear: { cable_id: string; label: string; status: string; far: CableEndView } | null;
+  }[];
+}
+
+export interface PowerLoad {
+  capacity_w: number | null;
+  load_w: number;
+  failover_load_w: number;
+  projected_failover_w: number;
+  utilisation_pct: number | null;
+  failover_utilisation_pct: number | null;
+  projected_utilisation_pct: number | null;
+  headroom_w: number | null;
+  runtime_estimate_min?: number;
+}
+
+export interface PowerNode extends Partial<PowerLoad> {
+  link_id: string;
+  outlet: number | null;
+  input: string;
+  item_id: string;
+  name: string;
+  kind: RackItemKind;
+  status: string;
+  rack: string | null;
+  draw_w: number | null;
+  inputs: number;
+  is_demo: boolean;
+  children?: PowerNode[];
+}
+
+export interface PowerTree extends PowerLoad {
+  id: string;
+  kind: "feed" | "ups" | "pdu";
+  name: string;
+  voltage_v?: number;
+  amperage_a?: number;
+  max_utilisation_pct?: number;
+  description?: string;
+  is_demo: boolean;
+  children: PowerNode[];
+}
+
+export interface PoeSwitch {
+  device_id: string;
+  name: string;
+  model: string;
+  poe_ports: number;
+  active_ports: number;
+  upper_bound_w: number;
+  ports: { idx: number; standard: string | null; type: number | null; state: string | null }[];
+  is_demo: boolean;
+}
+
+export type AssetKind = "hardware" | "spare" | "licence" | "subscription" | "consumable";
+export type AssetStatus = "ordered" | "in_service" | "spare" | "in_repair" | "retired" | "disposed";
+
+export interface Asset {
+  id: string;
+  name: string;
+  kind: AssetKind;
+  status: AssetStatus;
+  asset_tag: string;
+  vendor: string;
+  model: string;
+  serial: string;
+  quantity: number;
+  min_quantity: number | null;
+  supplier: string;
+  order_ref: string;
+  purchase_date: string | null;
+  purchase_cost: string | null;
+  currency: string;
+  warranty_until: string | null;
+  support_until: string | null;
+  end_of_sale: string | null;
+  end_of_life: string | null;
+  seats: number | null;
+  expires_on: string | null;
+  auto_renew: boolean;
+  device_id: string | null;
+  device: string | null;
+  rack_item_id: string | null;
+  rack_item: string | null;
+  location_id: string | null;
+  location: string | null;
+  labels: string[];
+  notes: string;
+  next_date: { date: string; label: string; days: number } | null;
+  is_demo: boolean;
+}
+
+export interface CalendarEntry {
+  source: "asset" | "device";
+  id: string;
+  name: string;
+  kind: string;
+  field: string;
+  label: string;
+  date: string;
+  days: number;
+  auto_renew: boolean;
+  is_demo: boolean;
+}
+
+export interface AssetSummary {
+  total: number;
+  active: number;
+  by_kind: Record<string, number>;
+  by_status: Record<string, number>;
+  spend: Record<string, string>;
+  due_within_90_days: number;
+}
+
+export interface TopoNode {
+  id: string;
+  type: "device" | "client" | "network";
+  role: string;
+  name: string;
+  model?: string;
+  ip_address?: string | null;
+  state?: string;
+  health: "ok" | "degraded" | "down" | "alerting" | "disabled";
+  alerts?: number;
+  depth: number;
+  clients?: number;
+  placement?: string | null;
+  vlan_clients?: number | null;
+  vlan_id?: number | null;
+  cidr?: string | null;
+  network?: string | null;
+  enabled?: boolean;
+  highlight?: boolean;
+  zone?: string | null;
+  is_demo: boolean;
+}
+
+export interface TopoEdge {
+  id: string;
+  source: string;
+  target: string;
+  kind: "uplink" | "client" | "routes";
+  tx_bps?: number | null;
+  rx_bps?: number | null;
+  in_vlan: boolean;
+}
+
+export interface Topology {
+  layer: "physical" | "logical";
+  vlan: number | null;
+  nodes: TopoNode[];
+  edges: TopoEdge[];
+  vlans: { vlan_id: number; name: string }[];
+  notes: string[];
+}
+
+export interface DocSummary {
+  id: string;
+  slug: string;
+  title: string;
+  parent_id: string | null;
+  tags: string[];
+  version: number;
+  updated_by: string;
+  updated_at: string;
+  is_demo: boolean;
+}
+
+export interface DocRef {
+  raw: string;
+  type: string;
+  key: string;
+  text: string | null;
+  resolved: boolean;
+  id?: string;
+  label?: string;
+  href?: string;
+  state?: string | null;
+  detail?: string;
+  is_demo?: boolean;
+}
+
+export interface DocPage extends DocSummary {
+  body: string;
+  references: DocRef[];
+  children: DocSummary[];
+  parent: DocSummary | null;
+  backlinks: DocSummary[];
+}
+
+export interface DocVersion {
+  version: number;
+  title: string;
+  message: string;
+  author: string;
+  created_at: string;
+  size: number;
 }

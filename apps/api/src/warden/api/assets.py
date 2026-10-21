@@ -32,6 +32,8 @@ Editor = Allowed(P.DCIM_EDIT)
 Kind = Literal["hardware", "spare", "licence", "subscription", "consumable"]
 Status = Literal["ordered", "in_service", "spare", "in_repair", "retired", "disposed"]
 INACTIVE = {"retired", "disposed"}
+# Past-tense wording for findings: "warranty ended 30 days ago", not "warranty ends passed".
+PAST = {"warranty_until": "warranty ended", "support_until": "support ended", "expires_on": "expired", "end_of_life": "reached end of life"}
 SOON_DAYS = 90
 # (field, what it means) in the order a renewal calendar reads them.
 DATES = (
@@ -330,7 +332,7 @@ async def findings(db: DB, principal: Reader) -> dict:
                         "key": f"{f}:{a.id}",
                         "kind": "expired",
                         "severity": sev,
-                        "title": f"{a.name}: {label.lower()} passed {-days} days ago",
+                        "title": f"{a.name}: {PAST[f]} {-days} days ago",
                         "asset_id": a.id,
                         "date": d,
                     }
