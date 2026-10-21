@@ -40,6 +40,7 @@ class AppState:
     simulator: SimulatorState = field(default_factory=SimulatorState)
     _sim_app: FastAPI | None = None
     host_sim: HostSimState = field(default_factory=HostSimState)
+    syslog: Any = None  # warden.syslog.Ingest, created in build_state
     _host_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
     # Seams for outbound I/O so tests never reach a real network.
     http_transport: httpx.AsyncBaseTransport | None = None  # notification webhooks / ntfy

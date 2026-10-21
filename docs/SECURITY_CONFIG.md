@@ -37,3 +37,15 @@ Built-in controls are evaluated on request against the platform's own data. Each
 | Every server is a known network client | a Servers host matches no client (unknown without Servers) |
 
 A failing control can be **waived** with a reason and an expiry (`compliance:manage`, owner/admin); waivers are audited and lapse automatically. `GET /api/compliance/evidence.csv` exports every control with its evidence. Custom baselines are not implemented yet.
+
+## Log Management (`/api/logs`) — Phase 5b
+
+A UDP syslog receiver runs inside the API when `WARDEN_SYSLOG_PORT` is set (the compose file sets 5514 and publishes it on **localhost only**; set `WARDEN_SYSLOG_BIND=0.0.0.0` in `deploy/.env` to receive from the LAN). Messages are parsed as RFC 5424, RFC 3164 or a CEF payload inside either, matched to a device or client by sender address, and written in batches every 2 s; a full buffer drops messages (counted) rather than blocking. Categories (firewall, ids, auth, system, other) are a **keyword heuristic**, not a per-vendor parser. UniFi's own CEF field set is not specially mapped because it has not been verified against a published reference. Retention: `WARDEN_LOG_RETENTION_DAYS` (14) and `WARDEN_LOG_MAX_ROWS` (2 000 000), enforced hourly. TCP syslog and TLS are not implemented. **Load demo logs** feeds labelled synthetic lines through the same parser.
+
+## Security Operations (`/api/soc`) — Phase 5b
+
+One queue of **signals** computed live from firewall findings (shadowed, permissive inbound), failing compliance controls, firing alerts, IDS events grouped by source, and repeated failed logins (5+ from one address in 24 h). Signals are not stored; a **case** records the decision: severity, status (open, investigating, resolved, false positive), assignee, linked entities and a timeline of notes and status changes, all audited. `soc:manage` (owner, admin, operator) opens and updates cases. IDS/IPS events only arrive through syslog; the official UniFi API does not expose them.
+
+## Investigation workbench (`/api/investigate?q=`) — Phase 5b
+
+Resolves an IP address, MAC address or name to the clients, devices, servers and workloads it matches (a match brings in their addresses), then merges onto one timeline: inventory events, client sightings, log lines from or mentioning those addresses, alerts, audit records and SOC cases, over 1–90 days.

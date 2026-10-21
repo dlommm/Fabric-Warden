@@ -472,7 +472,66 @@ COMPLIANCE = ModuleManifest(
     warnings=["Custom baselines are not implemented yet; the built-in controls are fixed."],
 )
 
+LOGS = ModuleManifest(
+    id="logs",
+    version=VERSION,
+    name="Log Management",
+    category=C.SECURITY,
+    description="Syslog receiver (RFC 3164, RFC 5424, CEF) with search, categories, per-source volume and retention.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    nav=[NavEntry(label="Logs", href="/logs", icon="scroll", section="Security")],
+    jobs=[JobDecl(id="logs.retention", title="Expire old log events", default_interval_seconds=3600)],
+    resources=ResourceEstimate(memory_mb=64, disk_mb_per_day=200),
+    data_ownership=["log_events"],
+    warnings=[
+        "The receiver listens only when WARDEN_SYSLOG_PORT is set (UDP). Categories are a keyword heuristic, not a parser per vendor; "
+        "UniFi's CEF field set is not specially mapped because it has not been verified against a published reference."
+    ],
+)
+
+SOC = ModuleManifest(
+    id="soc",
+    version=VERSION,
+    name="Security Operations Center",
+    category=C.SECURITY,
+    description="One queue of security signals from firewall analysis, compliance, alerts and logs, with cases to work them.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    optional=["firewall", "compliance", "monitoring", "logs"],
+    permissions=["soc:manage"],
+    nav=[NavEntry(label="SOC", href="/soc", icon="siren", section="Security")],
+    resources=ResourceEstimate(memory_mb=16),
+    data_ownership=["soc_cases"],
+    warnings=["IDS/IPS events are only available through syslog; the official UniFi API does not expose them."],
+)
+
+INVESTIGATIONS = ModuleManifest(
+    id="investigations",
+    version=VERSION,
+    name="Investigation Workbench",
+    category=C.SECURITY,
+    description="Pivot from an IP, MAC or name to every client, device, server, log line, alert, change and case that mentions it.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    optional=["client-intel", "logs", "servers", "soc"],
+    nav=[NavEntry(label="Investigate", href="/investigate", icon="search", section="Security")],
+    resources=ResourceEstimate(memory_mb=8),
+)
+
 PLANNED: list[ModuleManifest] = [
+    _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
+    _planned(
+        "change-engine",
+        "Change Approval & Recovery",
+        C.AUTOMATION,
+        6,
+        "Central transactional write path with approvals, verification and guarded rollback.",
+        ["unifi-network"],
+    ),
     _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
     ),
@@ -500,26 +559,6 @@ PLANNED: list[ModuleManifest] = [
         "IPFIX/NetFlow collection, top talkers and conversations.",
         memory_mb=512,
         containers=["flow-collector", "clickhouse"],
-    ),
-    _planned(
-        "logs",
-        "Log Management",
-        C.OBSERVABILITY,
-        5,
-        "Syslog/CEF ingestion, parsing, search and alert rules.",
-        memory_mb=256,
-        containers=["syslog-collector"],
-    ),
-    _planned("soc", "Security Operations Center", C.SECURITY, 5, "Findings, posture, IDS/IPS events and security incidents.", ["logs"]),
-    _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
-    _planned("investigations", "Investigation Workbench", C.SECURITY, 5, "Pivot from alerts to clients, flows, logs and changes.", ["soc"]),
-    _planned(
-        "change-engine",
-        "Change Approval & Recovery",
-        C.AUTOMATION,
-        6,
-        "Central transactional write path with approvals, verification and guarded rollback.",
-        ["unifi-network"],
     ),
     _planned(
         "bulk-ops", "Bulk Operations", C.AUTOMATION, 6, "Capability-verified bulk PoE, port and device operations.", ["change-engine"]
@@ -571,6 +610,9 @@ CATALOG: dict[str, ModuleManifest] = {
         FIREWALL,
         CONFIG_HISTORY,
         COMPLIANCE,
+        LOGS,
+        SOC,
+        INVESTIGATIONS,
         *PLANNED,
     ]
 }

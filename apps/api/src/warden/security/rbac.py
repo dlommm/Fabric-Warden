@@ -22,6 +22,7 @@ class P(StrEnum):
     CONTROLLERS_READ = "controllers:read"
     CONTROLLERS_MANAGE = "controllers:manage"
     COMPLIANCE_MANAGE = "compliance:manage"  # waive controls
+    SOC_MANAGE = "soc:manage"  # open and work security cases
     SERVERS_MANAGE = "servers:manage"  # host connections hold API credentials; read-only access to the hosts
     MODULES_READ = "modules:read"
     MODULES_MANAGE = "modules:manage"
@@ -50,6 +51,7 @@ ROLES: dict[str, frozenset[P]] = {
             P.ANALYTICS_EDIT,
             P.DCIM_EDIT,
             P.DOCS_EDIT,
+            P.SOC_MANAGE,
             P.MONITORING_MANAGE,
             P.CONTROLLERS_READ,
             P.MODULES_READ,

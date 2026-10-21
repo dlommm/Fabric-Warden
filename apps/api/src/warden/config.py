@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     public_url: str | None = None
     run_migrations_on_start: bool = True
 
+    # Syslog receiver (Log Management). 0 disables it; 514 needs privileges, so the default compose maps 5514.
+    syslog_port: int = 0
+    syslog_bind: str = "0.0.0.0"  # noqa: S104 - a receiver must listen on the LAN; set 127.0.0.1 to restrict
+    log_retention_days: int = 14
+    log_max_rows: int = 2_000_000
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -36,6 +36,7 @@ from warden.models.platform import (
     Setting,
     User,
 )
+from warden.models.security import LogEvent, SocCase
 from warden.models.servers import Host, HostConnection, HostStorage, Workload
 
 __all__ = [
@@ -67,6 +68,7 @@ __all__ = [
     "IpReservation",
     "JobRun",
     "Location",
+    "LogEvent",
     "MaintenanceWindow",
     "MetricSample",
     "MetricSeries",
@@ -83,6 +85,7 @@ __all__ = [
     "RoleAssignment",
     "Setting",
     "Site",
+    "SocCase",
     "User",
     "VlanRecord",
     "Wan",

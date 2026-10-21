@@ -28,11 +28,14 @@ from warden.api import (
     docs,
     firewall,
     inventory,
+    investigate,
     ipam,
+    logs,
     modules,
     notifications,
     power,
     servers,
+    soc,
     system,
     topology,
     users,
@@ -49,6 +52,7 @@ from warden.jobs import JobContext, JobSpec, Scheduler
 from warden.models import AuthSession, JobRun, NotificationDelivery
 from warden.modules.service import ModuleService
 from warden.security.vault import Vault, load_master_key
+from warden.syslog import Ingest, retention_job
 
 log = logging.getLogger("warden")
 
@@ -82,6 +86,8 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(JobSpec("unifi-network.sync", "unifi-network", "Poll controllers and sync inventory", sync_job, 60))
     state.scheduler.register(JobSpec("monitoring.evaluate", "monitoring", "Evaluate alert rules", monitoring.evaluate_job, 60))
     state.scheduler.register(JobSpec("wan.probe", "wan", "Probe latency and loss", probe_job, 60))
+    state.syslog = Ingest(state)
+    state.scheduler.register(JobSpec("logs.retention", "logs", "Expire old log events", retention_job, 3600))
     state.scheduler.register(JobSpec("servers.sync", "servers", "Poll servers and hypervisors", servers_sync_job, 60))
     return state
 
@@ -109,9 +115,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await db.commit()
         if settings.scheduler_enabled:
             state.scheduler.start(settings.scheduler_tick_seconds)
+        if settings.syslog_port:
+            await state.syslog.start(settings.syslog_bind, settings.syslog_port)
         log.info("Fabric Warden %s started", __version__)
         yield
         await state.scheduler.stop()
+        await state.syslog.stop()
         await state.db.dispose()
 
     app = FastAPI(
@@ -164,6 +173,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         firewall.router,
         config_history.router,
         compliance.router,
+        logs.router,
+        soc.router,
+        investigate.router,
         system.router,
     ):
         app.include_router(r)

@@ -33,7 +33,7 @@ async def test_enable_requires_dependencies(owner):
 
 
 async def test_planned_module_cannot_be_enabled(owner):
-    r = await owner.post("/api/modules/logs/enable", json={"with_dependencies": True})
+    r = await owner.post("/api/modules/flows/enable", json={"with_dependencies": True})
     assert r.status_code == 409
     assert "not yet implemented" in r.json()["detail"]["message"]
 
@@ -81,8 +81,11 @@ async def test_full_preset_reports_unavailable(owner):
         "firewall",
         "config-history",
         "compliance",
+        "logs",
+        "soc",
+        "investigations",
     }
-    assert "logs" in r["unavailable"] and "ai-agents" in r["unavailable"]
+    assert "flows" in r["unavailable"] and "ai-agents" in r["unavailable"]
 
 
 async def test_module_listing_shape(owner):

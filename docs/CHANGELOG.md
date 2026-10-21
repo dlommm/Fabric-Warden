@@ -2,6 +2,7 @@
 
 ## 0.1.0 — unreleased
 - Phase 0 research: UniFi Network/Protect official API matrices.
+- Phase 5b (backend): Log Management (UDP syslog receiver, RFC 3164/5424/CEF parsing, search, stats, retention), SOC (signals + cases), Investigation workbench. New permission `soc:manage`. Migration `0007`. Compose publishes syslog on localhost:5514/udp.
 - Phase 5a (backend): Firewall & Policy Manager (exact shadowing/redundancy analysis, zone matrix), Configuration History (snapshots on change, semantic diffs, baseline/drift, `config.changed`), Policy & Compliance (11 controls, waivers, evidence CSV). New permission `compliance:manage`. Migration `0006`.
 - Phase 4b: Servers & Virtualization — read-only Proxmox VE, Unraid (GraphQL API), Docker Engine and node_exporter collectors with simulators; hosts, VMs/LXCs and containers matched to network clients; storage, disk, UPS and autostart findings; host metrics. New permission `servers:manage`. Migration `0005`.
 - Phase 4a: Rack & DCIM (locations, elevations, occupancy validation), Cabling & Fiber (tracing through patch panels, schedule, labels), Power & Environment (feeds, UPS/PDU chains, failover load, runtime estimate, PoE upper bound), Asset Lifecycle (renewal calendar, expiry and stock findings), Network Topology (uplink tree, logical view, VLAN overlay), Documentation & Wiki (versioned pages with live inventory references); labelled demo layout; search covers racks, cables, assets and pages. New permissions `dcim:edit`, `docs:edit`. Migration `0004`.

@@ -42,9 +42,14 @@ services:
       WARDEN_SECRET_KEY: ${WARDEN_SECRET_KEY:?set WARDEN_SECRET_KEY in deploy/.env}
       WARDEN_COOKIE_SECURE: ${WARDEN_COOKIE_SECURE:-true}
       WARDEN_DEMO_CONTROLLER_ENABLED: ${WARDEN_DEMO_CONTROLLER_ENABLED:-true}
+      WARDEN_SYSLOG_PORT: "5514"
     volumes:
       - data:/data
-    # Not published: only the web container talks to the API.
+    # The HTTP API is not published: only the web container talks to it.
+    # Syslog (UDP) is published on localhost only; set WARDEN_SYSLOG_BIND=0.0.0.0
+    # in deploy/.env to receive logs from your gateway and servers.
+    ports:
+      - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
 
   web:
     build:
