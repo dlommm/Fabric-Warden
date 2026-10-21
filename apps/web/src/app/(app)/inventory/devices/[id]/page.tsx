@@ -2,23 +2,24 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, Plus, Zap } from "lucide-react";
+import { ChevronLeft, Pencil, Plus, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { type Hop, RouteSign } from "@/components/route-sign";
 import { Button } from "@/components/ui/button";
-import { Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Textarea } from "@/components/ui/field";
 import { EmptyState, KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { Chip, DeviceState, ProvenanceLine, StateLabel, deviceTone } from "@/components/ui/signs";
 import { ApiError, get, patch } from "@/lib/api";
 import { describeEvent } from "@/lib/events";
 import { ROLE_LABEL, ago, bps, dateTime, deviceRole, speed, uptime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { DeviceDetail, DeviceSummary, Port } from "@/lib/types";
+import type { AssetRecord, DeviceDetail, DeviceSummary, Port } from "@/lib/types";
 
 export default function DevicePage() {
   const { id } = useParams<{ id: string }>();
+  const { moduleEnabled } = useSession();
   const q = useQuery({ queryKey: ["device", id], queryFn: () => get<DeviceDetail>(`/api/inventory/devices/${id}`) });
   const all = useQuery({ queryKey: ["devices", "all"], queryFn: () => get<{ items: DeviceSummary[] }>("/api/inventory/devices") });
 
@@ -89,7 +90,10 @@ export default function DevicePage() {
               ]}
             />
           </Panel>
-          <MetadataPanel d={d} />
+          <div className="flex flex-col gap-[var(--gap)]">
+            <AssetPanel d={d} />
+            <MetadataPanel d={d} />
+          </div>
         </div>
 
         {d.ports.length > 0 && (
@@ -147,7 +151,7 @@ export default function DevicePage() {
                 ))}
                 {d.clients.map((c) => (
                   <li key={c.id} className="flex min-h-[var(--row-h)] items-center gap-3 border-b border-rule px-4 py-1.5 last:border-b-0">
-                    <Link href={`/inventory/clients?q=${encodeURIComponent(c.name)}`} className="font-semibold hover:underline">{c.name}</Link>
+                    <Link href={moduleEnabled("client-intel") ? `/inventory/clients/${c.id}` : `/inventory/clients?q=${encodeURIComponent(c.name)}`} className="font-semibold hover:underline">{c.name}</Link>
                     <span className="font-mono text-sm text-ink-3">{c.ip_address}</span>
                     <span className="ml-auto text-sm text-ink-3">{c.type.toLowerCase()}</span>
                   </li>
@@ -281,8 +285,8 @@ function MetadataPanel({ d }: { d: DeviceDetail }) {
           <Chip key={l}>
             {l}
             {editable && (
-              <button type="button" className="ml-1.5 text-ink-3 hover:text-crit" aria-label={`Remove label ${l}`} onClick={() => save.mutate({ labels: d.labels.filter((x) => x !== l) })}>
-                ×
+              <button type="button" className="-mr-1 ml-1 rounded-[2px] p-0.5 text-ink-3 hover:text-crit" aria-label={`Remove label ${l}`} onClick={() => save.mutate({ labels: d.labels.filter((x) => x !== l) })}>
+                <X className="size-3.5" aria-hidden />
               </button>
             )}
           </Chip>
@@ -306,4 +310,104 @@ function MetadataPanel({ d }: { d: DeviceDetail }) {
       </div>
     </Panel>
   );
+}
+
+const ASSET_FIELDS: { key: keyof AssetRecord; label: string; date?: boolean; mono?: boolean; placeholder?: string }[] = [
+  { key: "asset_tag", label: "Asset tag", mono: true, placeholder: "FW-0042" },
+  { key: "serial_number", label: "Serial number", mono: true, placeholder: "From the device label" },
+  { key: "location", label: "Location", placeholder: "Rack A, U12" },
+  { key: "owner", label: "Owner", placeholder: "Person or team" },
+  { key: "supplier", label: "Supplier" },
+  { key: "purchased_on", label: "Purchased", date: true },
+  { key: "warranty_until", label: "Warranty until", date: true },
+];
+
+function warranty(until?: string) {
+  if (!until) return null;
+  const days = Math.ceil((new Date(`${until}T00:00:00`).getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return <StateLabel tone="warn">Expired {Math.abs(days)} day{days === -1 ? "" : "s"} ago</StateLabel>;
+  if (days <= 90) return <StateLabel tone="warn">Ends in {days} day{days === 1 ? "" : "s"}</StateLabel>;
+  return <StateLabel tone="ok">In warranty</StateLabel>;
+}
+
+function AssetPanel({ d }: { d: DeviceDetail }) {
+  const { can } = useSession();
+  const qc = useQueryClient();
+  const editable = can("inventory:edit");
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState<AssetRecord>(d.asset);
+  const [err, setErr] = useState<string | null>(null);
+  const save = useMutation({
+    mutationFn: () =>
+      patch(`/api/inventory/devices/${d.id}`, {
+        asset: Object.fromEntries(Object.entries(form).map(([k, v]) => [k, typeof v === "string" && v.trim() ? v.trim() : null])),
+      }),
+    onSuccess: () => {
+      setErr(null);
+      setEditing(false);
+      qc.invalidateQueries({ queryKey: ["device", d.id] });
+      qc.invalidateQueries({ queryKey: ["devices"] });
+    },
+    onError: (e) => setErr(e instanceof ApiError ? e.message : "Couldn't save."),
+  });
+  const empty = ASSET_FIELDS.every((f) => !d.asset[f.key]);
+  return (
+    <Panel
+      title="Asset record"
+      id="asset"
+      actions={editable && !editing && <Button size="sm" icon={<Pencil />} onClick={() => { setForm(d.asset); setEditing(true); }}>{empty ? "Add" : "Edit"}</Button>}
+    >
+      {editing ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            save.mutate();
+          }}
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          {ASSET_FIELDS.map((f) => (
+            <Field key={f.key} label={f.label}>
+              {(p) => (
+                <Input
+                  {...p}
+                  type={f.date ? "date" : "text"}
+                  className={f.mono ? "font-mono" : undefined}
+                  value={form[f.key] ?? ""}
+                  maxLength={128}
+                  placeholder={f.placeholder}
+                  onChange={(e) => setForm({ ...form, [f.key]: e.target.value })}
+                />
+              )}
+            </Field>
+          ))}
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+            <Button type="submit" variant="primary" size="sm" loading={save.isPending}>Save asset record</Button>
+            <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancel</Button>
+            {err && <span role="alert" className="text-sm font-semibold text-crit">{err}</span>}
+          </div>
+        </form>
+      ) : empty ? (
+        <p className="text-sm text-ink-3">
+          No asset details yet. The UniFi API doesn&apos;t report serial numbers or purchase data, so they come from you.
+        </p>
+      ) : (
+        <KeyValue
+          items={ASSET_FIELDS.filter((f) => d.asset[f.key]).map((f) => [
+            f.label,
+            f.key === "warranty_until" ? (
+              <span key={f.key} className="inline-flex flex-wrap items-center gap-x-3">{dateOnly(d.asset[f.key])} {warranty(d.asset.warranty_until)}</span>
+            ) : f.date ? (
+              dateOnly(d.asset[f.key])
+            ) : (
+              <span key={f.key} className={f.mono ? "font-mono" : undefined}>{d.asset[f.key]}</span>
+            ),
+          ])}
+        />
+      )}
+    </Panel>
+  );
+}
+
+function dateOnly(v?: string) {
+  return v ? new Date(`${v}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";
 }

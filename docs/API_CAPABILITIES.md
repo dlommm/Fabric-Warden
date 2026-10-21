@@ -38,6 +38,8 @@ API keys are per console: a key from a gateway does not authenticate against a s
 | FEC mode/state | Same |
 | Per-port CRC/symbol/discard and byte/packet counters | Same; port utilisation history needs SNMP or IPFIX |
 | DHCP lease table | IPAM shows configured pools and address-matched clients only |
+| Controller fixed-IP / DHCP reservations | IPAM reservations are local documentation; they are compared with observed clients, not with controller config |
+| Client OS / device-type fingerprint | Client Intelligence reports no fingerprint (`null`) rather than guessing |
 | LLDP neighbours | Topology uses controller-reported uplinks only |
 | IDS/IPS events | Needs syslog/CEF ingestion (Log Management, Phase 5) |
 | Historical statistics | Only `statistics/latest`; history must be collected by Fabric Warden |

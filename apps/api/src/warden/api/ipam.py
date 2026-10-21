@@ -508,8 +508,10 @@ async def list_vlans(db: DB, principal: Reader) -> dict:
             state = "deprecated_in_use" if rec.status == "deprecated" else "documented"
         elif rec:
             state = "unobserved" if rec.status == "active" else rec.status
-        else:
+        elif nets:
             state = "undocumented"
+        else:
+            state = "prefix_only"  # named only by a documented prefix
         items.append(
             {
                 "vlan_id": vid,

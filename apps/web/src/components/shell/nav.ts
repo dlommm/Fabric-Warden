@@ -1,4 +1,4 @@
-import { Blocks, Gauge, Laptop, Network, Router, ScrollText, Server, Users } from "lucide-react";
+import { Blocks, Gauge, Grid3x3, Laptop, Layers, Network, Router, ScrollText, Server, Users } from "lucide-react";
 
 export interface NavItem {
   label: string;
@@ -16,6 +16,8 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Devices", href: "/inventory/devices", icon: Router, module: "inventory", permission: "inventory:read" },
       { label: "Clients", href: "/inventory/clients", icon: Laptop, module: "inventory", permission: "inventory:read" },
       { label: "Networks", href: "/inventory/networks", icon: Network, module: "inventory", permission: "inventory:read" },
+      { label: "IP plan", href: "/ipam", icon: Grid3x3, module: "ipam", permission: "inventory:read" },
+      { label: "VLANs", href: "/ipam/vlans", icon: Layers, module: "ipam", permission: "inventory:read" },
     ],
   },
   {

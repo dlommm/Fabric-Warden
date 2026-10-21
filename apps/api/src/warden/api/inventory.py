@@ -485,7 +485,14 @@ async def search(db: DB, state: State, principal: Reader, q: Annotated[str, Quer
     ]
     if await state.modules.is_enabled(db, "ipam"):
         results += await _search_ipam(db, like, addr)
-    return {"results": results}
+
+    def rank(h: dict[str, Any]) -> int:
+        # Exact hits first (an IP, a hostname), then prefixes that contain the address.
+        if term == h["title"].lower() or term in h["subtitle"].lower().split(" · "):
+            return 0
+        return 1 if h["kind"] == "prefix" and addr is not None else 2
+
+    return {"results": sorted(results, key=rank)}
 
 
 async def _search_ipam(db: DB, like: str, addr: ipaddress.IPv4Address | ipaddress.IPv6Address | None) -> list[dict[str, Any]]:

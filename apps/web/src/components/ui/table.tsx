@@ -56,7 +56,7 @@ export function DataTable<T extends { id: string }>({
     setSort((s) => (s?.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       {columns.length > 4 && (
         <p className="border-b border-rule px-4 py-1.5 text-xs text-ink-3 md:hidden">Scroll sideways for {columns.length - 3} more columns →</p>
       )}

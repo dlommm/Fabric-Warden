@@ -37,6 +37,7 @@ export interface DeviceSummary {
   state: string;
   features: string[];
   labels: string[];
+  asset_tag?: string | null;
   site_id: string;
   cpu_pct: number | null;
   memory_pct: number | null;
@@ -73,8 +74,19 @@ export interface Radio {
   tx_retries_pct: number | null;
 }
 
+export interface AssetRecord {
+  asset_tag?: string;
+  serial_number?: string;
+  location?: string;
+  owner?: string;
+  supplier?: string;
+  purchased_on?: string;
+  warranty_until?: string;
+}
+
 export interface DeviceDetail extends DeviceSummary {
   notes: string;
+  asset: AssetRecord;
   stats: Record<string, unknown>;
   stats_observed_at: string | null;
   ports: Port[];
@@ -88,6 +100,9 @@ export interface DeviceDetail extends DeviceSummary {
 export interface ClientRow {
   id: string;
   name: string;
+  alias: string | null;
+  owner: string | null;
+  labels: string[];
   type: string;
   mac_address: string | null;
   ip_address: string | null;
@@ -221,4 +236,136 @@ export interface UserRow {
   mfa_enabled: boolean;
   last_login_at: string | null;
   created_at: string;
+}
+
+export interface ClientSighting {
+  id: string;
+  ip_address: string | null;
+  uplink: { id: string; name: string } | null;
+  type: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  duration_seconds: number;
+}
+
+export interface ClientDetail {
+  id: string;
+  name: string;
+  alias: string | null;
+  owner: string | null;
+  notes: string;
+  labels: string[];
+  type: string;
+  mac_address: string | null;
+  ip_address: string | null;
+  connected_at: string | null;
+  access_type: string | null;
+  network: { id: string; name: string; vlan_id: number | null; subnet: string } | null;
+  zone: { id: string; name: string } | null;
+  /** Attachment point first, then each uplink up to the top of the tree. */
+  path: { id: string; name: string; model: string; state: string; features: string[] }[];
+  sightings: ClientSighting[];
+  addresses: { address: string; first_seen_at: string; last_seen_at: string; sightings: number }[];
+  history_summary: { sightings: number; distinct_addresses: number; distinct_uplinks: number; tracking_since: string | null };
+  reservation: {
+    id: string;
+    address: string;
+    hostname: string;
+    kind: string;
+    prefix: { id: string; cidr: string } | null;
+    status: "ok" | "conflict" | "elsewhere";
+  } | null;
+  events: WardenEvent[];
+  provenance: Provenance;
+  fingerprint: null;
+}
+
+export type IpStatus = "active" | "planned" | "reserved" | "deprecated";
+
+export interface PrefixRow {
+  id: string;
+  cidr: string;
+  family: number;
+  vlan_id: number | null;
+  status: IpStatus;
+  description: string;
+  labels: string[];
+  is_demo: boolean;
+  site: { id: string; name: string | null } | null;
+  size: number;
+  usable: number;
+  used: number;
+  utilization_pct: number;
+  reservations: number;
+  observed: {
+    network_id: string;
+    name: string;
+    vlan_id: number | null;
+    gateway: string | null;
+    dhcp_range: { start: string; stop: string } | null;
+    dhcp_pool_size: number | null;
+  } | null;
+  updated_at: string;
+  parent_id?: string | null;
+  depth?: number;
+}
+
+export interface Holder {
+  kind: "client" | "device";
+  id: string;
+  name: string;
+  mac: string | null;
+}
+
+export type AddressState = "network" | "broadcast" | "gateway" | "observed" | "reserved" | "dhcp" | "free";
+
+export interface AddressCell {
+  address: string;
+  state: AddressState;
+  in_dhcp_pool: boolean;
+  holders?: Holder[];
+  reservation?: { id: string; hostname: string; kind: string; mac: string | null };
+  conflict?: boolean;
+}
+
+export interface Reservation {
+  id: string;
+  prefix_id: string;
+  address: string;
+  kind: "static" | "dhcp" | "infrastructure";
+  mac_address: string | null;
+  hostname: string;
+  description: string;
+  is_demo: boolean;
+  state: "in_use" | "idle" | "elsewhere" | "conflict";
+  observed_holders: Holder[];
+  mac_seen_at: string | null;
+}
+
+export interface PrefixDetail extends PrefixRow {
+  parents: { id: string; cidr: string }[];
+  children: { id: string; cidr: string; status: IpStatus }[];
+  reservation_items: Reservation[];
+  address_map: AddressCell[] | null;
+  address_map_omitted: string | null;
+  next_free: string | null;
+  free_count: number | null;
+}
+
+export interface Finding {
+  key: string;
+  kind: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail: string;
+  refs: { prefix_id?: string; network_id?: string; reservation_id?: string; address?: string };
+}
+
+export interface VlanRow {
+  vlan_id: number;
+  record: { id: string; name: string; status: IpStatus; description: string; is_demo: boolean } | null;
+  state: "documented" | "deprecated_in_use" | "unobserved" | "undocumented" | "prefix_only" | "planned" | "reserved" | "deprecated";
+  observed_networks: { id: string; name: string; subnet: string | null; enabled: boolean; is_demo: boolean }[];
+  prefixes: { id: string; cidr: string; status: IpStatus }[];
+  name_mismatch: boolean;
 }

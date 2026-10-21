@@ -175,6 +175,9 @@ async def test_vlan_records(phase2, owner):
     assert (await owner.post("/api/ipam/vlans", json={"vlan_id": 5000, "name": "Bad"})).status_code == 422
     vlans = {v["vlan_id"]: v for v in (await owner.get("/api/ipam/vlans")).json()["items"]}
     assert vlans[99]["state"] == "unobserved" and vlans[30]["state"] == "undocumented"
+    await owner.post("/api/ipam/prefixes", json={"cidr": "10.0.88.0/24", "vlan_id": 88, "status": "planned"})
+    vlans = {v["vlan_id"]: v for v in (await owner.get("/api/ipam/vlans")).json()["items"]}
+    assert vlans[88]["state"] == "prefix_only"
     await owner.patch(f"/api/ipam/vlans/{r.json()['id']}", json={"status": "planned"})
     vlans = {v["vlan_id"]: v for v in (await owner.get("/api/ipam/vlans")).json()["items"]}
     assert vlans[99]["state"] == "planned"

@@ -15,6 +15,8 @@ export function describeEvent(e: WardenEvent): string {
       return `${p.name} connected${p.ip ? ` (${p.ip})` : ""}`;
     case "inventory.client.disconnected":
       return `${p.name} disconnected`;
+    case "inventory.client.moved":
+      return p.from_ip !== p.to_ip ? `${p.name} moved from ${p.from_ip ?? "no address"} to ${p.to_ip ?? "no address"}` : `${p.name} changed attachment point`;
     case "controller.status_changed":
       return `Controller status ${p.from} → ${p.to}${p.detail ? `: ${p.detail}` : ""}`;
     case "controller.sync.completed":
@@ -36,5 +38,6 @@ function fmtState(s?: string) {
 export function eventHref(e: WardenEvent): string | undefined {
   if (e.entity_type === "device" && e.entity_id) return `/inventory/devices/${e.entity_id}`;
   if (e.entity_type === "controller" && e.entity_id) return `/controllers/${e.entity_id}`;
+  if (e.entity_type === "client" && e.entity_id) return `/inventory/clients/${e.entity_id}`;
   return undefined;
 }

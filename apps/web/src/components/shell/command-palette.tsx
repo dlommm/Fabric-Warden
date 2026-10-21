@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { CornerDownLeft, Laptop, Network, Router, Search } from "lucide-react";
+import { Bookmark, CornerDownLeft, Grid3x3, Laptop, Network, Router, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { useEffect, useMemo, useState } from "react";
@@ -12,7 +12,7 @@ import { DemoTag } from "../ui/signs";
 import { NAV } from "./nav";
 
 interface Result {
-  kind: "device" | "client" | "network" | "page";
+  kind: "device" | "client" | "network" | "prefix" | "reservation" | "page";
   id: string;
   title: string;
   subtitle: string;
@@ -20,7 +20,7 @@ interface Result {
   is_demo?: boolean;
 }
 
-const KIND_ICON = { device: Router, client: Laptop, network: Network };
+const KIND_ICON = { device: Router, client: Laptop, network: Network, prefix: Grid3x3, reservation: Bookmark };
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);

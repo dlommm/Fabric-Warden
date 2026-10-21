@@ -81,7 +81,12 @@ async def client_360(client_id: str, db: DB, state: State, principal: Reader) ->
         "connected_at": c.connected_at.isoformat() if c.connected_at else None,
         "access_type": (c.access or {}).get("type"),
         "network": (
-            {"id": net.id, "name": net.name, "vlan_id": net.vlan_id, "subnet": f"{net.ipv4['hostIpAddress']}/{net.ipv4['prefixLength']}"}
+            {
+                "id": net.id,
+                "name": net.name,
+                "vlan_id": net.vlan_id,
+                "subnet": str(ipaddress.ip_network(f"{net.ipv4['hostIpAddress']}/{net.ipv4['prefixLength']}", strict=False)),
+            }
             if net and net.ipv4
             else None
         ),

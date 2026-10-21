@@ -57,3 +57,21 @@ export function deviceRole(features: string[]): "gateway" | "accessPoint" | "swi
 }
 
 export const ROLE_LABEL = { gateway: "Gateway", switching: "Switch", accessPoint: "Access point" } as const;
+
+export function duration(sec: number): string {
+  if (sec < 60) return "under a minute";
+  if (sec < 3600) return `${Math.round(sec / 60)} min`;
+  if (sec < 86400) return `${Math.round(sec / 3600)} h`;
+  return `${Math.round(sec / 86400)} d`;
+}
+
+/** Sort key for IPv4 dotted quads; other values sort as text. */
+export function ipKey(ip: string | null | undefined): string | null {
+  if (!ip) return null;
+  return /^\d+\.\d+\.\d+\.\d+$/.test(ip) ? ip.split(".").map((p) => p.padStart(3, "0")).join(".") : ip;
+}
+
+export function cidrKey(cidr: string): string {
+  const [ip, len] = cidr.split("/");
+  return `${ipKey(ip)}/${len.padStart(3, "0")}`;
+}

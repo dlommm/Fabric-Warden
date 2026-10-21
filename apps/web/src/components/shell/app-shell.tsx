@@ -51,6 +51,11 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { can, moduleEnabled, modules } = useSession();
   const loaded = modules.length > 0;
+  // The most specific matching entry wins, so /ipam/vlans doesn't also light up /ipam.
+  const activeHref = NAV.flatMap((g) => g.items)
+    .map((i) => i.href)
+    .filter((h) => (h === "/" ? pathname === "/" : pathname === h || pathname.startsWith(`${h}/`)))
+    .sort((a, b) => b.length - a.length)[0];
   return (
     <nav aria-label="Primary" className="flex h-full flex-col gap-6 overflow-y-auto px-3 py-4">
       <Link href="/" className="flex items-center gap-2.5 px-2" onClick={onNavigate}>
@@ -71,7 +76,7 @@ function Rail({ onNavigate }: { onNavigate?: () => void }) {
             <p className="mb-1.5 px-2 text-xs font-bold tracking-wider text-rail-ink-2 uppercase">{group.section}</p>
             <ul className="flex flex-col gap-0.5">
               {items.map((item) => {
-                const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+                const active = item.href === activeHref;
                 const Icon = item.icon;
                 return (
                   <li key={item.href}>

@@ -11,7 +11,8 @@ import { EmptyState, Notice, PageHeader, Panel } from "@/components/ui/layout-bi
 import { DemoTag } from "@/components/ui/signs";
 import { type Column, DataTable } from "@/components/ui/table";
 import { get } from "@/lib/api";
-import { ago } from "@/lib/format";
+import { ago, ipKey } from "@/lib/format";
+import { useSession } from "@/lib/session";
 import type { ClientRow, NetworkRow } from "@/lib/types";
 
 type Kind = "all" | "WIRED" | "WIRELESS" | "VPN";
@@ -24,13 +25,11 @@ export default function ClientsPage() {
   );
 }
 
-function ipKey(ip: string | null) {
-  return ip ? ip.split(".").map((p) => p.padStart(3, "0")).join(".") : null;
-}
-
 function Clients() {
   const router = useRouter();
   const params = useSearchParams();
+  const { moduleEnabled } = useSession();
+  const intel = moduleEnabled("client-intel");
   const q = params.get("q") ?? "";
   const kind = (params.get("type") as Kind) ?? "all";
   const network = params.get("network") ?? "";
@@ -49,13 +48,27 @@ function Clients() {
       (c) =>
         (kind === "all" || c.type === kind) &&
         (!network || c.network?.id === network) &&
-        (!term || [c.name, c.ip_address ?? "", c.mac_address ?? ""].some((x) => x.toLowerCase().includes(term))),
+        (!term || [c.name, c.alias ?? "", c.owner ?? "", c.ip_address ?? "", c.mac_address ?? "", ...c.labels].some((x) => x.toLowerCase().includes(term))),
     );
   }, [all, q, kind, network]);
   const count = (k: Kind) => all?.filter((c) => k === "all" || c.type === k).length;
 
   const columns: Column<ClientRow>[] = [
-    { key: "name", header: "Name", sort: (c) => c.name.toLowerCase(), cell: (c) => <span className="font-bold">{c.name}</span> },
+    {
+      key: "name",
+      header: "Name",
+      sort: (c) => (c.alias ?? c.name).toLowerCase(),
+      cell: (c) => (
+        <span className="flex flex-col">
+          {intel ? (
+            <Link href={`/inventory/clients/${c.id}`} className="font-bold hover:underline">{c.alias ?? c.name}</Link>
+          ) : (
+            <span className="font-bold">{c.alias ?? c.name}</span>
+          )}
+          {(c.alias || c.owner) && <span className="text-sm text-ink-3">{[c.alias && c.name, c.owner].filter(Boolean).join(" · ")}</span>}
+        </span>
+      ),
+    },
     { key: "type", header: "Connection", sort: (c) => c.type, cell: (c) => <span className="text-ink-2">{c.type === "WIRELESS" ? "Wi-Fi" : c.type === "WIRED" ? "Wired" : c.type}</span> },
     { key: "ip", header: "IP address", sort: (c) => ipKey(c.ip_address), cell: (c) => <span className="font-mono text-sm">{c.ip_address ?? "—"}</span> },
     { key: "mac", header: "MAC", cell: (c) => <span className="font-mono text-sm text-ink-2">{c.mac_address ?? "—"}</span> },
@@ -79,13 +92,17 @@ function Clients() {
     <>
       <PageHeader
         title="Clients"
-        description="Devices currently connected, as reported by the controller. History arrives with Client Intelligence."
+        description={
+          intel
+            ? "Devices currently connected, as reported by the controller. Open one for its route, address history and identity."
+            : "Devices currently connected, as reported by the controller. Turn on Client Intelligence for history and identity."
+        }
         meta={all?.some((c) => c.provenance.is_demo) ? <span className="inline-flex items-center gap-2 text-sm text-ink-2"><DemoTag /> Simulated controller</span> : undefined}
       />
       {error && <Notice tone="crit" className="mb-4">{(error as Error).message}</Notice>}
       <Panel bodyClassName="p-0">
         <FilterBar>
-          <SearchInput value={q} onChange={(v) => setParam("q", v)} placeholder="Name, IP or MAC" label="Filter clients" />
+          <SearchInput value={q} onChange={(v) => setParam("q", v)} placeholder="Name, owner, IP or MAC" label="Filter clients" />
           <Segmented
             label="Connection"
             value={kind}
@@ -109,6 +126,7 @@ function Clients() {
           rows={rows}
           columns={columns}
           loading={isLoading}
+          href={intel ? (c) => `/inventory/clients/${c.id}` : undefined}
           initialSort={{ key: "name", dir: "asc" }}
           empty={
             all && all.length === 0 ? (
