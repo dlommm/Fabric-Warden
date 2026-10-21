@@ -16,6 +16,7 @@ import {
   Package,
   PlugZap,
   Router,
+  ScanSearch,
   Rows3,
   ScrollText,
   Server,
@@ -60,6 +61,9 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Firewall", href: "/firewall", icon: Shield, module: "firewall", permission: "inventory:read" },
       { label: "Config history", href: "/config", icon: History, module: "config-history", permission: "inventory:read" },
       { label: "Compliance", href: "/compliance", icon: ClipboardCheck, module: "compliance", permission: "inventory:read" },
+      { label: "SOC", href: "/soc", icon: Siren, module: "soc", permission: "inventory:read" },
+      { label: "Logs", href: "/logs", icon: ScrollText, module: "logs", permission: "inventory:read" },
+      { label: "Investigate", href: "/investigate", icon: ScanSearch, module: "investigations", permission: "inventory:read" },
     ],
   },
   {
