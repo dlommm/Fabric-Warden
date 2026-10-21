@@ -14,6 +14,9 @@ class P(StrEnum):
     INVENTORY_READ = "inventory:read"
     INVENTORY_EDIT = "inventory:edit"  # labels, notes; never controller config
     IPAM_EDIT = "ipam:edit"  # documented prefixes/VLANs/reservations; never controller config
+    ANALYTICS_EDIT = "analytics:edit"  # dashboards
+    MONITORING_MANAGE = "monitoring:manage"  # alert rules, acknowledgements, maintenance windows, WAN probe
+    NOTIFICATIONS_MANAGE = "notifications:manage"  # channels hold delivery secrets
     CONTROLLERS_READ = "controllers:read"
     CONTROLLERS_MANAGE = "controllers:manage"
     MODULES_READ = "modules:read"
@@ -40,6 +43,8 @@ ROLES: dict[str, frozenset[P]] = {
             P.INVENTORY_READ,
             P.INVENTORY_EDIT,
             P.IPAM_EDIT,
+            P.ANALYTICS_EDIT,
+            P.MONITORING_MANAGE,
             P.CONTROLLERS_READ,
             P.MODULES_READ,
             P.JOBS_READ,

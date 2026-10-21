@@ -62,7 +62,16 @@ async def test_disabled_module_blocks_api_and_jobs_but_keeps_data(demo, owner):
 
 async def test_full_preset_reports_unavailable(owner):
     r = (await owner.post("/api/modules/presets/full/apply")).json()
-    assert set(r["enabled"]) == {"unifi-network", "inventory", "client-intel", "ipam"}
+    assert set(r["enabled"]) == {
+        "unifi-network",
+        "inventory",
+        "client-intel",
+        "ipam",
+        "analytics-studio",
+        "monitoring",
+        "notifications",
+        "wan",
+    }
     assert "dcim" in r["unavailable"] and "ai-agents" in r["unavailable"]
 
 

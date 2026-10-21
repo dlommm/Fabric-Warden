@@ -12,15 +12,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete
 
-from warden import __version__
-from warden.api import auth, clients, controllers, inventory, ipam, modules, system, users
+from warden import __version__, metrics, monitoring
+from warden.api import alerts, analytics, auth, clients, controllers, inventory, ipam, modules, notifications, system, users, wan
 from warden.app_state import AppState
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
 from warden.events import EventBus
+from warden.integrations.probe import probe_job
 from warden.integrations.unifi.sync import sync_job
 from warden.jobs import JobContext, JobSpec, Scheduler
-from warden.models import AuthSession, JobRun
+from warden.models import AuthSession, JobRun, NotificationDelivery
 from warden.modules.service import ModuleService
 from warden.security.vault import Vault, load_master_key
 
@@ -31,7 +32,13 @@ async def housekeeping(ctx: JobContext) -> dict[str, Any]:
     now = utcnow()
     s = await ctx.db.execute(delete(AuthSession).where(AuthSession.expires_at < now - timedelta(days=1)))
     j = await ctx.db.execute(delete(JobRun).where(JobRun.started_at < now - timedelta(days=30)))
-    return {"sessions_pruned": s.rowcount, "job_runs_pruned": j.rowcount}
+    n = await ctx.db.execute(delete(NotificationDelivery).where(NotificationDelivery.created_at < now - timedelta(days=30)))
+    a = await monitoring.prune(ctx.db, now - timedelta(days=365))
+    return {"sessions_pruned": s.rowcount, "job_runs_pruned": j.rowcount, "deliveries_pruned": n.rowcount, "alerts_pruned": a}
+
+
+async def metrics_job(ctx: JobContext) -> dict[str, Any]:
+    return await metrics.rollup(ctx.db)
 
 
 def build_state(settings: Settings) -> AppState:
@@ -46,7 +53,10 @@ def build_state(settings: Settings) -> AppState:
     )
     state.scheduler = Scheduler(db.sessionmaker, state, settings.redis_url)
     state.scheduler.register(JobSpec("core.housekeeping", "core", "Expire sessions and prune job history", housekeeping, 3600))
+    state.scheduler.register(JobSpec("core.metrics", "core", "Roll up and prune metric history", metrics_job, 900))
     state.scheduler.register(JobSpec("unifi-network.sync", "unifi-network", "Poll controllers and sync inventory", sync_job, 60))
+    state.scheduler.register(JobSpec("monitoring.evaluate", "monitoring", "Evaluate alert rules", monitoring.evaluate_job, 60))
+    state.scheduler.register(JobSpec("wan.probe", "wan", "Probe latency and loss", probe_job, 60))
     return state
 
 
@@ -104,7 +114,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "DENY")
         return response
 
-    for r in (auth.router, users.router, modules.router, controllers.router, inventory.router, clients.router, ipam.router, system.router):
+    for r in (
+        auth.router,
+        users.router,
+        modules.router,
+        controllers.router,
+        inventory.router,
+        clients.router,
+        ipam.router,
+        analytics.metrics_router,
+        analytics.router,
+        alerts.router,
+        notifications.router,
+        wan.router,
+        system.router,
+    ):
         app.include_router(r)
     return app
 

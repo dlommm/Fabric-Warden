@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     demo_controller_enabled: bool = True
 
     cors_origins: list[str] = Field(default_factory=list)
+    # Base URL people use to open Warden; alert notifications link back to it when set.
+    public_url: str | None = None
     run_migrations_on_start: bool = True
 
 

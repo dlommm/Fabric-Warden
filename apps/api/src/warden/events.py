@@ -60,6 +60,8 @@ CLIENT_MOVED = "inventory.client.moved"  # address or attachment point changed
 CONTROLLER_STATUS_CHANGED = "controller.status_changed"
 CONTROLLER_SYNC_COMPLETED = "controller.sync.completed"
 MODULE_ENABLED = "module.enabled"
+ALERT_FIRING = "monitoring.alert.firing"
+ALERT_RESOLVED = "monitoring.alert.resolved"
 MODULE_DISABLED = "module.disabled"
 
 Handler = Callable[[Event], Awaitable[None]]

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 import httpx
 from fastapi import FastAPI
@@ -30,6 +32,10 @@ class AppState:
     scheduler: Scheduler = field(init=False)
     simulator: SimulatorState = field(default_factory=SimulatorState)
     _sim_app: FastAPI | None = None
+    # Seams for outbound I/O so tests never reach a real network.
+    http_transport: httpx.AsyncBaseTransport | None = None  # notification webhooks / ntfy
+    smtp_send: Callable[[dict[str, Any], str, Any], Awaitable[None]] | None = None  # (config, password, EmailMessage)
+    probe_connect: Callable[[str, int, float], Awaitable[float | None]] | None = None  # host, port, timeout -> ms
 
     def simulator_transport(self) -> httpx.AsyncBaseTransport:
         if self._sim_app is None:

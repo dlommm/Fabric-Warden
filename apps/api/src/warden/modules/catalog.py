@@ -8,6 +8,8 @@ be enabled until their implementation lands.
 from __future__ import annotations
 
 from warden.events import (
+    ALERT_FIRING,
+    ALERT_RESOLVED,
     CLIENT_CONNECTED,
     CLIENT_DISCONNECTED,
     CLIENT_MOVED,
@@ -73,9 +75,22 @@ CORE = ModuleManifest(
         NavEntry(label="Audit Trail", href="/audit", icon="scroll", section="Platform"),
         NavEntry(label="Users & Access", href="/settings/users", icon="users", section="Platform"),
     ],
-    jobs=[JobDecl(id="core.housekeeping", title="Expire sessions and prune job history", default_interval_seconds=3600)],
+    jobs=[
+        JobDecl(id="core.housekeeping", title="Expire sessions and prune job history", default_interval_seconds=3600),
+        JobDecl(id="core.metrics", title="Roll up and prune metric history", default_interval_seconds=900),
+    ],
     resources=ResourceEstimate(memory_mb=256, cpu_millicores=250),
-    data_ownership=["users", "auth_sessions", "api_tokens", "credentials", "audit_records", "events", "job_runs"],
+    data_ownership=[
+        "users",
+        "auth_sessions",
+        "api_tokens",
+        "credentials",
+        "audit_records",
+        "events",
+        "job_runs",
+        "metric_series",
+        "metric_samples",
+    ],
 )
 
 UNIFI_NETWORK = ModuleManifest(
@@ -184,32 +199,90 @@ IPAM = ModuleManifest(
     ],
 )
 
+ANALYTICS = ModuleManifest(
+    id="analytics-studio",
+    version=VERSION,
+    name="Analytics Studio",
+    category=C.OBSERVABILITY,
+    description=(
+        "Metric history for devices, radios, clients, networks and controllers, sampled on every sync, "
+        "with dashboards built from widgets and starter templates."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=3,
+    requires=["core", "inventory"],
+    controller_capabilities=["network.devices.stats.read"],
+    permissions=["analytics:edit"],
+    nav=[NavEntry(label="Dashboards", href="/analytics", icon="chart", section="Operate")],
+    resources=ResourceEstimate(memory_mb=64, disk_mb_per_day=20),
+    data_ownership=["dashboards"],
+    uninstall_behavior="Disabling hides dashboards. Metric history keeps recording while Monitoring or WAN is enabled.",
+    warnings=[
+        "The official API exposes only the latest statistics, so history starts when this module is enabled "
+        "and has the sync interval's resolution (60 s). Port counters, per-client traffic and WAN throughput are not available."
+    ],
+)
+
+MONITORING = ModuleManifest(
+    id="monitoring",
+    version=VERSION,
+    name="Monitoring & Alerts",
+    category=C.OBSERVABILITY,
+    description="Threshold rules over metric history with pending, firing and resolved alerts, acknowledgement and maintenance windows.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=3,
+    requires=["core", "inventory"],
+    optional=["notifications"],
+    permissions=["monitoring:manage"],
+    nav=[NavEntry(label="Alerts", href="/alerts", icon="siren", section="Operate")],
+    widgets=[WidgetDecl(id="monitoring.active-alerts", title="Active alerts")],
+    jobs=[JobDecl(id="monitoring.evaluate", title="Evaluate alert rules", default_interval_seconds=60)],
+    publishes=[ALERT_FIRING, ALERT_RESOLVED],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=1),
+    data_ownership=["alert_rules", "alerts", "maintenance_windows"],
+    uninstall_behavior="Disabling stops evaluation; open alerts stay as they were and history is retained.",
+    warnings=["Escalation policies and on-call schedules are not implemented yet."],
+)
+
+NOTIFICATIONS = ModuleManifest(
+    id="notifications",
+    version=VERSION,
+    name="Notification Channels",
+    category=C.INTEGRATION,
+    description="Send alert notifications to webhooks (HMAC-signed), ntfy topics and email over SMTP.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=3,
+    requires=["core"],
+    permissions=["notifications:manage"],
+    nav=[NavEntry(label="Notifications", href="/settings/notifications", icon="bell", section="Platform")],
+    subscribes=[ALERT_FIRING, ALERT_RESOLVED],
+    external_integrations=["HTTP webhooks", "ntfy", "SMTP"],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["notification_channels", "notification_deliveries"],
+    warnings=["Matrix, Slack-native and push-provider channels are not implemented yet; a webhook covers most of them."],
+)
+
+WAN = ModuleManifest(
+    id="wan",
+    version=VERSION,
+    name="WAN & ISP Operations",
+    category=C.NETWORK,
+    description="WAN interfaces, gateway health and an opt-in latency and loss probe measured from the Warden host.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=3,
+    requires=["core", "inventory"],
+    controller_capabilities=["network.wans.read"],
+    nav=[NavEntry(label="WAN", href="/wan", icon="globe", section="Network")],
+    jobs=[JobDecl(id="wan.probe", title="Probe latency and loss", default_interval_seconds=60)],
+    resources=ResourceEstimate(memory_mb=8),
+    warnings=[
+        "The official API lists WAN interfaces by name only: no link state, addresses, throughput or failover events. "
+        "Latency and loss come from Warden's own TCP probe, so they describe the active path from the Warden host. "
+        "Speed and bufferbloat tests are not implemented yet."
+    ],
+)
+
 PLANNED: list[ModuleManifest] = [
-    _planned(
-        "analytics-studio",
-        "Analytics Studio",
-        C.OBSERVABILITY,
-        3,
-        "Native dashboard engine with drag-and-drop widgets, templates and drilldowns.",
-        memory_mb=128,
-    ),
-    _planned(
-        "monitoring",
-        "Monitoring & Alerts",
-        C.OBSERVABILITY,
-        3,
-        "Health, reachability, thresholds, maintenance windows and escalations.",
-        ["inventory"],
-    ),
-    _planned("notifications", "Notification Channels", C.INTEGRATION, 3, "Email, webhook, ntfy, Matrix and other alert destinations."),
-    _planned(
-        "wan",
-        "WAN & ISP Operations",
-        C.NETWORK,
-        3,
-        "WAN health, latency/loss, opt-in speed and bufferbloat tests, failover history.",
-        ["inventory"],
-    ),
     _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
     ),
@@ -338,7 +411,9 @@ PLANNED: list[ModuleManifest] = [
     ),
 ]
 
-CATALOG: dict[str, ModuleManifest] = {m.id: m for m in [CORE, UNIFI_NETWORK, INVENTORY, CLIENT_INTEL, IPAM, *PLANNED]}
+CATALOG: dict[str, ModuleManifest] = {
+    m.id: m for m in [CORE, UNIFI_NETWORK, INVENTORY, CLIENT_INTEL, IPAM, ANALYTICS, MONITORING, NOTIFICATIONS, WAN, *PLANNED]
+}
 
 PRESETS: dict[str, dict[str, object]] = {
     "minimal": {"name": "Minimal Core", "modules": ["core", "unifi-network", "inventory"]},

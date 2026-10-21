@@ -1,3 +1,13 @@
+from warden.models.analytics import (
+    Alert,
+    AlertRule,
+    Dashboard,
+    MaintenanceWindow,
+    MetricSample,
+    MetricSeries,
+    NotificationChannel,
+    NotificationDelivery,
+)
 from warden.models.inventory import (
     Client,
     ClientSighting,
@@ -26,6 +36,8 @@ from warden.models.platform import (
 )
 
 __all__ = [
+    "Alert",
+    "AlertRule",
     "ApiToken",
     "AuditRecord",
     "AuthSession",
@@ -33,6 +45,7 @@ __all__ = [
     "ClientSighting",
     "Controller",
     "Credential",
+    "Dashboard",
     "Device",
     "EventRecord",
     "FirewallPolicy",
@@ -40,8 +53,13 @@ __all__ = [
     "IpPrefix",
     "IpReservation",
     "JobRun",
+    "MaintenanceWindow",
+    "MetricSample",
+    "MetricSeries",
     "ModuleState",
     "Network",
+    "NotificationChannel",
+    "NotificationDelivery",
     "Port",
     "Radio",
     "RoleAssignment",

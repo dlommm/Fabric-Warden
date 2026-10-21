@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from warden import events as ev
+from warden import metrics
 from warden.app_state import AppState
 from warden.db import Base, utcnow
 from warden.events import Event
@@ -254,20 +255,30 @@ async def _try(caps: dict[str, Any], cap_id: str, fn: Callable[[], Awaitable[Any
 
 
 async def sync_controller(
-    db: AsyncSession, state: AppState, controller: Controller, *, inventory: bool, client_history: bool = False
+    db: AsyncSession,
+    state: AppState,
+    controller: Controller,
+    *,
+    inventory: bool,
+    client_history: bool = False,
+    collect_metrics: bool = False,
 ) -> dict[str, Any]:
     api_key = await state.vault.reveal(db, controller.credential_id) if controller.credential_id else ""
     prev_status = controller.status
     summary: dict[str, Any] = {"controller": controller.name}
     try:
         async with state.unifi_client(controller, api_key) as api:
-            summary.update(await _sync(db, state, controller, api, inventory=inventory, client_history=client_history))
+            summary.update(
+                await _sync(db, state, controller, api, inventory=inventory, client_history=client_history, collect_metrics=collect_metrics)
+            )
         controller.status, controller.status_detail = "ok", ""
     except UniFiError as exc:
         controller.status = "unreachable" if exc.kind in ("unreachable", "tls") else "degraded"
         controller.status_detail = str(exc)[:500]
         summary["error"] = str(exc)
     controller.last_sync_at = utcnow()
+    if collect_metrics:
+        await metrics.record(db, [metrics.controller_sample(controller)], controller.last_sync_at)
     if prev_status != controller.status:
         await state.bus.publish(
             db,
@@ -285,7 +296,14 @@ async def sync_controller(
 
 
 async def _sync(
-    db: AsyncSession, state: AppState, controller: Controller, api: UniFiNetworkClient, *, inventory: bool, client_history: bool
+    db: AsyncSession,
+    state: AppState,
+    controller: Controller,
+    api: UniFiNetworkClient,
+    *,
+    inventory: bool,
+    client_history: bool,
+    collect_metrics: bool = False,
 ) -> dict[str, Any]:
     info = await api.info()
     version = info.get("applicationVersion")
@@ -328,6 +346,8 @@ async def _sync(
         if (policies := await _try(caps, "network.firewall.policies.read", partial(api.firewall_policies, sid))) is not None:
             await ss.upsert(FirewallPolicy, policies, ss.apply_policy)
         out.setdefault("counts", {})[site.name] = ss.counts
+        if collect_metrics:
+            out["samples"] = out.get("samples", 0) + await metrics.record(db, await metrics.site_samples(db, site), now)
 
     controller.capabilities = report
     controller.capabilities_checked_at = now
@@ -353,12 +373,18 @@ async def _sync_stats(db: AsyncSession, caps: dict[str, Any], api: UniFiNetworkC
 async def sync_job(ctx: JobContext) -> dict[str, Any]:
     inventory = await ctx.state.modules.is_enabled(ctx.db, "inventory")
     client_history = inventory and await ctx.state.modules.is_enabled(ctx.db, "client-intel")
+    enabled = await ctx.state.modules.enabled_ids(ctx.db)
+    collect_metrics = inventory and any(m in enabled for m in metrics.CONSUMERS)
     q = select(Controller)
     if cid := ctx.params.get("controller_id"):
         q = q.where(Controller.id == cid)
     results = []
     for controller in await ctx.db.scalars(q):
-        results.append(await sync_controller(ctx.db, ctx.state, controller, inventory=inventory, client_history=client_history))
+        results.append(
+            await sync_controller(
+                ctx.db, ctx.state, controller, inventory=inventory, client_history=client_history, collect_metrics=collect_metrics
+            )
+        )
         await ctx.state.bus.publish(
             ctx.db,
             Event(
