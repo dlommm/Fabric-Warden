@@ -6,7 +6,15 @@
 import { clsx } from "clsx";
 import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
-import type { Tone } from "./ui/signs";
+import { deviceTone, type Tone } from "./ui/signs";
+
+/** Uplink path (nearest device first, as the API reports it) as hops from the internet down. */
+export function pathHops(path: { id: string; name: string; model: string; state: string; features: string[] }[]): Hop[] {
+  const devices = [...path].reverse();
+  const hops: Hop[] = devices.map((d) => ({ key: d.id, label: d.name, sub: d.model, href: `/inventory/devices/${d.id}`, tone: deviceTone(d.state) }));
+  if (devices[0]?.features.includes("gateway")) hops.unshift({ key: "wan", label: "Internet", sub: "via WAN", tone: "muted" });
+  return hops;
+}
 
 export interface Hop {
   key: string;

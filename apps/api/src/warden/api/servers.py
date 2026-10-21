@@ -580,14 +580,15 @@ async def findings(db: DB, principal: Reader) -> dict:
         h = hosts.get(w.host_id)
         if h is None or h.status != "online":
             continue
-        label = {"vm": "VM", "lxc": "Container", "container": "Container"}[w.kind]
+        label = {"vm": "VM", "lxc": "LXC", "container": "Container"}[w.kind]
         if w.autostart and w.status != "running":
             out.append(
                 {
                     "key": f"autostart:{w.id}",
                     "kind": "autostart_stopped",
                     "severity": "warning",
-                    "title": f"{label} {w.name} on {h.name} starts automatically but is {w.raw_status.lower() or w.status}",
+                    "title": f"{label} {w.name} on {h.name} starts automatically but is not running",
+                    "detail": w.raw_status if w.raw_status.lower() != w.status else "",
                     "host_id": h.id,
                     "workload_id": w.id,
                 }

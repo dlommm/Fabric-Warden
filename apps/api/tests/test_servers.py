@@ -73,6 +73,7 @@ async def test_findings_and_simulated_failures(servers, owner, app):
     items = (await owner.get("/api/servers/findings")).json()["items"]
     by = titles(items)
     assert sorted(t.split(" ")[1] for t in by["autostart_stopped"]) == ["immich", "paperless", "win11-lab"]
+    assert all(t.endswith("starts automatically but is not running") for t in by["autostart_stopped"])
     assert by["storage_full"] == ["proxmox-02: local-lvm is 91.0% full", "nas-backup: /srv/backup is 88.0% full"]
     assert by["disk_hot"] == ["unraid-tower: disk2 is at 52 °C"]
     assert {t.split(" ")[1] for t in by["not_on_network"]} == {"pihole", "k3s-01", "media"}

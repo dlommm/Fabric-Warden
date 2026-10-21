@@ -915,3 +915,124 @@ export interface DocVersion {
   created_at: string;
   size: number;
 }
+
+// -- Phase 4b: servers ------------------------------------------------------------------
+
+export type HostKind = "proxmox-node" | "unraid" | "docker" | "linux";
+export type ConnectionKind = "proxmox" | "unraid" | "docker" | "node_exporter";
+
+export interface ClientRef {
+  id: string;
+  name: string;
+  ip_address: string | null;
+  mac_address: string | null;
+  present: boolean;
+  match: "ip" | "mac" | "hostname" | null;
+}
+
+export interface HostConnection {
+  id: string;
+  name: string;
+  kind: ConnectionKind;
+  base_url: string;
+  token_id: string;
+  credential_fingerprint: string | null;
+  verify_tls: boolean;
+  enabled: boolean;
+  status: "ok" | "degraded" | "unreachable" | "unknown";
+  status_detail: string;
+  version: string | null;
+  last_sync_at: string | null;
+  host_count: number;
+  workload_count: number;
+  is_demo: boolean;
+}
+
+export interface UpsInfo {
+  name: string;
+  model: string;
+  status: string;
+  charge_pct: number | null;
+  runtime_s: number | null;
+  battery_health: string | null;
+  load_pct: number | null;
+}
+
+export interface ServerHost {
+  id: string;
+  name: string;
+  kind: HostKind;
+  status: "online" | "offline" | "unknown";
+  hostname: string;
+  os: string;
+  version: string;
+  ip_address: string | null;
+  mac_addresses: string[];
+  cpu_count: number | null;
+  cpu_pct: number | null;
+  mem_total: number | null;
+  mem_used: number | null;
+  mem_pct: number | null;
+  load_1m: number | null;
+  uptime_s: number | null;
+  extra: { cluster?: string | null; array_state?: string; api_version?: string; ups?: UpsInfo[]; containers?: number; running?: number; machine?: string };
+  client: ClientRef | null;
+  connection: { id: string; name: string; kind: ConnectionKind; status: string } | null;
+  workloads: { total: number; running: number };
+  labels: string[];
+  notes: string;
+  provenance: Provenance;
+  storage_worst?: { name: string; used_pct: number | null } | null;
+  storage_unhealthy?: number;
+  is_demo: boolean;
+}
+
+export interface ServerWorkload {
+  id: string;
+  host_id: string;
+  host: string | null;
+  host_kind: HostKind | null;
+  kind: "vm" | "lxc" | "container";
+  name: string;
+  status: "running" | "stopped" | "paused" | "other";
+  raw_status: string;
+  vmid: number | null;
+  cpu_pct: number | null;
+  cpu_count: number | null;
+  mem_used: number | null;
+  mem_max: number | null;
+  mem_pct: number | null;
+  disk_max: number | null;
+  uptime_s: number | null;
+  ip_addresses: string[];
+  mac_addresses: string[];
+  image: string;
+  ports: { private: number | null; public: number | null; type: string | null }[];
+  autostart: boolean | null;
+  template: boolean;
+  tags: string[];
+  client: ClientRef | null;
+  present: boolean;
+  is_demo: boolean;
+}
+
+export interface ServerStorage {
+  id: string;
+  host_id: string;
+  name: string;
+  kind: "datastore" | "array" | "disk" | "pool" | "filesystem";
+  total_bytes: number | null;
+  used_bytes: number | null;
+  used_pct: number | null;
+  status: string;
+  healthy: boolean | null;
+  shared: boolean;
+  temperature_c: number | null;
+  extra: { role?: string; device?: string; rotational?: boolean; plugin?: string };
+  is_demo: boolean;
+}
+
+export interface ServerHostDetail extends ServerHost {
+  workload_items: ServerWorkload[];
+  storage_items: ServerStorage[];
+}

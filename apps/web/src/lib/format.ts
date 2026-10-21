@@ -75,3 +75,15 @@ export function cidrKey(cidr: string): string {
   const [ip, len] = cidr.split("/");
   return `${ipKey(ip)}/${len.padStart(3, "0")}`;
 }
+
+export function bytes(v: number | null | undefined): string {
+  if (v == null) return "—";
+  const units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"];
+  let n = v;
+  let i = 0;
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024;
+    i++;
+  }
+  return `${n >= 100 || i === 0 ? Math.round(n) : n.toFixed(1)} ${units[i]}`;
+}

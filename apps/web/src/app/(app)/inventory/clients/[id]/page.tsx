@@ -4,16 +4,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronLeft, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type FormEvent, useState } from "react";
-import { type Hop, RouteSign } from "@/components/route-sign";
+import { type FormEvent, type ReactNode, useState } from "react";
+import { type Hop, RouteSign, pathHops } from "@/components/route-sign";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { EmptyState, KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
-import { Chip, ProvenanceLine, StateLabel, VlanPatch, ZonePatch, deviceTone } from "@/components/ui/signs";
+import { Chip, ProvenanceLine, StateLabel, VlanPatch, ZonePatch } from "@/components/ui/signs";
 import { ApiError, get, patch } from "@/lib/api";
 import { describeEvent } from "@/lib/events";
 import { ago, dateTime, duration } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { ServerSide } from "@/components/servers";
 import type { ClientDetail } from "@/lib/types";
 
 const CONNECTION = { WIRED: "Wired", WIRELESS: "Wi-Fi", VPN: "VPN", TELEPORT: "Teleport" } as Record<string, string>;
@@ -97,6 +98,7 @@ export default function ClientPage() {
                 ["Connected via", c.path[0] ? <Link key="u" href={`/inventory/devices/${c.path[0].id}`} className="font-semibold hover:underline">{c.path[0].name}</Link> : "—"],
                 ["Connected since", c.connected_at ? `${dateTime(c.connected_at)} (${ago(c.connected_at)})` : "—"],
                 ["Owner", c.owner ?? <span className="text-ink-3">Not set</span>],
+                ...(moduleEnabled("servers") ? ([["Server side", <ServerSide key="srv" clientId={c.id} />]] as [string, ReactNode][]) : []),
                 ["Device type", <span key="fp" className="text-ink-3">Unknown: the UniFi API exposes no fingerprint</span>],
               ]}
             />
@@ -190,9 +192,7 @@ function BackLink() {
 }
 
 function route(c: ClientDetail): Hop[] {
-  const devices = [...c.path].reverse();
-  const hops: Hop[] = devices.map((d) => ({ key: d.id, label: d.name, sub: d.model, href: `/inventory/devices/${d.id}`, tone: deviceTone(d.state) }));
-  if (devices[0]?.features.includes("gateway")) hops.unshift({ key: "wan", label: "Internet", sub: "via WAN", tone: "muted" });
+  const hops = pathHops(c.path);
   hops.push({ key: c.id, label: c.alias || c.name, sub: c.ip_address ?? "You are here", tone: "ok", current: true });
   return hops;
 }
