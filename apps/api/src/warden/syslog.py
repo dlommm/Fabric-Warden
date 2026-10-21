@@ -159,7 +159,8 @@ class Ingest:
             }
             db.add_all(
                 LogEvent(
-                    received_at=utcnow(),
+                    # Demo lines keep their synthetic time so the day has a shape; real lines are stamped on arrival.
+                    received_at=p.logged_at if demo and p.logged_at else utcnow(),
                     logged_at=p.logged_at,
                     source_ip=p.source_ip,
                     host=p.host[:255],
@@ -258,7 +259,10 @@ async def seed_demo(state: AppState, ingest: Ingest, count: int = 120) -> int:
     now = datetime.now(UTC)
     for i in range(count):
         ip, tmpl = DEMO_LINES[i % len(DEMO_LINES)]
-        t = now - timedelta(seconds=(count - i) * 30)
+        # Spread over 24 h; failed logins and IDS hits arrive in a burst about two hours ago.
+        burst = "Failed password" in tmpl or "CEF:" in tmpl
+        offset = 7200 + (i * 37) % 900 if burst else (count - i) * (86_000 // count) + (i * 53) % 400
+        t = now - timedelta(seconds=offset)
         ingest.submit(
             tmpl.format(
                 ts=t.strftime("%Y-%m-%dT%H:%M:%SZ"),

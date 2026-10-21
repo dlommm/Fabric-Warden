@@ -41,6 +41,21 @@ interface Stats {
 interface Status { enabled: boolean; listening: string | null; error: string | null; port: number | null; received: number; stored: number; dropped: number; last_received_at: string | null; retention_days: number }
 
 const CATS = ["firewall", "ids", "auth", "system", "other"];
+const CAT_LABEL: Record<string, string> = { firewall: "Firewall", ids: "IDS", auth: "Auth", system: "System", other: "Other" };
+const PAGE = 50;
+
+/** Consecutive identical lines (same sender, severity and message) fold into one row with a count. */
+function collapse(rows: LogRow[]): (LogRow & { repeat: number; first: string })[] {
+  const out: (LogRow & { repeat: number; first: string })[] = [];
+  for (const r of rows) {
+    const last = out[out.length - 1];
+    if (last && last.source_ip === r.source_ip && last.severity === r.severity && last.message === r.message) {
+      last.repeat += 1;
+      last.first = r.received_at;
+    } else out.push({ ...r, repeat: 1, first: r.received_at });
+  }
+  return out;
+}
 const sevTone = (s: number): Tone => (s <= 3 ? "crit" : s === 4 ? "warn" : s <= 6 ? "muted" : "muted");
 
 /** Volume per bucket as plain bars: a count over time, so one ink-2 series, no state colour. */
@@ -55,7 +70,7 @@ function Volume({ s }: { s: Stats }) {
         ))}
       </div>
       <figcaption className="mt-1 flex justify-between font-mono text-[11px] text-ink-3">
-        <span>{new Date(s.series[0].t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+        <span>24 h ago</span>
         <span>busiest {max} per {Math.round(s.bucket_seconds / 60)} min</span>
         <span>now</span>
       </figcaption>
@@ -71,6 +86,7 @@ export default function LogsPage() {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [sev, setSev] = useState("7");
+  const [shown, setShown] = useState(PAGE);
   const params = new URLSearchParams({ hours: "24", max_severity: sev, ...(q.trim() ? { q: q.trim() } : {}), ...(cat ? { category: cat } : {}) });
   const list = useQuery({ queryKey: ["logs", "search", params.toString()], queryFn: () => get<{ items: LogRow[] }>(`/api/logs?${params}`), enabled: on, refetchInterval: 15_000, placeholderData: (p) => p });
   const stats = useQuery({ queryKey: ["logs", "stats"], queryFn: () => get<Stats>("/api/logs/stats"), enabled: on, refetchInterval: 30_000 });
@@ -90,6 +106,7 @@ export default function LogsPage() {
   const st = status.data;
   const s = stats.data;
   const rows = list.data?.items;
+  const folded = rows ? collapse(rows) : undefined;
   const hasDemo = rows?.some((r) => r.is_demo);
   return (
     <>
@@ -122,8 +139,8 @@ export default function LogsPage() {
             {s && (
               <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Filter by category">
                 {CATS.map((c) => (
-                  <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(cat === c ? "" : c)} className={clsx("inline-flex h-7 items-center gap-2 rounded-[3px] border px-2.5 text-sm font-semibold capitalize", cat === c ? "border-accent bg-accent-soft text-ink" : "border-rule-strong bg-surface text-ink-2 hover:bg-surface-2")}>
-                    {c} <span className="tabular text-ink-3">{s.by_category[c] ?? 0}</span>
+                  <button key={c} type="button" aria-pressed={cat === c} onClick={() => setCat(cat === c ? "" : c)} className={clsx("inline-flex h-7 items-center gap-2 rounded-[3px] border px-2.5 text-sm font-semibold", cat === c ? "border-accent bg-accent-soft text-ink" : "border-rule-strong bg-surface text-ink-2 hover:bg-surface-2")}>
+                    {CAT_LABEL[c]} <span className="tabular text-ink-3">{s.by_category[c] ?? 0}</span>
                   </button>
                 ))}
               </div>
@@ -165,8 +182,9 @@ export default function LogsPage() {
           ) : rows.length === 0 ? (
             <EmptyState icon={<ScrollText />} title="No log lines match">Change the search, severity or category, or point a device&apos;s syslog at this host.</EmptyState>
           ) : (
+            <>
             <ol className="font-mono text-xs">
-              {rows.map((r) => (
+              {folded!.slice(0, shown).map((r) => (
                 <li key={r.id} className="grid grid-cols-[auto_1fr] gap-x-3 border-b border-rule px-4 py-1.5 last:border-b-0 md:grid-cols-[9rem_8rem_10rem_1fr]">
                   <span className="text-ink-3" title={dateTime(r.received_at)}>{new Date(r.received_at).toLocaleTimeString()}</span>
                   <span className="md:order-none"><StateLabel tone={sevTone(r.severity)} className="text-[11px]">{r.severity_name}</StateLabel></span>
@@ -177,11 +195,18 @@ export default function LogsPage() {
                   <span className="col-span-2 break-words text-ink md:col-span-1">
                     <span className="mr-2 font-sans text-[11px] font-semibold text-ink-3 uppercase">{r.category}</span>
                     {r.message}
+                    {r.repeat > 1 && <span className="ml-2 font-sans text-[11px] font-bold text-ink-2" title={`First at ${dateTime(r.first)}`}>× {r.repeat}</span>}
                     {r.is_demo && <DemoTag className="ml-2 align-middle" />}
                   </span>
                 </li>
               ))}
             </ol>
+            {folded!.length > shown && (
+              <div className="border-t border-rule px-4 py-2">
+                <Button size="sm" variant="ghost" onClick={() => setShown((n) => n + PAGE)}>Show {Math.min(PAGE, folded!.length - shown)} more of {folded!.length - shown}</Button>
+              </div>
+            )}
+            </>
           )}
         </Panel>
       </div>

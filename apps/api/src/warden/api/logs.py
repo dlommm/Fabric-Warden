@@ -96,7 +96,9 @@ async def stats(db: DB, principal: Reader, hours: Annotated[int, Query(ge=1, le=
     ).all()
     rows = list(await db.scalars(select(LogEvent.received_at).where(LogEvent.received_at >= since)))
     bucket = max(60, hours * 3600 // 48)
-    series: dict[int, int] = {}
+    # Every bucket in the window, empty ones included, so quiet periods read as quiet.
+    first = int(since.timestamp()) // bucket * bucket
+    series: dict[int, int] = {first + i * bucket: 0 for i in range((int(utcnow().timestamp()) - first) // bucket + 1)}
     for ts in rows:
         k = int(ts.timestamp()) // bucket * bucket
         series[k] = series.get(k, 0) + 1
@@ -108,6 +110,7 @@ async def stats(db: DB, principal: Reader, hours: Annotated[int, Query(ge=1, le=
         "top_sources": [{"source_ip": ip, "host": host, "count": n} for ip, host, n in top],
         "bucket_seconds": bucket,
         "series": [{"t": k, "count": v} for k, v in sorted(series.items())],
+        "since": since,
     }
 
 

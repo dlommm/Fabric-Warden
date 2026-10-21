@@ -9,7 +9,7 @@ import { type FormEvent, Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/field";
 import { EmptyState, ModuleOff, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
-import { Chip, DemoTag } from "@/components/ui/signs";
+import { Chip, DemoTag, StateLabel } from "@/components/ui/signs";
 import { get } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
@@ -56,7 +56,15 @@ function Investigate() {
     if (draft.trim().length >= 2) router.replace(`/investigate?q=${encodeURIComponent(draft.trim())}`);
   };
   const r = res.data;
-  const shown = r?.timeline.filter((t) => !kinds.size || kinds.has(t.kind)) ?? [];
+  // Consecutive entries with the same kind, title, severity and source fold into one row with a count.
+  const shown = (r?.timeline.filter((t) => !kinds.size || kinds.has(t.kind)) ?? []).reduce<(Result["timeline"][number] & { repeat: number; first: string })[]>((acc, t) => {
+    const last = acc[acc.length - 1];
+    if (last && last.kind === t.kind && last.title === t.title && last.severity === t.severity && last.source === t.source) {
+      last.repeat += 1;
+      last.first = t.at;
+    } else acc.push({ ...t, repeat: 1, first: t.at });
+    return acc;
+  }, []);
   const counts = r ? r.timeline.reduce<Record<string, number>>((m, t) => ({ ...m, [t.kind]: (m[t.kind] ?? 0) + 1 }), {}) : {};
   return (
     <>
@@ -118,10 +126,10 @@ function Investigate() {
                   return (
                     <li key={i} className={clsx("grid grid-cols-[1.25rem_1fr] gap-x-3 border-b border-rule px-4 py-2 last:border-b-0 md:grid-cols-[1.25rem_10rem_1fr]", SEVERE.has(t.severity) && "bg-crit-soft")}>
                       <k.icon className="mt-0.5 size-4 text-ink-3" aria-label={k.word} />
-                      <span className="text-xs text-ink-3 md:pt-0.5">{dateTime(t.at)}</span>
+                      <span className="text-xs text-ink-3 md:pt-0.5">{dateTime(t.at)}{t.repeat > 1 && <span className="block">since {dateTime(t.first)}</span>}</span>
                       <span className="col-start-2 min-w-0 md:col-start-3">
-                        <span className="block break-words text-sm">{t.title}</span>
-                        <span className="text-xs text-ink-3">{t.source}{SEVERE.has(t.severity) ? ` · ${t.severity}` : ""}</span>
+                        <span className="block break-words text-sm">{t.title}{t.repeat > 1 && <b className="ml-2 text-ink-2">× {t.repeat}</b>}</span>
+                        <span className="flex flex-wrap items-center gap-2 text-xs text-ink-3">{t.source}{SEVERE.has(t.severity) && <StateLabel tone="crit" className="text-xs capitalize">{t.severity}</StateLabel>}</span>
                         {t.is_demo && <DemoTag className="ml-2 align-middle" />}
                       </span>
                     </li>
