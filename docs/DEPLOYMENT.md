@@ -9,7 +9,9 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 Open `http://<host>:8080` (or `WARDEN_HTTP_PORT`) and complete setup. Services: `db` (PostgreSQL 17), `redis` (job coordination, no persistence), `api` (not published), `web` (published).
 
-**Status:** the compose file and Dockerfiles are written but have not yet been built end-to-end on the development host (its `/var` partition was full). Treat as pre-release.
+**Status:** verified on the development host (Docker 29): both images build (API about 340 MB, web about 330 MB), all four services become healthy, migrations apply on PostgreSQL 17, and a first-run → demo controller → sync → IPAM → metrics → alerts → notifications smoke test passes through the web container. Not yet tested against a real UniFi console. Treat as pre-release.
+
+Docker keeps images and build cache under `/var/lib/docker` and `/var/lib/containerd`. If that partition is small, move both to a larger disk (for example bind-mount them from `/home`) before building.
 
 ### TLS
 Put a reverse proxy (Caddy, Traefik, Nginx Proxy Manager, SWAG) in front of `web` and keep `WARDEN_COOKIE_SECURE=true`. Only set it to `false` for plain HTTP on a trusted LAN.
