@@ -17,7 +17,7 @@ import type { ClientRow, DeviceSummary, NetworkRow, OverviewPanel, Summary } fro
 
 const PANEL_LABEL: Record<OverviewPanel, string> = {
   attention: "Needs attention",
-  route: "Route to the internet",
+  route: "Route from the internet",
   health: "Estate health",
   changes: "Recent changes",
   controllers: "Controllers",
@@ -25,6 +25,31 @@ const PANEL_LABEL: Record<OverviewPanel, string> = {
 };
 
 const STALE_AFTER_S = 300;
+const WIDE = new Set<OverviewPanel>(["attention", "route"]);
+
+/** Approximate rendered heights in rows, used to split panels into two even columns. */
+function panelWeight(id: OverviewPanel, s?: Summary): number {
+  switch (id) {
+    case "health": return 6;
+    case "changes": return 2 + Math.min(s?.recent_events.length ?? 8, 8);
+    case "controllers": return 2 + (s?.controllers.length ?? 1) * 1.5;
+    case "clients": return 3 + (s ? Math.min(s.networks, 12) * 0.8 : 6);
+    default: return 4;
+  }
+}
+
+/** Greedy split by weight; each column keeps the user's chosen order. */
+function balance(ids: OverviewPanel[], s?: Summary): [OverviewPanel[], OverviewPanel[]] {
+  const sorted = [...ids].sort((a, b) => panelWeight(b, s) - panelWeight(a, s));
+  const cols: [Set<OverviewPanel>, Set<OverviewPanel>] = [new Set(), new Set()];
+  const h = [0, 0];
+  for (const id of sorted) {
+    const i = h[0] <= h[1] ? 0 : 1;
+    cols[i].add(id);
+    h[i] += panelWeight(id, s);
+  }
+  return [ids.filter((id) => cols[0].has(id)), ids.filter((id) => cols[1].has(id))];
+}
 
 export default function OverviewPage() {
   const { prefs, setPrefs, can, moduleEnabled, modules } = useSession();
@@ -51,6 +76,16 @@ export default function OverviewPage() {
 
   const s = summary.data;
   const panels = prefs.overview_panels;
+  const renderPanel = (id: OverviewPanel) => (
+    <>
+      {id === "attention" && <AttentionPanel s={s} />}
+      {id === "route" && <RoutePanel devices={devices.data?.items} s={s} />}
+      {id === "health" && <HealthPanel s={s} devices={devices.data?.items} />}
+      {id === "changes" && <ChangesPanel s={s} />}
+      {id === "controllers" && <ControllersPanel s={s} />}
+      {id === "clients" && <ClientsPanel />}
+    </>
+  );
 
   return (
     <>
@@ -74,20 +109,19 @@ export default function OverviewPage() {
           </EmptyState>
         </Panel>
       ) : (
-        <div className="gap-[var(--gap)] xl:columns-2 [&>*]:mb-[var(--gap)]">
-          {panels.map((id) => {
-            const wide = id === "attention" || id === "route";
-            return (
-              <div key={id} className={clsx("break-inside-avoid", wide && "[column-span:all]")}>
-                {id === "attention" && <AttentionPanel s={s} />}
-                {id === "route" && <RoutePanel devices={devices.data?.items} s={s} />}
-                {id === "health" && <HealthPanel s={s} devices={devices.data?.items} />}
-                {id === "changes" && <ChangesPanel s={s} />}
-                {id === "controllers" && <ControllersPanel s={s} />}
-                {id === "clients" && <ClientsPanel />}
+        <div className="flex flex-col gap-[var(--gap)]">
+          {panels.filter((id) => WIDE.has(id)).map((id) => (
+            <div key={id}>{renderPanel(id)}</div>
+          ))}
+          <div className="grid grid-cols-1 items-start gap-[var(--gap)] xl:grid-cols-2">
+            {balance(panels.filter((id) => !WIDE.has(id)), s).map((col, i) => (
+              <div key={i} className="flex flex-col gap-[var(--gap)]">
+                {col.map((id) => (
+                  <div key={id}>{renderPanel(id)}</div>
+                ))}
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       )}
     </>
@@ -220,7 +254,7 @@ function RoutePanel({ devices, s }: { devices?: DeviceSummary[]; s?: Summary }) 
   }
   hops.push({ key: "clients", label: "Clients", sub: Object.entries(s.clients.by_type).map(([t, n]) => `${n} ${t.toLowerCase()}`).join(" · "), count: s.clients.total, href: "/inventory/clients", tone: "muted" });
   return (
-    <Panel title="Route to the internet" id="route">
+    <Panel title="Route from the internet" id="route">
       <RouteSign
         hops={hops}
         label="Network path from the internet to clients"

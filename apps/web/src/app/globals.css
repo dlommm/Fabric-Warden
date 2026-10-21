@@ -156,6 +156,7 @@
   --radius-sign: var(--radius);
 }
 
+@layer base {
 html {
   background: var(--ground);
   color: var(--ink);
@@ -198,6 +199,7 @@ textarea {
 
 .tabular {
   font-variant-numeric: tabular-nums;
+}
 }
 
 /* The sign border: a flat panel with a thin inset rule, used on zone patches,

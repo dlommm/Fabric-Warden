@@ -42,7 +42,7 @@ function Label({ hop }: { hop: Hop }) {
     <span
       className={clsx(
         "inline-flex max-w-full flex-col rounded-[3px] text-left sm:items-center sm:text-center",
-        patch && "px-2 py-1",
+        patch && "px-2 py-1 sm:-mt-1",
         tone === "warn" && "bg-[#ffd200] text-[#14171a]",
         tone === "crit" && "bg-white text-[#14171a] ring-2 ring-[#c8102e]",
         !patch && "text-white",
