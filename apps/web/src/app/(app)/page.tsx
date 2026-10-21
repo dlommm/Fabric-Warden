@@ -38,11 +38,18 @@ function panelWeight(id: OverviewPanel, s?: Summary): number {
   }
 }
 
-/** Greedy split by weight; each column keeps the user's chosen order. */
+/**
+ * Greedy split by weight. The user's first panel always leads the left column;
+ * each column keeps the user's chosen order.
+ */
 function balance(ids: OverviewPanel[], s?: Summary): [OverviewPanel[], OverviewPanel[]] {
-  const sorted = [...ids].sort((a, b) => panelWeight(b, s) - panelWeight(a, s));
   const cols: [Set<OverviewPanel>, Set<OverviewPanel>] = [new Set(), new Set()];
   const h = [0, 0];
+  if (ids.length) {
+    cols[0].add(ids[0]);
+    h[0] = panelWeight(ids[0], s);
+  }
+  const sorted = ids.slice(1).sort((a, b) => panelWeight(b, s) - panelWeight(a, s));
   for (const id of sorted) {
     const i = h[0] <= h[1] ? 0 : 1;
     cols[i].add(id);
@@ -113,7 +120,13 @@ export default function OverviewPage() {
           {panels.filter((id) => WIDE.has(id)).map((id) => (
             <div key={id}>{renderPanel(id)}</div>
           ))}
-          <div className="grid grid-cols-1 items-start gap-[var(--gap)] xl:grid-cols-2">
+          {/* Below xl: the user's order, one column. At xl: two balanced columns. */}
+          <div className="flex flex-col gap-[var(--gap)] xl:hidden">
+            {panels.filter((id) => !WIDE.has(id)).map((id) => (
+              <div key={id}>{renderPanel(id)}</div>
+            ))}
+          </div>
+          <div className="hidden items-start gap-[var(--gap)] xl:grid xl:grid-cols-2">
             {balance(panels.filter((id) => !WIDE.has(id)), s).map((col, i) => (
               <div key={i} className="flex flex-col gap-[var(--gap)]">
                 {col.map((id) => (
