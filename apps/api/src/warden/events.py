@@ -56,6 +56,7 @@ DEVICE_FIRMWARE_CHANGED = "inventory.device.firmware_changed"
 DEVICE_MISSING = "inventory.device.missing"
 CLIENT_CONNECTED = "inventory.client.connected"
 CLIENT_DISCONNECTED = "inventory.client.disconnected"
+CLIENT_MOVED = "inventory.client.moved"  # address or attachment point changed
 CONTROLLER_STATUS_CHANGED = "controller.status_changed"
 CONTROLLER_SYNC_COMPLETED = "controller.sync.completed"
 MODULE_ENABLED = "module.enabled"

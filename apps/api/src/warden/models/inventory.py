@@ -76,6 +76,8 @@ class Device(IdMixin, ObservedMixin, Base):
     # User-owned metadata; never overwritten by discovery.
     labels: Mapped[list[str]] = mapped_column(JSON, default=list)
     notes: Mapped[str] = mapped_column(Text, default="")
+    # Asset record (tag, serial, location, owner, purchase/warranty dates); user-owned.
+    asset: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
 
 
 class Port(IdMixin, Base):
@@ -117,6 +119,28 @@ class Client(IdMixin, ObservedMixin, Base):
     connected_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
     access: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     labels: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # User-owned identity; never overwritten by discovery.
+    alias: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    notes: Mapped[str] = mapped_column(Text, default="")
+
+
+class ClientSighting(IdMixin, Base):
+    """One continuous stretch of a client at the same address and attachment point.
+
+    Sync extends the open sighting while (ip, uplink, type) stay the same and opens
+    a new one when they change, so the table is the client's address/roaming history.
+    """
+
+    __tablename__ = "client_sightings"
+
+    client_id: Mapped[str] = mapped_column(ForeignKey("clients.id", ondelete="CASCADE"), index=True)
+    ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True, index=True)
+    uplink_device_external_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    type: Mapped[str] = mapped_column(String(16))
+    first_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    last_seen_at: Mapped[datetime] = mapped_column(UTCDateTime(), default=utcnow)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class Network(IdMixin, ObservedMixin, Base):

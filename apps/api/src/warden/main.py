@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete
 
 from warden import __version__
-from warden.api import auth, controllers, inventory, modules, system, users
+from warden.api import auth, clients, controllers, inventory, ipam, modules, system, users
 from warden.app_state import AppState
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
@@ -104,7 +104,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "DENY")
         return response
 
-    for r in (auth.router, users.router, modules.router, controllers.router, inventory.router, system.router):
+    for r in (auth.router, users.router, modules.router, controllers.router, inventory.router, clients.router, ipam.router, system.router):
         app.include_router(r)
     return app
 

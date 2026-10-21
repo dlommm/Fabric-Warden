@@ -33,7 +33,7 @@ async def test_enable_requires_dependencies(owner):
 
 
 async def test_planned_module_cannot_be_enabled(owner):
-    r = await owner.post("/api/modules/ipam/enable", json={"with_dependencies": True})
+    r = await owner.post("/api/modules/dcim/enable", json={"with_dependencies": True})
     assert r.status_code == 409
     assert "not yet implemented" in r.json()["detail"]["message"]
 
@@ -62,8 +62,8 @@ async def test_disabled_module_blocks_api_and_jobs_but_keeps_data(demo, owner):
 
 async def test_full_preset_reports_unavailable(owner):
     r = (await owner.post("/api/modules/presets/full/apply")).json()
-    assert set(r["enabled"]) == {"unifi-network", "inventory"}
-    assert "ipam" in r["unavailable"] and "ai-agents" in r["unavailable"]
+    assert set(r["enabled"]) == {"unifi-network", "inventory", "client-intel", "ipam"}
+    assert "dcim" in r["unavailable"] and "ai-agents" in r["unavailable"]
 
 
 async def test_module_listing_shape(owner):

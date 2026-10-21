@@ -20,6 +20,7 @@ from warden.integrations.unifi.client import UniFiError, UniFiNetworkClient
 from warden.jobs import JobContext
 from warden.models import (
     Client,
+    ClientSighting,
     Controller,
     Device,
     FirewallPolicy,
@@ -44,8 +45,12 @@ def _ts(value: str | None) -> datetime | None:
 class SiteSync:
     """Upserts one site's objects and tracks which ones disappeared."""
 
-    def __init__(self, db: AsyncSession, state: AppState, controller: Controller, site: Site, source: str) -> None:
+    def __init__(
+        self, db: AsyncSession, state: AppState, controller: Controller, site: Site, source: str, *, client_history: bool = False
+    ) -> None:
         self.db = db
+        self.client_history = client_history
+        self._sightings: dict[str, ClientSighting] | None = None
         self.state = state
         self.controller = controller
         self.site = site
@@ -151,6 +156,7 @@ class SiteSync:
             await self.db.delete(stale)
 
     async def apply_client(self, c: Client, item: dict[str, Any], created: bool) -> None:
+        prev = (c.ip_address, c.uplink_device_external_id)
         c.name = item.get("name") or item.get("macAddress") or item["id"]
         c.type = item.get("type", "UNKNOWN")
         c.mac_address = (item.get("macAddress") or "").lower() or None
@@ -163,6 +169,43 @@ class SiteSync:
         if created:
             await self.db.flush()
             await self.publish(ev.CLIENT_CONNECTED, "client", c.id, {"name": c.name, "ip": c.ip_address, "type": c.type})
+        elif prev != (c.ip_address, c.uplink_device_external_id):
+            payload = {
+                "name": c.name,
+                "from_ip": prev[0],
+                "to_ip": c.ip_address,
+                "from_uplink": prev[1],
+                "to_uplink": c.uplink_device_external_id,
+            }
+            await self.publish(ev.CLIENT_MOVED, "client", c.id, payload)
+        if self.client_history:
+            await self._record_sighting(c)
+
+    async def _record_sighting(self, c: Client) -> None:
+        if self._sightings is None:
+            # Latest sighting per client in this site, loaded once per sync.
+            rows = await self.db.scalars(
+                select(ClientSighting)
+                .join(Client, Client.id == ClientSighting.client_id)
+                .where(Client.site_id == self.site.id)
+                .order_by(ClientSighting.last_seen_at)
+            )
+            self._sightings = {r.client_id: r for r in rows}
+        last = self._sightings.get(c.id)
+        if last and (last.ip_address, last.uplink_device_external_id, last.type) == (c.ip_address, c.uplink_device_external_id, c.type):
+            last.last_seen_at = self.now
+            return
+        row = ClientSighting(
+            client_id=c.id,
+            ip_address=c.ip_address,
+            uplink_device_external_id=c.uplink_device_external_id,
+            type=c.type,
+            first_seen_at=self.now,
+            last_seen_at=self.now,
+            is_demo=self.controller.is_demo,
+        )
+        self.db.add(row)
+        self._sightings[c.id] = row
 
     async def apply_network(self, n: Network, item: dict[str, Any], created: bool) -> None:
         n.name = item.get("name", "")
@@ -210,13 +253,15 @@ async def _try(caps: dict[str, Any], cap_id: str, fn: Callable[[], Awaitable[Any
     return result
 
 
-async def sync_controller(db: AsyncSession, state: AppState, controller: Controller, *, inventory: bool) -> dict[str, Any]:
+async def sync_controller(
+    db: AsyncSession, state: AppState, controller: Controller, *, inventory: bool, client_history: bool = False
+) -> dict[str, Any]:
     api_key = await state.vault.reveal(db, controller.credential_id) if controller.credential_id else ""
     prev_status = controller.status
     summary: dict[str, Any] = {"controller": controller.name}
     try:
         async with state.unifi_client(controller, api_key) as api:
-            summary.update(await _sync(db, state, controller, api, inventory=inventory))
+            summary.update(await _sync(db, state, controller, api, inventory=inventory, client_history=client_history))
         controller.status, controller.status_detail = "ok", ""
     except UniFiError as exc:
         controller.status = "unreachable" if exc.kind in ("unreachable", "tls") else "degraded"
@@ -239,7 +284,9 @@ async def sync_controller(db: AsyncSession, state: AppState, controller: Control
     return summary
 
 
-async def _sync(db: AsyncSession, state: AppState, controller: Controller, api: UniFiNetworkClient, *, inventory: bool) -> dict[str, Any]:
+async def _sync(
+    db: AsyncSession, state: AppState, controller: Controller, api: UniFiNetworkClient, *, inventory: bool, client_history: bool
+) -> dict[str, Any]:
     info = await api.info()
     version = info.get("applicationVersion")
     report = capabilities.evaluate(version)
@@ -261,7 +308,7 @@ async def _sync(db: AsyncSession, state: AppState, controller: Controller, api: 
         await db.flush()
         if not inventory:
             continue
-        ss = SiteSync(db, state, controller, site, source)
+        ss = SiteSync(db, state, controller, site, source, client_history=client_history)
         sid = item["id"]
         devices = await _try(caps, "network.devices.read", partial(api.devices, sid))
         if devices is not None:
@@ -305,12 +352,13 @@ async def _sync_stats(db: AsyncSession, caps: dict[str, Any], api: UniFiNetworkC
 
 async def sync_job(ctx: JobContext) -> dict[str, Any]:
     inventory = await ctx.state.modules.is_enabled(ctx.db, "inventory")
+    client_history = inventory and await ctx.state.modules.is_enabled(ctx.db, "client-intel")
     q = select(Controller)
     if cid := ctx.params.get("controller_id"):
         q = q.where(Controller.id == cid)
     results = []
     for controller in await ctx.db.scalars(q):
-        results.append(await sync_controller(ctx.db, ctx.state, controller, inventory=inventory))
+        results.append(await sync_controller(ctx.db, ctx.state, controller, inventory=inventory, client_history=client_history))
         await ctx.state.bus.publish(
             ctx.db,
             Event(

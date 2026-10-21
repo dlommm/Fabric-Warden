@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 import ipaddress
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, String, cast, func, or_, select
 
 from warden import audit
-from warden.api.deps import DB, Allowed, require_module
+from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
 from warden.models import (
     Client,
@@ -20,6 +20,8 @@ from warden.models import (
     EventRecord,
     FirewallPolicy,
     FirewallZone,
+    IpPrefix,
+    IpReservation,
     Network,
     Port,
     Radio,
@@ -57,6 +59,7 @@ def device_summary(d: Device) -> dict[str, Any]:
         "state": d.state,
         "features": d.features,
         "labels": d.labels,
+        "asset_tag": (d.asset or {}).get("asset_tag"),
         "site_id": d.site_id,
         "cpu_pct": (d.stats or {}).get("cpuUtilizationPct"),
         "memory_pct": (d.stats or {}).get("memoryUtilizationPct"),
@@ -174,6 +177,7 @@ async def get_device(device_id: str, db: DB, principal: Reader) -> dict:
     return {
         **device_summary(d),
         "notes": d.notes,
+        "asset": d.asset or {},
         "stats": d.stats,
         "stats_observed_at": d.stats_observed_at.isoformat() if d.stats_observed_at else None,
         "ports": [
@@ -204,9 +208,26 @@ async def get_device(device_id: str, db: DB, principal: Reader) -> dict:
     }
 
 
+Label = Annotated[str, Field(min_length=1, max_length=48)]
+Short = Annotated[str, Field(max_length=128)]
+
+
+class AssetRecord(BaseModel):
+    """User-maintained asset facts. The official API does not expose serial numbers."""
+
+    asset_tag: Short | None = None
+    serial_number: Short | None = None
+    location: Short | None = None
+    owner: Short | None = None
+    purchased_on: date | None = None
+    warranty_until: date | None = None
+    supplier: Short | None = None
+
+
 class MetadataPatch(BaseModel):
-    labels: list[Annotated[str, Field(min_length=1, max_length=48)]] | None = Field(default=None, max_length=32)
+    labels: list[Label] | None = Field(default=None, max_length=32)
     notes: str | None = Field(default=None, max_length=20000)
+    asset: AssetRecord | None = None
 
 
 @router.patch("/devices/{device_id}")
@@ -218,13 +239,16 @@ async def update_device_metadata(device_id: str, body: MetadataPatch, db: DB, pr
         d.labels = sorted(set(body.labels))
     if body.notes is not None:
         d.notes = body.notes
+    if body.asset is not None:
+        d.asset = body.asset.model_dump(mode="json", exclude_none=True)
     await audit.record(
         db,
         principal.actor,
         "inventory.device.metadata",
         target_type="device",
         target_id=d.id,
-        detail=body.model_dump(exclude_unset=True, exclude={"notes"}) | ({"notes": "updated"} if body.notes is not None else {}),
+        detail=body.model_dump(mode="json", exclude_unset=True, exclude={"notes"})
+        | ({"notes": "updated"} if body.notes is not None else {}),
     )
     return device_summary(d)
 
@@ -256,7 +280,7 @@ async def list_clients(db: DB, principal: Reader, q: str | None = None, type: st
     stmt = select(Client).where(Client.present.is_(True)).order_by(Client.name)
     if type:
         stmt = stmt.where(Client.type == type)
-    stmt = _search(stmt, [Client.name, Client.mac_address, Client.ip_address], q)
+    stmt = _search(stmt, [Client.name, Client.alias, Client.owner, Client.mac_address, Client.ip_address], q)
     nets = _subnets(list(await db.scalars(select(Network).where(Network.present.is_(True)))))
     devices = {(d.site_id, d.external_id): d for d in await db.scalars(select(Device))}
     items = []
@@ -269,6 +293,9 @@ async def list_clients(db: DB, principal: Reader, q: str | None = None, type: st
             {
                 "id": c.id,
                 "name": c.name,
+                "alias": c.alias,
+                "owner": c.owner,
+                "labels": c.labels,
                 "type": c.type,
                 "mac_address": c.mac_address,
                 "ip_address": c.ip_address,
@@ -280,6 +307,37 @@ async def list_clients(db: DB, principal: Reader, q: str | None = None, type: st
             }
         )
     return {"items": items, "total": len(items)}
+
+
+class ClientIdentityPatch(BaseModel):
+    alias: Short | None = None
+    owner: Short | None = None
+    labels: list[Label] | None = Field(default=None, max_length=32)
+    notes: str | None = Field(default=None, max_length=20000)
+
+
+@router.patch("/clients/{client_id}")
+async def update_client_identity(client_id: str, body: ClientIdentityPatch, db: DB, principal: Allowed(P.INVENTORY_EDIT)) -> dict:
+    c = await db.get(Client, client_id)
+    if c is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "client not found")
+    fields = body.model_dump(exclude_unset=True)
+    for key in ("alias", "owner"):
+        if key in fields:
+            setattr(c, key, (fields[key] or "").strip() or None)
+    if body.labels is not None:
+        c.labels = sorted(set(body.labels))
+    if body.notes is not None:
+        c.notes = body.notes
+    await audit.record(
+        db,
+        principal.actor,
+        "inventory.client.identity",
+        target_type="client",
+        target_id=c.id,
+        detail={k: v for k, v in fields.items() if k != "notes"} | ({"notes": "updated"} if body.notes is not None else {}),
+    )
+    return {"id": c.id, "name": c.name, "alias": c.alias, "owner": c.owner, "labels": c.labels, "notes": c.notes}
 
 
 @router.get("/networks")
@@ -359,9 +417,18 @@ async def list_sites(db: DB, principal: Reader) -> dict:
     return {"items": [{"id": s.id, "name": s.name, "controller_id": s.controller_id, "provenance": provenance(s)} for s in rows]}
 
 
+def _hit(kind: str, id: str, title: str, subtitle: str, href: str, is_demo: bool) -> dict[str, Any]:
+    return {"kind": kind, "id": id, "title": title, "subtitle": subtitle, "href": href, "is_demo": is_demo}
+
+
 @router.get("/search")
-async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1, max_length=128)]) -> dict:
-    like = f"%{q.strip().lower()}%"
+async def search(db: DB, state: State, principal: Reader, q: Annotated[str, Query(min_length=1, max_length=128)]) -> dict:
+    term = q.strip().lower()
+    like = f"%{term}%"
+    try:
+        addr: ipaddress.IPv4Address | ipaddress.IPv6Address | None = ipaddress.ip_address(term)
+    except ValueError:
+        addr = None
     devices = await db.scalars(
         select(Device)
         .where(
@@ -371,6 +438,8 @@ async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1
                 Device.mac_address.like(like),
                 Device.ip_address.like(like),
                 func.lower(Device.model).like(like),
+                func.lower(cast(Device.labels, String)).like(like),
+                func.lower(cast(Device.asset, String)).like(like),
             ),
         )
         .limit(8)
@@ -378,43 +447,69 @@ async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1
     clients = await db.scalars(
         select(Client)
         .where(
-            Client.present.is_(True), or_(func.lower(Client.name).like(like), Client.mac_address.like(like), Client.ip_address.like(like))
+            Client.present.is_(True),
+            or_(
+                func.lower(Client.name).like(like),
+                func.lower(Client.alias).like(like),
+                func.lower(Client.owner).like(like),
+                Client.mac_address.like(like),
+                Client.ip_address.like(like),
+                func.lower(cast(Client.labels, String)).like(like),
+            ),
         )
         .limit(8)
     )
-    networks = await db.scalars(select(Network).where(Network.present.is_(True), func.lower(Network.name).like(like)).limit(5))
-    results: list[dict[str, Any]] = []
-    results += [
-        {
-            "kind": "device",
-            "id": d.id,
-            "title": d.name,
-            "subtitle": f"{d.model} · {d.ip_address or d.mac_address}",
-            "href": f"/inventory/devices/{d.id}",
-            "is_demo": d.is_demo,
-        }
+    present_nets = list(await db.scalars(select(Network).where(Network.present.is_(True))))
+    networks = [n for n in present_nets if term in n.name.lower()][:5]
+    if addr is not None:
+        networks += [row for net, row in _subnets(present_nets) if addr in net and row not in networks]
+    client_intel = await state.modules.is_enabled(db, "client-intel")
+    results = [
+        _hit("device", d.id, d.name, f"{d.model} · {d.ip_address or d.mac_address}", f"/inventory/devices/{d.id}", d.is_demo)
         for d in devices
     ]
     results += [
-        {
-            "kind": "client",
-            "id": c.id,
-            "title": c.name,
-            "subtitle": c.ip_address or c.mac_address or c.type,
-            "href": f"/inventory/clients?q={c.name}",
-            "is_demo": c.is_demo,
-        }
+        _hit(
+            "client",
+            c.id,
+            c.alias or c.name,
+            " · ".join(x for x in (c.name if c.alias else None, c.ip_address or c.mac_address or c.type) if x),
+            f"/inventory/clients/{c.id}" if client_intel else f"/inventory/clients?q={c.name}",
+            c.is_demo,
+        )
         for c in clients
     ]
     results += [
-        {
-            "kind": "network",
-            "id": n.id,
-            "title": n.name,
-            "subtitle": f"VLAN {n.vlan_id}" if n.vlan_id else n.management,
-            "href": "/inventory/networks",
-            "is_demo": n.is_demo,
-        }
+        _hit("network", n.id, n.name, f"VLAN {n.vlan_id}" if n.vlan_id else n.management, "/inventory/networks", n.is_demo)
         for n in networks
     ]
+    if await state.modules.is_enabled(db, "ipam"):
+        results += await _search_ipam(db, like, addr)
     return {"results": results}
+
+
+async def _search_ipam(db: DB, like: str, addr: ipaddress.IPv4Address | ipaddress.IPv6Address | None) -> list[dict[str, Any]]:
+    out = []
+    prefixes = list(await db.scalars(select(IpPrefix)))
+    for p in prefixes:
+        net = ipaddress.ip_network(p.cidr)
+        hit = (addr is not None and addr in net) or like.strip("%") in p.cidr or like.strip("%") in p.description.lower()
+        if hit:
+            out.append(_hit("prefix", p.id, p.cidr, p.description or p.status, f"/ipam/prefixes/{p.id}", p.is_demo))
+    reservations = await db.scalars(
+        select(IpReservation)
+        .where(
+            or_(
+                IpReservation.address.like(like),
+                func.lower(IpReservation.hostname).like(like),
+                IpReservation.mac_address.like(like),
+                func.lower(IpReservation.description).like(like),
+            )
+        )
+        .limit(8)
+    )
+    out += [
+        _hit("reservation", r.id, r.address, r.hostname or r.kind, f"/ipam/prefixes/{r.prefix_id}?address={r.address}", r.is_demo)
+        for r in reservations
+    ]
+    return out[:12]

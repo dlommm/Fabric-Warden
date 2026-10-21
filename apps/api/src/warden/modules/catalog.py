@@ -10,6 +10,7 @@ from __future__ import annotations
 from warden.events import (
     CLIENT_CONNECTED,
     CLIENT_DISCONNECTED,
+    CLIENT_MOVED,
     CONTROLLER_STATUS_CHANGED,
     CONTROLLER_SYNC_COMPLETED,
     DEVICE_DISCOVERED,
@@ -129,29 +130,61 @@ INVENTORY = ModuleManifest(
         DEVICE_MISSING,
         CLIENT_CONNECTED,
         CLIENT_DISCONNECTED,
+        CLIENT_MOVED,
     ],
     subscribes=[CONTROLLER_SYNC_COMPLETED],
     resources=ResourceEstimate(memory_mb=32, disk_mb_per_day=5),
     data_ownership=["sites", "devices", "ports", "radios", "clients", "networks", "wans", "firewall_zones", "firewall_policies"],
 )
 
+CLIENT_INTEL = ModuleManifest(
+    id="client-intel",
+    version=VERSION,
+    name="Client Intelligence",
+    category=C.NETWORK,
+    description="Client 360 view with address and attachment history, identity (alias, owner, notes) and per-client timeline.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=2,
+    requires=["core", "inventory"],
+    controller_capabilities=["network.clients.read"],
+    subscribes=[CLIENT_CONNECTED, CLIENT_DISCONNECTED, CLIENT_MOVED],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=2),
+    data_ownership=["client_sightings"],
+    uninstall_behavior="Disabling stops recording new sightings; recorded history is retained.",
+    warnings=[
+        "The official API exposes no device fingerprint, hostname source or DHCP lease data, "
+        "so device-type confidence is not available. History begins when this module is enabled."
+    ],
+)
+
+IPAM = ModuleManifest(
+    id="ipam",
+    version=VERSION,
+    name="IP Address Management",
+    category=C.NETWORK,
+    description=(
+        "Documented prefixes, VLANs and address reservations compared against observed networks and clients: "
+        "utilisation, address maps and planned-vs-observed findings."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=2,
+    requires=["core", "inventory"],
+    controller_capabilities=["network.networks.read", "network.clients.read"],
+    permissions=["ipam:edit"],
+    nav=[
+        NavEntry(label="IP Plan", href="/ipam", icon="grid", section="Network"),
+        NavEntry(label="VLANs", href="/ipam/vlans", icon="layers", section="Network"),
+    ],
+    resources=ResourceEstimate(memory_mb=16),
+    data_ownership=["ip_prefixes", "ip_reservations", "vlan_records"],
+    warnings=[
+        "IPAM records are documentation only and are never pushed to a controller. "
+        "DHCP leases and controller-side fixed-IP reservations are not exposed by the official API, "
+        "so lease state and controller reservations cannot be compared yet."
+    ],
+)
+
 PLANNED: list[ModuleManifest] = [
-    _planned(
-        "ipam",
-        "Enterprise IPAM",
-        C.NETWORK,
-        2,
-        "Prefixes, VLANs, DHCP scopes and reservations, utilisation and planned-vs-observed allocations.",
-        ["inventory"],
-    ),
-    _planned(
-        "client-intel",
-        "Client Intelligence",
-        C.NETWORK,
-        2,
-        "Client 360 view, address and connection history, fingerprint confidence.",
-        ["inventory"],
-    ),
     _planned(
         "analytics-studio",
         "Analytics Studio",
@@ -305,7 +338,7 @@ PLANNED: list[ModuleManifest] = [
     ),
 ]
 
-CATALOG: dict[str, ModuleManifest] = {m.id: m for m in [CORE, UNIFI_NETWORK, INVENTORY, *PLANNED]}
+CATALOG: dict[str, ModuleManifest] = {m.id: m for m in [CORE, UNIFI_NETWORK, INVENTORY, CLIENT_INTEL, IPAM, *PLANNED]}
 
 PRESETS: dict[str, dict[str, object]] = {
     "minimal": {"name": "Minimal Core", "modules": ["core", "unifi-network", "inventory"]},

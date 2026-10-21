@@ -1,5 +1,6 @@
 from warden.models.inventory import (
     Client,
+    ClientSighting,
     Controller,
     Device,
     FirewallPolicy,
@@ -10,6 +11,7 @@ from warden.models.inventory import (
     Site,
     Wan,
 )
+from warden.models.ipam import IpPrefix, IpReservation, VlanRecord
 from warden.models.platform import (
     ApiToken,
     AuditRecord,
@@ -28,12 +30,15 @@ __all__ = [
     "AuditRecord",
     "AuthSession",
     "Client",
+    "ClientSighting",
     "Controller",
     "Credential",
     "Device",
     "EventRecord",
     "FirewallPolicy",
     "FirewallZone",
+    "IpPrefix",
+    "IpReservation",
     "JobRun",
     "ModuleState",
     "Network",
@@ -43,5 +48,6 @@ __all__ = [
     "Setting",
     "Site",
     "User",
+    "VlanRecord",
     "Wan",
 ]

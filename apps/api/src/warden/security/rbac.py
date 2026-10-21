@@ -13,6 +13,7 @@ from enum import StrEnum
 class P(StrEnum):
     INVENTORY_READ = "inventory:read"
     INVENTORY_EDIT = "inventory:edit"  # labels, notes; never controller config
+    IPAM_EDIT = "ipam:edit"  # documented prefixes/VLANs/reservations; never controller config
     CONTROLLERS_READ = "controllers:read"
     CONTROLLERS_MANAGE = "controllers:manage"
     MODULES_READ = "modules:read"
@@ -38,6 +39,7 @@ ROLES: dict[str, frozenset[P]] = {
         {
             P.INVENTORY_READ,
             P.INVENTORY_EDIT,
+            P.IPAM_EDIT,
             P.CONTROLLERS_READ,
             P.MODULES_READ,
             P.JOBS_READ,
