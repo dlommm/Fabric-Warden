@@ -1,0 +1,66 @@
+{
+  "retrieved": "2026-10-21",
+  "note": "Every endpoint Fabric Warden calls on a server or hypervisor, with the published source it was verified against. All calls are reads.",
+  "integrations": {
+    "proxmox": {
+      "name": "Proxmox VE API",
+      "sources": [
+        "https://pve.proxmox.com/wiki/Proxmox_VE_API",
+        "https://pve.proxmox.com/pve-docs/api-viewer/apidoc.js"
+      ],
+      "base": "https://<host>:8006/api2/json",
+      "auth": "Authorization: PVEAPIToken=USER@REALM!TOKENID=SECRET (API token; no CSRF token needed). Least privilege: the built-in PVEAuditor role on /, or VM.Audit + Sys.Audit + Datastore.Audit; VM.GuestAgent.Audit for guest IP addresses.",
+      "endpoints": [
+        {"method": "GET", "path": "/version", "used_for": "Proxmox VE version", "permission": "any authenticated user"},
+        {"method": "GET", "path": "/cluster/status", "used_for": "Cluster name, node names and node IP addresses", "permission": "any authenticated user"},
+        {"method": "GET", "path": "/cluster/resources", "used_for": "Nodes, VMs, LXC containers and storage with CPU, memory, disk and status (type in vm, storage, node, sdn)", "permission": "user: all; results filtered by the token's privileges"},
+        {"method": "GET", "path": "/nodes/{node}/status", "used_for": "pveversion, kernel, load average", "permission": "Sys.Audit on /nodes/{node}"},
+        {"method": "GET", "path": "/nodes/{node}/qemu/{vmid}/config", "used_for": "onboot (start at boot) and NIC MAC addresses", "permission": "VM.Audit on /vms/{vmid}"},
+        {"method": "GET", "path": "/nodes/{node}/lxc/{vmid}/config", "used_for": "onboot and NIC MAC addresses", "permission": "VM.Audit on /vms/{vmid}"},
+        {"method": "GET", "path": "/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces", "used_for": "Guest IP addresses (needs the QEMU guest agent in the VM)", "permission": "VM.GuestAgent.Audit or VM.GuestAgent.Unrestricted on /vms/{vmid}"},
+        {"method": "GET", "path": "/nodes/{node}/lxc/{vmid}/interfaces", "used_for": "Container IP addresses", "permission": "VM.Audit on /vms/{vmid}"}
+      ],
+      "not_used": "Ticket/cookie authentication; any POST, PUT or DELETE (power actions, config changes)."
+    },
+    "unraid": {
+      "name": "Unraid API (GraphQL)",
+      "sources": [
+        "https://docs.unraid.net/API/",
+        "https://docs.unraid.net/API/how-to-use-the-api/",
+        "https://github.com/unraid/api/blob/main/api/generated-schema.graphql"
+      ],
+      "base": "http(s)://<server>/graphql",
+      "auth": "x-api-key: <API key>. Built into Unraid 7.2 and later; earlier releases need the Unraid Connect plugin. Create a key with read-only access.",
+      "endpoints": [
+        {"method": "POST", "path": "/graphql", "operation": "query", "used_for": "info.os, info.cpu, info.versions.core, metrics.cpu.percentTotal, metrics.memory, networkInterfaces, array (state, capacity, parities, disks, caches), docker.containers, vms.domains, upsDevices"}
+      ],
+      "not_used": "Every mutation (array, Docker, VM and parity actions). The client refuses any document that is not a query before sending it."
+    },
+    "docker": {
+      "name": "Docker Engine API",
+      "sources": ["https://docs.docker.com/reference/api/engine/version/v1.47/"],
+      "base": "http://<socket-proxy>:2375 or unix:///var/run/docker.sock (prefixed /v1.47)",
+      "auth": "None by default. Expose the engine through a read-only socket proxy that allows only GET on the endpoints below; an optional bearer token is sent when a reverse proxy requires one.",
+      "endpoints": [
+        {"method": "GET", "path": "/version", "used_for": "Engine and API version"},
+        {"method": "GET", "path": "/info", "used_for": "Host name, OS, kernel, CPU count, memory, container counts"},
+        {"method": "GET", "path": "/containers/json?all=true", "used_for": "Containers with image, state, status, ports and network addresses"},
+        {"method": "GET", "path": "/containers/{id}/json", "used_for": "Restart policy (always / unless-stopped count as autostart)"}
+      ],
+      "not_used": "Container stats (CPU and memory per container), exec, logs and every POST/DELETE."
+    },
+    "node_exporter": {
+      "name": "Prometheus node_exporter",
+      "sources": [
+        "https://prometheus.io/docs/guides/node-exporter/",
+        "https://github.com/prometheus/node_exporter/tree/master/collector"
+      ],
+      "base": "http://<host>:9100",
+      "auth": "None by default; optional bearer token for a reverse proxy.",
+      "endpoints": [
+        {"method": "GET", "path": "/metrics", "used_for": "node_uname_info, node_memory_MemTotal_bytes, node_memory_MemAvailable_bytes, node_load1, node_boot_time_seconds, node_time_seconds, node_cpu_seconds_total (utilisation from two scrapes), node_filesystem_size_bytes / node_filesystem_avail_bytes, node_network_info (MAC addresses), node_exporter_build_info"}
+      ],
+      "not_used": "SSH or any agent that can run commands."
+    }
+  }
+}

@@ -390,6 +390,32 @@ DOCS = ModuleManifest(
     uninstall_behavior="Disabling hides pages; pages and their full history are retained.",
 )
 
+SERVERS = ModuleManifest(
+    id="servers",
+    version=VERSION,
+    name="Servers & Virtualization",
+    category=C.INFRASTRUCTURE,
+    description=(
+        "Read-only inventory of Proxmox VE nodes, VMs and containers, Unraid servers (array, Docker, VMs, UPS), "
+        "Docker hosts and Linux hosts via node_exporter, matched to the clients the network reports."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "inventory"],
+    permissions=["servers:manage"],
+    nav=[NavEntry(label="Servers", href="/servers", icon="server", section="Infrastructure")],
+    jobs=[JobDecl(id="servers.sync", title="Poll servers and hypervisors", default_interval_seconds=60)],
+    external_integrations=["Proxmox VE API (8.x/9.x)", "Unraid API (7.2+)", "Docker Engine API 1.47+", "Prometheus node_exporter"],
+    resources=ResourceEstimate(memory_mb=32, disk_mb_per_day=5),
+    data_ownership=["host_connections", "hosts", "workloads", "host_storage"],
+    uninstall_behavior="Disabling stops polling; collected inventory and credentials are retained until connections are deleted.",
+    warnings=[
+        "All integrations are read-only: Fabric Warden never starts, stops or changes a VM or container. "
+        "Docker should be reached through a read-only socket proxy, not an exposed Docker socket. "
+        "Guest IP addresses need the QEMU guest agent; container CPU usage is not collected."
+    ],
+)
+
 PLANNED: list[ModuleManifest] = [
     _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
@@ -409,9 +435,6 @@ PLANNED: list[ModuleManifest] = [
         3,
         "Optics inventory, FEC state, optical power and physical-layer errors where hardware exposes them.",
         ["switching"],
-    ),
-    _planned(
-        "servers", "Servers & Virtualization", C.INFRASTRUCTURE, 4, "Proxmox, Unraid, Docker and Linux host integrations.", ["inventory"]
     ),
     _planned(
         "firewall",
@@ -507,6 +530,7 @@ CATALOG: dict[str, ModuleManifest] = {
         ASSET_LIFECYCLE,
         TOPOLOGY,
         DOCS,
+        SERVERS,
         *PLANNED,
     ]
 }

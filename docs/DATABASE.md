@@ -13,6 +13,8 @@ PostgreSQL in deployment, SQLite for development and tests. Schema managed by Al
 ## Phase 4 tables
 `dcim_locations`, `dcim_racks`, `dcim_rack_items` (optional unique link to a device), `dcim_cables`, `dcim_cable_ends` (two per cable), `dcim_power_feeds`, `dcim_power_links`, `assets`, `doc_pages`, `doc_versions`. All user-owned with `is_demo`. See [INFRASTRUCTURE.md](INFRASTRUCTURE.md).
 
+Servers (4b): `host_connections` (credential in `credentials`), and observed `hosts`, `workloads`, `host_storage` with the shared provenance columns. See [SERVERS.md](SERVERS.md).
+
 ## Phase 3 tables
 `metric_series`, `metric_samples` (tiered metric history), `dashboards`, `alert_rules`, `alerts`, `maintenance_windows`, `notification_channels` (secrets in `credentials`), `notification_deliveries`. See [ANALYTICS.md](ANALYTICS.md).
 

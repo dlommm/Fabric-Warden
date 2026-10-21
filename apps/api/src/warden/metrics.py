@@ -67,6 +67,9 @@ METRICS: dict[str, MetricDef] = {
         MetricDef("controller.reachable", "Controller reachable", "bool", "controller", "1 when the last sync succeeded.", False),
         MetricDef("wan.latency_ms", "Latency", "ms", "probe", "TCP connect time from the Warden host to a probe target."),
         MetricDef("wan.loss_pct", "Probe loss", "pct", "probe", "Share of probe attempts that failed."),
+        MetricDef("host.cpu_pct", "Host CPU", "pct", "host", "CPU utilisation reported by Proxmox, Unraid or node_exporter."),
+        MetricDef("host.mem_pct", "Host memory", "pct", "host", "Memory in use on a server or hypervisor node."),
+        MetricDef("host.load_1m", "Host load (1 min)", "load", "host", "One-minute load average on a server."),
     ]
 }
 

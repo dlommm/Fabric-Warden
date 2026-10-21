@@ -123,3 +123,14 @@ API keys are per console: a key from a gateway does not authenticate against a s
 | 10.3.58 | `GET` | `/v1/sites/{siteId}/switching/mc-lag-domains/{mcLagDomainId}` | Get MC-LAG Domain |
 | 10.3.58 | `GET` | `/v1/sites/{siteId}/switching/switch-stacks` | List Switch Stacks |
 | 10.3.58 | `GET` | `/v1/sites/{siteId}/switching/switch-stacks/{switchStackId}` | Get Switch Stack |
+
+## Servers and virtualization
+
+Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoints were verified on 2026-10-21 against the published sources below; the machine-readable list with required permissions is `apps/api/src/warden/integrations/hosts/official_api_matrix.json`. Everything is read-only (see [SERVERS.md](SERVERS.md)).
+
+| Integration | Source | Endpoints used |
+|---|---|---|
+| Proxmox VE API | [API wiki](https://pve.proxmox.com/wiki/Proxmox_VE_API), [API viewer schema](https://pve.proxmox.com/pve-docs/api-viewer/) | `GET /version`, `/cluster/status`, `/cluster/resources`, `/nodes/{node}/status`, `/nodes/{node}/{qemu,lxc}/{vmid}/config`, `/nodes/{node}/qemu/{vmid}/agent/network-get-interfaces`, `/nodes/{node}/lxc/{vmid}/interfaces` |
+| Unraid API | [docs.unraid.net/API](https://docs.unraid.net/API/), [GraphQL schema](https://github.com/unraid/api/blob/main/api/generated-schema.graphql) | one `query` on `/graphql`: `info`, `metrics`, `networkInterfaces`, `array`, `docker.containers`, `vms.domains`, `upsDevices` |
+| Docker Engine API v1.47 | [Engine API reference](https://docs.docker.com/reference/api/engine/version/v1.47/) | `GET /version`, `/info`, `/containers/json?all=true`, `/containers/{id}/json` |
+| node_exporter | [Prometheus guide](https://prometheus.io/docs/guides/node-exporter/), [collector source](https://github.com/prometheus/node_exporter/tree/master/collector) | `GET /metrics` |

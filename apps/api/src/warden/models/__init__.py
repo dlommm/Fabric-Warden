@@ -35,6 +35,7 @@ from warden.models.platform import (
     Setting,
     User,
 )
+from warden.models.servers import Host, HostConnection, HostStorage, Workload
 
 __all__ = [
     "Alert",
@@ -56,6 +57,9 @@ __all__ = [
     "EventRecord",
     "FirewallPolicy",
     "FirewallZone",
+    "Host",
+    "HostConnection",
+    "HostStorage",
     "IpPrefix",
     "IpReservation",
     "JobRun",
@@ -79,4 +83,5 @@ __all__ = [
     "User",
     "VlanRecord",
     "Wan",
+    "Workload",
 ]

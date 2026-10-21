@@ -29,6 +29,7 @@ from warden.api import (
     modules,
     notifications,
     power,
+    servers,
     system,
     topology,
     users,
@@ -38,6 +39,7 @@ from warden.app_state import AppState
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
 from warden.events import EventBus
+from warden.integrations.hosts.sync import sync_job as servers_sync_job
 from warden.integrations.probe import probe_job
 from warden.integrations.unifi.sync import sync_job
 from warden.jobs import JobContext, JobSpec, Scheduler
@@ -77,6 +79,7 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(JobSpec("unifi-network.sync", "unifi-network", "Poll controllers and sync inventory", sync_job, 60))
     state.scheduler.register(JobSpec("monitoring.evaluate", "monitoring", "Evaluate alert rules", monitoring.evaluate_job, 60))
     state.scheduler.register(JobSpec("wan.probe", "wan", "Probe latency and loss", probe_job, 60))
+    state.scheduler.register(JobSpec("servers.sync", "servers", "Poll servers and hypervisors", servers_sync_job, 60))
     return state
 
 
@@ -154,6 +157,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         topology.router,
         docs.router,
         demo_infra.router,
+        servers.router,
         system.router,
     ):
         app.include_router(r)

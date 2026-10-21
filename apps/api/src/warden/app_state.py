@@ -12,10 +12,17 @@ from fastapi import FastAPI
 from warden.config import Settings
 from warden.db import Database
 from warden.events import EventBus
+from warden.integrations.hosts.simulators import (
+    HostSimState,
+    create_docker_app,
+    create_node_exporter_app,
+    create_proxmox_app,
+    create_unraid_app,
+)
 from warden.integrations.unifi.client import UniFiNetworkClient
 from warden.integrations.unifi.simulator import SimulatorState, create_simulator_app
 from warden.jobs import Scheduler
-from warden.models import Controller
+from warden.models import Controller, HostConnection
 from warden.modules.service import ModuleService
 from warden.security.vault import Vault
 
@@ -32,6 +39,8 @@ class AppState:
     scheduler: Scheduler = field(init=False)
     simulator: SimulatorState = field(default_factory=SimulatorState)
     _sim_app: FastAPI | None = None
+    host_sim: HostSimState = field(default_factory=HostSimState)
+    _host_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
     # Seams for outbound I/O so tests never reach a real network.
     http_transport: httpx.AsyncBaseTransport | None = None  # notification webhooks / ntfy
     smtp_send: Callable[[dict[str, Any], str, Any], Awaitable[None]] | None = None  # (config, password, EmailMessage)
@@ -41,6 +50,20 @@ class AppState:
         if self._sim_app is None:
             self._sim_app = create_simulator_app(self.simulator)
         return httpx.ASGITransport(app=self._sim_app)
+
+    def host_transport(self, conn: HostConnection) -> httpx.AsyncBaseTransport | None:
+        """Demo connections are served by in-process simulators; real ones use the network."""
+        if not conn.is_demo:
+            return None
+        if conn.kind not in self._host_sim_apps:
+            factory = {
+                "proxmox": create_proxmox_app,
+                "unraid": create_unraid_app,
+                "docker": create_docker_app,
+                "node_exporter": create_node_exporter_app,
+            }
+            self._host_sim_apps[conn.kind] = factory[conn.kind](self.host_sim)
+        return httpx.ASGITransport(app=self._host_sim_apps[conn.kind])
 
     def unifi_client(self, controller: Controller, api_key: str) -> UniFiNetworkClient:
         if controller.kind == "unifi-simulator":
