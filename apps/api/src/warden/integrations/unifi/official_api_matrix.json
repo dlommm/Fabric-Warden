@@ -1,0 +1,605 @@
+{
+ "_provenance": {
+  "description": "Endpoint availability derived from the versioned UniFi Network API OpenAPI documents published at developer.ui.com (retrieved via the opastorello/unifi-api-docs mirror). Base path on a console: /proxy/network/integration. Auth header: X-API-KEY.",
+  "retrieved": "2026-10-20",
+  "spec_versions": [
+   "9.1.120",
+   "9.2.87",
+   "9.3.45",
+   "9.4.19",
+   "9.5.21",
+   "10.0.162",
+   "10.1.84",
+   "10.3.58",
+   "10.4.57",
+   "10.5.67",
+   "10.6.106"
+  ]
+ },
+ "endpoints": [
+  {
+   "method": "GET",
+   "path": "/v1/countries",
+   "summary": "List Countries",
+   "introduced": "10.0.162",
+   "operationId": "getCountries",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/dpi/applications",
+   "summary": "List DPI Applications",
+   "introduced": "10.0.162",
+   "operationId": "getApplications",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/dpi/categories",
+   "summary": "List DPI Categories",
+   "introduced": "10.0.162",
+   "operationId": "getCategories",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/info",
+   "summary": "Get Application Info",
+   "introduced": "9.1.120",
+   "operationId": "getInfo",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/pending-devices",
+   "summary": "List Devices Pending Adoption",
+   "introduced": "10.0.162",
+   "operationId": "getPendingDevicePage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites",
+   "summary": "List Local Sites",
+   "introduced": "9.1.120",
+   "operationId": "getSiteOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/acl-rules",
+   "summary": "List ACL Rules",
+   "introduced": "10.0.162",
+   "operationId": "getAclRulePage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/acl-rules",
+   "summary": "Create ACL Rule",
+   "introduced": "10.0.162",
+   "operationId": "createAclRule",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/acl-rules/ordering",
+   "summary": "Get User-Defined ACL Rule Ordering",
+   "introduced": "10.1.84",
+   "operationId": "getAclRuleOrdering",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/acl-rules/ordering",
+   "summary": "Reorder User-Defined ACL Rules",
+   "introduced": "10.1.84",
+   "operationId": "updateAclRuleOrdering",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/acl-rules/{aclRuleId}",
+   "summary": "Delete ACL Rule",
+   "introduced": "10.0.162",
+   "operationId": "deleteAclRule",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/acl-rules/{aclRuleId}",
+   "summary": "Get ACL Rule",
+   "introduced": "10.0.162",
+   "operationId": "getAclRule",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/acl-rules/{aclRuleId}",
+   "summary": "Update ACL Rule",
+   "introduced": "10.0.162",
+   "operationId": "updateAclRule",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/clients",
+   "summary": "List Connected Clients",
+   "introduced": "9.1.120",
+   "operationId": "getConnectedClientOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/clients/{clientId}",
+   "summary": "Get Connected Client Details",
+   "introduced": "9.1.120",
+   "operationId": "getConnectedClientDetails",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/clients/{clientId}/actions",
+   "summary": "Execute Client Action",
+   "introduced": "9.1.120",
+   "operationId": "executeConnectedClientAction",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/device-tags",
+   "summary": "List Device Tags",
+   "introduced": "10.0.162",
+   "operationId": "getDeviceTagPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/devices",
+   "summary": "List Devices",
+   "introduced": "9.1.120",
+   "operationId": "getDeviceOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/devices",
+   "summary": "Adopt Devices",
+   "introduced": "10.1.84",
+   "operationId": "adoptDevice",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/devices/{deviceId}",
+   "summary": "Remove (Unadopt) Device",
+   "introduced": "10.1.84",
+   "operationId": "removeDevice",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/devices/{deviceId}",
+   "summary": "Get Device Details",
+   "introduced": "9.1.120",
+   "operationId": "getDeviceDetails",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/devices/{deviceId}/actions",
+   "summary": "Execute Device Action",
+   "introduced": "9.1.120",
+   "operationId": "executeDeviceAction",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions",
+   "summary": "Execute Port Action",
+   "introduced": "9.1.120",
+   "operationId": "executePortAction",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/devices/{deviceId}/statistics/latest",
+   "summary": "Get Latest Device Statistics",
+   "introduced": "9.1.120",
+   "operationId": "getDeviceLatestStatistics",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/dns/policies",
+   "summary": "List DNS Policies",
+   "introduced": "10.1.84",
+   "operationId": "getDnsPolicyPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/dns/policies",
+   "summary": "Create DNS Policy",
+   "introduced": "10.1.84",
+   "operationId": "createDnsPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/dns/policies/{dnsPolicyId}",
+   "summary": "Delete DNS Policy",
+   "introduced": "10.1.84",
+   "operationId": "deleteDnsPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/dns/policies/{dnsPolicyId}",
+   "summary": "Get DNS Policy",
+   "introduced": "10.1.84",
+   "operationId": "getDnsPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/dns/policies/{dnsPolicyId}",
+   "summary": "Update DNS Policy",
+   "introduced": "10.1.84",
+   "operationId": "updateDnsPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/firewall/policies",
+   "summary": "List Firewall Policies",
+   "introduced": "10.1.84",
+   "operationId": "getFirewallPolicies",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/firewall/policies",
+   "summary": "Create Firewall Policy",
+   "introduced": "10.1.84",
+   "operationId": "createFirewallPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/firewall/policies/ordering",
+   "summary": "Get User-Defined Firewall Policy Ordering",
+   "introduced": "10.1.84",
+   "operationId": "getFirewallPolicyOrdering",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/firewall/policies/ordering",
+   "summary": "Reorder User-Defined Firewall Policies",
+   "introduced": "10.1.84",
+   "operationId": "updateFirewallPolicyOrdering",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}",
+   "summary": "Delete Firewall Policy",
+   "introduced": "10.1.84",
+   "operationId": "deleteFirewallPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}",
+   "summary": "Get Firewall Policy",
+   "introduced": "10.1.84",
+   "operationId": "getFirewallPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PATCH",
+   "path": "/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}",
+   "summary": "Patch Firewall Policy",
+   "introduced": "10.1.84",
+   "operationId": "patchFirewallPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/firewall/policies/{firewallPolicyId}",
+   "summary": "Update Firewall Policy",
+   "introduced": "10.1.84",
+   "operationId": "updateFirewallPolicy",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/firewall/zones",
+   "summary": "List Firewall Zones",
+   "introduced": "10.0.162",
+   "operationId": "getFirewallZones",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/firewall/zones",
+   "summary": "Create Custom Firewall Zone",
+   "introduced": "10.0.162",
+   "operationId": "createFirewallZone",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/firewall/zones/{firewallZoneId}",
+   "summary": "Delete Custom Firewall Zone",
+   "introduced": "10.0.162",
+   "operationId": "deleteFirewallZone",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/firewall/zones/{firewallZoneId}",
+   "summary": "Get Firewall Zone",
+   "introduced": "10.0.162",
+   "operationId": "getFirewallZone",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/firewall/zones/{firewallZoneId}",
+   "summary": "Update Firewall Zone",
+   "introduced": "10.0.162",
+   "operationId": "updateFirewallZone",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/hotspot/vouchers",
+   "summary": "Delete Vouchers",
+   "introduced": "9.1.120",
+   "operationId": "deleteVouchers",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/hotspot/vouchers",
+   "summary": "List Vouchers",
+   "introduced": "9.1.120",
+   "operationId": "getVouchers",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/hotspot/vouchers",
+   "summary": "Generate Vouchers",
+   "introduced": "9.1.120",
+   "operationId": "createVouchers",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/hotspot/vouchers/{voucherId}",
+   "summary": "Delete Voucher",
+   "introduced": "9.1.120",
+   "operationId": "deleteVoucher",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/hotspot/vouchers/{voucherId}",
+   "summary": "Get Voucher Details",
+   "introduced": "9.1.120",
+   "operationId": "getVoucher",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/networks",
+   "summary": "List Networks",
+   "introduced": "10.0.162",
+   "operationId": "getNetworksOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/networks",
+   "summary": "Create Network",
+   "introduced": "10.0.162",
+   "operationId": "createNetwork",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/networks/{networkId}",
+   "summary": "Delete Network",
+   "introduced": "10.0.162",
+   "operationId": "deleteNetwork",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/networks/{networkId}",
+   "summary": "Get Network Details",
+   "introduced": "10.0.162",
+   "operationId": "getNetworkDetails",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/networks/{networkId}",
+   "summary": "Update Network",
+   "introduced": "10.0.162",
+   "operationId": "updateNetwork",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/networks/{networkId}/references",
+   "summary": "Get Network References",
+   "introduced": "10.0.162",
+   "operationId": "getNetworkReferences",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/radius/profiles",
+   "summary": "List Radius Profiles",
+   "introduced": "10.0.162",
+   "operationId": "getRadiusProfileOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/lags",
+   "summary": "List LAGs",
+   "introduced": "10.3.58",
+   "operationId": "getLagPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/lags/{lagId}",
+   "summary": "Get LAG Details",
+   "introduced": "10.3.58",
+   "operationId": "getLag",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/mc-lag-domains",
+   "summary": "List MC-LAG Domains",
+   "introduced": "10.3.58",
+   "operationId": "getMcLagDomainPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/mc-lag-domains/{mcLagDomainId}",
+   "summary": "Get MC-LAG Domain",
+   "introduced": "10.3.58",
+   "operationId": "getMcLagDomain",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/switch-stacks",
+   "summary": "List Switch Stacks",
+   "introduced": "10.3.58",
+   "operationId": "getSwitchStackPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/switching/switch-stacks/{switchStackId}",
+   "summary": "Get Switch Stack",
+   "introduced": "10.3.58",
+   "operationId": "getSwitchStack",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/traffic-matching-lists",
+   "summary": "List Traffic Matching Lists",
+   "introduced": "10.0.162",
+   "operationId": "getTrafficMatchingLists",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/traffic-matching-lists",
+   "summary": "Create Traffic Matching List",
+   "introduced": "10.0.162",
+   "operationId": "createTrafficMatchingList",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId}",
+   "summary": "Delete Traffic Matching List",
+   "introduced": "10.0.162",
+   "operationId": "deleteTrafficMatchingList",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId}",
+   "summary": "Get Traffic Matching List",
+   "introduced": "10.0.162",
+   "operationId": "getTrafficMatchingList",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/traffic-matching-lists/{trafficMatchingListId}",
+   "summary": "Update Traffic Matching List",
+   "introduced": "10.0.162",
+   "operationId": "updateTrafficMatchingList",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/vpn/servers",
+   "summary": "List VPN Servers",
+   "introduced": "10.0.162",
+   "operationId": "getVpnServerPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/vpn/site-to-site-tunnels",
+   "summary": "List Site-To-Site VPN Tunnels",
+   "introduced": "10.0.162",
+   "operationId": "getSiteToSiteVpnTunnelPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/wans",
+   "summary": "List WAN Interfaces",
+   "introduced": "10.0.162",
+   "operationId": "getWansOverviewPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/wifi/broadcasts",
+   "summary": "List Wifi Broadcasts",
+   "introduced": "10.0.162",
+   "operationId": "getWifiBroadcastPage",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "POST",
+   "path": "/v1/sites/{siteId}/wifi/broadcasts",
+   "summary": "Create Wifi Broadcast",
+   "introduced": "10.0.162",
+   "operationId": "createWifiBroadcast",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "DELETE",
+   "path": "/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}",
+   "summary": "Delete Wifi Broadcast",
+   "introduced": "10.0.162",
+   "operationId": "deleteWifiBroadcast",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "GET",
+   "path": "/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}",
+   "summary": "Get Wifi Broadcast Details",
+   "introduced": "10.0.162",
+   "operationId": "getWifiBroadcastDetails",
+   "last_seen_in": "10.6.106"
+  },
+  {
+   "method": "PUT",
+   "path": "/v1/sites/{siteId}/wifi/broadcasts/{wifiBroadcastId}",
+   "summary": "Update Wifi Broadcast",
+   "introduced": "10.0.162",
+   "operationId": "updateWifiBroadcast",
+   "last_seen_in": "10.6.106"
+  }
+ ]
+}
