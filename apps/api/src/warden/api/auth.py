@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 import pyotp
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -16,8 +16,15 @@ from warden import audit
 from warden.api.deps import DB, CurrentPrincipal, Principal, State, authenticate, client_ip, require
 from warden.audit import Actor
 from warden.db import utcnow
-from warden.models import ApiToken, AuthSession, Credential, User
-from warden.security.crypto import burn_password_check, new_token, token_digest, verify_password
+from warden.models import ApiToken, AuthSession, Credential, Setting, User
+from warden.security.crypto import (
+    burn_password_check,
+    hash_password,
+    new_token,
+    token_digest,
+    validate_password_strength,
+    verify_password,
+)
 from warden.security.rbac import ROLES, P
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -181,6 +188,69 @@ async def roles(principal: CurrentPrincipal) -> dict:
             {"id": r, "description": ROLE_DESCRIPTIONS[r], "permissions": sorted(p.value for p in perms)} for r, perms in ROLES.items()
         ]
     }
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=1024)
+    new_password: str = Field(max_length=1024)
+
+
+@router.post("/password")
+async def change_password(body: PasswordChange, request: Request, principal: CurrentPrincipal, db: DB) -> dict:
+    if principal.via != "session":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Passwords can only be changed from an interactive session.")
+    if not verify_password(principal.user.password_hash, body.current_password):
+        await audit.record(db, principal.actor, "auth.password.change", outcome="denied")
+        await db.commit()  # keep the denial even though the request fails
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Your current password is incorrect.")
+    if err := validate_password_strength(body.new_password):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, err)
+    principal.user.password_hash = hash_password(body.new_password)
+    # Sign out every other session for this user.
+    for s in await db.scalars(
+        select(AuthSession).where(
+            AuthSession.user_id == principal.user.id, AuthSession.revoked_at.is_(None), AuthSession.id != principal.session_id
+        )
+    ):
+        s.revoked_at = utcnow()
+    await audit.record(db, principal.actor, "auth.password.change", target_type="user", target_id=principal.user.id)
+    return {"ok": True}
+
+
+# -- Preferences ------------------------------------------------------------
+
+OVERVIEW_PANELS = ("attention", "route", "health", "changes", "controllers", "clients")
+
+
+class Preferences(BaseModel):
+    density: Literal["comfortable", "compact"] = "comfortable"
+    theme: Literal["system", "light", "dark"] = "system"
+    # Ordered panel ids; panels not listed are hidden.
+    overview_panels: list[str] = Field(default_factory=lambda: list(OVERVIEW_PANELS))
+
+
+def _prefs_key(user_id: str) -> str:
+    return f"user:{user_id}:preferences"
+
+
+@router.get("/preferences", response_model=Preferences)
+async def get_preferences(principal: CurrentPrincipal, db: DB) -> Preferences:
+    row = await db.get(Setting, _prefs_key(principal.user.id))
+    return Preferences.model_validate(row.value) if row else Preferences()
+
+
+@router.put("/preferences", response_model=Preferences)
+async def put_preferences(body: Preferences, principal: CurrentPrincipal, db: DB) -> Preferences:
+    unknown = [p for p in body.overview_panels if p not in OVERVIEW_PANELS]
+    if unknown:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"unknown panels: {unknown}")
+    body.overview_panels = list(dict.fromkeys(body.overview_panels))
+    row = await db.get(Setting, _prefs_key(principal.user.id))
+    if row is None:
+        db.add(Setting(key=_prefs_key(principal.user.id), value=body.model_dump()))
+    else:
+        row.value = body.model_dump()
+    return body
 
 
 # -- MFA enrolment ----------------------------------------------------------

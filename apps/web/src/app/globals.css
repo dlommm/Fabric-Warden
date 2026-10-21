@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+/*
+ * Fabric Warden tokens. The world is wayfinding signage: sign-blue rail,
+ * route green for healthy paths, sign yellow for attention, flat panels with
+ * inset borders. No gradients, glass or shadows.
+ */
+:root {
+  --ground: #eef1f3;
+  --surface: #ffffff;
+  --surface-2: #f5f7f8;
+  --surface-3: #e6eaed;
+  --ink: #14171a;
+  --ink-2: #434c55;
+  --ink-3: #626c76;
+  --rule: #d3d9de;
+  --rule-strong: #b5bec6;
+
+  --rail: #0b3d91;
+  --rail-2: #0a3580;
+  --rail-ink: #ffffff;
+  --rail-ink-2: #c9d6ef;
+
+  --accent: #0b3d91;
+  --accent-hover: #082f72;
+  --accent-ink: #ffffff;
+  --accent-soft: #e4ebf7;
+
+  --ok: #00704a;
+  --ok-soft: #e1f1e9;
+  --warn: #ffd200;
+  --warn-ink: #14171a;
+  --warn-text: #7a5a00;
+  --warn-soft: #fff6cc;
+  --crit: #c8102e;
+  --crit-soft: #fbe6e9;
+  --muted-state: #626c76;
+
+  --focus: #0b3d91;
+  --selection: #ffe680;
+
+  --row-h: 40px;
+  --row-pad: 12px;
+  --gap: 16px;
+  --radius: 4px;
+
+  color-scheme: light;
+}
+
+:root[data-density="compact"] {
+  --row-h: 32px;
+  --row-pad: 8px;
+  --gap: 12px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0d1217;
+    --surface: #131a21;
+    --surface-2: #19222b;
+    --surface-3: #212c37;
+    --ink: #e8edf1;
+    --ink-2: #b2bdc7;
+    --ink-3: #8e9aa6;
+    --rule: #26313c;
+    --rule-strong: #364350;
+    --rail: #0a2c66;
+    --rail-2: #092557;
+    --rail-ink-2: #aebfdf;
+    --accent: #6d9be8;
+    --accent-hover: #8cb1ef;
+    --accent-ink: #0d1217;
+    --accent-soft: #17294a;
+    --ok: #3fbf8a;
+    --ok-soft: #0f2b21;
+    --warn-text: #ffd84d;
+    --warn-soft: #2c2608;
+    --crit: #ff6b7f;
+    --crit-soft: #33141a;
+    --muted-state: #8e9aa6;
+    --focus: #8cb1ef;
+    --selection: #4a3f0a;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0d1217;
+  --surface: #131a21;
+  --surface-2: #19222b;
+  --surface-3: #212c37;
+  --ink: #e8edf1;
+  --ink-2: #b2bdc7;
+  --ink-3: #8e9aa6;
+  --rule: #26313c;
+  --rule-strong: #364350;
+  --rail: #0a2c66;
+  --rail-2: #092557;
+  --rail-ink-2: #aebfdf;
+  --accent: #6d9be8;
+  --accent-hover: #8cb1ef;
+  --accent-ink: #0d1217;
+  --accent-soft: #17294a;
+  --ok: #3fbf8a;
+  --ok-soft: #0f2b21;
+  --warn-text: #ffd84d;
+  --warn-soft: #2c2608;
+  --crit: #ff6b7f;
+  --crit-soft: #33141a;
+  --muted-state: #8e9aa6;
+  --focus: #8cb1ef;
+  --selection: #4a3f0a;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-rail: var(--rail);
+  --color-rail-2: var(--rail-2);
+  --color-rail-ink: var(--rail-ink);
+  --color-rail-ink-2: var(--rail-ink-2);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-ink: var(--warn-ink);
+  --color-warn-text: var(--warn-text);
+  --color-warn-soft: var(--warn-soft);
+  --color-crit: var(--crit);
+  --color-crit-soft: var(--crit-soft);
+  --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-data), ui-monospace, monospace;
+  --text-xs: 0.75rem;
+  --text-xs--line-height: 1rem;
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.875rem;
+  --text-base--line-height: 1.375rem;
+  --text-md: 1rem;
+  --text-md--line-height: 1.5rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.625rem;
+  --text-xl: 1.4375rem;
+  --text-xl--line-height: 1.875rem;
+  --radius-sign: var(--radius);
+}
+
+html {
+  background: var(--ground);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--text-base--line-height);
+  font-feature-settings: "ss01";
+}
+
+::selection {
+  background: var(--selection);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule-strong) transparent;
+}
+
+a {
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+
+input,
+select,
+textarea {
+  caret-color: var(--accent);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* The sign border: a flat panel with a thin inset rule, used on zone patches,
+   state plates and the active rail item. */
+.sign {
+  outline: 1.5px solid currentColor;
+  outline-offset: -3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

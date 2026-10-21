@@ -91,3 +91,26 @@ async def test_cannot_grant_permissions_not_held(app, owner):
         await v.post("/api/auth/login", json={"username": "vic", "password": PASSWORD})
         r = await v.post("/api/auth/tokens", json={"name": "x", "permissions": ["users:manage"]})
         assert r.status_code == 403
+
+
+async def test_preferences_roundtrip(owner):
+    assert (await owner.get("/api/auth/preferences")).json()["density"] == "comfortable"
+    r = await owner.put(
+        "/api/auth/preferences", json={"density": "compact", "theme": "dark", "overview_panels": ["health", "attention", "health"]}
+    )
+    assert r.status_code == 200
+    p = (await owner.get("/api/auth/preferences")).json()
+    assert p == {"density": "compact", "theme": "dark", "overview_panels": ["health", "attention"]}
+    assert (await owner.put("/api/auth/preferences", json={"overview_panels": ["bogus"]})).status_code == 422
+
+
+async def test_change_password_revokes_other_sessions(app, owner):
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers={"x-warden-csrf": "1"}) as other:
+        await other.post("/api/auth/login", json={"username": "owner", "password": PASSWORD})
+        assert (await other.get("/api/auth/me")).status_code == 200
+        bad = await owner.post("/api/auth/password", json={"current_password": "nope", "new_password": "another long passphrase 1"})
+        assert bad.status_code == 403
+        r = await owner.post("/api/auth/password", json={"current_password": PASSWORD, "new_password": "another long passphrase 1"})
+        assert r.status_code == 200
+        assert (await owner.get("/api/auth/me")).status_code == 200
+        assert (await other.get("/api/auth/me")).status_code == 401

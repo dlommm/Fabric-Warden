@@ -147,7 +147,9 @@ async def list_devices(
         stmt = stmt.where(Device.state == state)
     stmt = _search(stmt, [Device.name, Device.model, Device.mac_address, Device.ip_address], q)
     rows = [d for d in await db.scalars(stmt) if not role or role in d.features]
-    return {"items": [device_summary(d) for d in rows], "total": len(rows)}
+    ids = {(d.site_id, d.external_id): d.id for d in await db.scalars(select(Device))}
+    items = [device_summary(d) | {"uplink_id": ids.get((d.site_id, d.uplink_device_external_id or ""))} for d in rows]
+    return {"items": items, "total": len(rows)}
 
 
 @router.get("/devices/{device_id}")

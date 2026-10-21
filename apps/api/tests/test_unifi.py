@@ -172,3 +172,10 @@ async def test_user_metadata_survives_resync(demo, owner):
 async def test_search(demo, owner):
     res = (await owner.get("/api/inventory/search?q=proxmox")).json()["results"]
     assert {r["title"] for r in res} == {"proxmox-01", "proxmox-02"}
+
+
+async def test_device_list_resolves_uplinks(demo, owner):
+    items = {d["name"]: d for d in (await owner.get("/api/inventory/devices")).json()["items"]}
+    assert items["Gateway"]["uplink_id"] is None
+    assert items["Core Aggregation"]["uplink_id"] == items["Gateway"]["id"]
+    assert items["AP Garage"]["uplink_id"] == items["Office Switch"]["id"]
