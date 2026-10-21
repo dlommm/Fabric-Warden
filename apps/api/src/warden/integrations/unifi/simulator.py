@@ -254,8 +254,20 @@ def _build_zones() -> list[dict[str, Any]]:
 
 
 def _policy(
-    n: int, name: str, src: str, dst: str, action: str, *, logging: bool = False, origin: str = "USER_DEFINED", enabled: bool = True
+    n: int,
+    name: str,
+    src: str,
+    dst: str,
+    action: str,
+    *,
+    logging: bool = False,
+    origin: str = "USER_DEFINED",
+    enabled: bool = True,
+    dst_filter: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    destination: dict[str, Any] = {"zoneId": _zone_id(dst)}
+    if dst_filter:
+        destination["trafficFilter"] = dst_filter
     return {
         "id": _uuid(n, 0xF1),
         "name": name,
@@ -263,11 +275,19 @@ def _policy(
         "index": 10000 + n if origin == "USER_DEFINED" else None,
         "action": {"type": action},
         "source": {"zoneId": _zone_id(src)},
-        "destination": {"zoneId": _zone_id(dst)},
+        "destination": destination,
         "ipProtocolScope": {"ipVersion": "IPV4_AND_IPV6"},
         "connectionStateFilter": ["NEW"],
         "loggingEnabled": logging,
         "metadata": {"origin": origin},
+    }
+
+
+def _ports(*ports: int) -> dict[str, Any]:
+    """A destination port filter in the Integration API's shape (Firewall policy port filter)."""
+    return {
+        "type": "PORT",
+        "portFilter": {"type": "PORTS", "matchOpposite": False, "items": [{"type": "PORT_NUMBER", "value": p} for p in ports]},
     }
 
 
@@ -280,6 +300,10 @@ def _build_policies() -> list[dict[str, Any]]:
         _policy(5, "Block Servers to Internal", "servers", "internal", "BLOCK", logging=True),
         _policy(6, "Block Guest to Gateway admin", "hotspot", "gateway", "REJECT"),
         _policy(7, "Legacy allow IoT to Servers", "iot", "servers", "ALLOW", enabled=False),
+        # Placed after "Block IoT to Internal", so it never matches (shadowed).
+        _policy(8, "Allow IoT to Internal DNS", "iot", "internal", "ALLOW", dst_filter=_ports(53)),
+        # Covered by "Allow Internal to IoT" with the same action (redundant).
+        _policy(9, "Allow Internal to IoT web", "internal", "iot", "ALLOW", dst_filter=_ports(80, 443)),
     ]
 
 

@@ -11,8 +11,8 @@ from typing import Any, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from warden import config_history, metrics
 from warden import events as ev
-from warden import metrics
 from warden.app_state import AppState
 from warden.db import Base, utcnow
 from warden.events import Event
@@ -385,6 +385,8 @@ async def sync_job(ctx: JobContext) -> dict[str, Any]:
                 ctx.db, ctx.state, controller, inventory=inventory, client_history=client_history, collect_metrics=collect_metrics
             )
         )
+        if controller.status == "ok" and await ctx.state.modules.is_enabled(ctx.db, "config-history"):
+            await capture_config(ctx, controller)
         await ctx.state.bus.publish(
             ctx.db,
             Event(
@@ -396,3 +398,22 @@ async def sync_job(ctx: JobContext) -> dict[str, Any]:
             ),
         )
     return {"controllers": results}
+
+
+async def capture_config(ctx: JobContext, controller: Controller) -> None:
+    """Snapshot each site's configuration; publish config.changed when it differs from the last snapshot."""
+    for site in await ctx.db.scalars(select(Site).where(Site.controller_id == controller.id, Site.present.is_(True))):
+        snap = await config_history.capture(
+            ctx.db, site, source=f"{'simulator' if controller.is_demo else 'unifi-integration-api'}@{controller.application_version}"
+        )
+        if snap is not None and snap.change_counts:
+            await ctx.state.bus.publish(
+                ctx.db,
+                Event(
+                    type=ev.CONFIG_CHANGED,
+                    source="config-history",
+                    entity_type="site",
+                    entity_id=site.id,
+                    payload={"snapshot_id": snap.id, "changes": snap.change_counts},
+                ),
+            )

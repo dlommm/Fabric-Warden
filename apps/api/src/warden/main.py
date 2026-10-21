@@ -20,10 +20,13 @@ from warden.api import (
     auth,
     cabling,
     clients,
+    compliance,
+    config_history,
     controllers,
     dcim,
     demo_infra,
     docs,
+    firewall,
     inventory,
     ipam,
     modules,
@@ -158,6 +161,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs.router,
         demo_infra.router,
         servers.router,
+        firewall.router,
+        config_history.router,
+        compliance.router,
         system.router,
     ):
         app.include_router(r)

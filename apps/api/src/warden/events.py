@@ -62,6 +62,7 @@ CONTROLLER_SYNC_COMPLETED = "controller.sync.completed"
 MODULE_ENABLED = "module.enabled"
 ALERT_FIRING = "monitoring.alert.firing"
 ALERT_RESOLVED = "monitoring.alert.resolved"
+CONFIG_CHANGED = "config.changed"  # a new configuration snapshot differs from the previous one
 MODULE_DISABLED = "module.disabled"
 
 Handler = Callable[[Event], Awaitable[None]]

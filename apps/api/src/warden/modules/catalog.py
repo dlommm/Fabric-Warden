@@ -13,6 +13,7 @@ from warden.events import (
     CLIENT_CONNECTED,
     CLIENT_DISCONNECTED,
     CLIENT_MOVED,
+    CONFIG_CHANGED,
     CONTROLLER_STATUS_CHANGED,
     CONTROLLER_SYNC_COMPLETED,
     DEVICE_DISCOVERED,
@@ -416,6 +417,61 @@ SERVERS = ModuleManifest(
     ],
 )
 
+FIREWALL = ModuleManifest(
+    id="firewall",
+    version=VERSION,
+    name="Firewall & Policy Manager",
+    category=C.SECURITY,
+    description="Zone policies in evaluation order with shadowing and redundancy analysis, the zone matrix and hygiene findings.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    controller_capabilities=["network.firewall.policies.read"],
+    nav=[NavEntry(label="Firewall", href="/firewall", icon="shield", section="Security")],
+    resources=ResourceEstimate(memory_mb=8),
+    warnings=[
+        "Read-only. Coverage is only claimed when certain from the data; overlapping traffic filters are reported as not determined."
+    ],
+)
+
+CONFIG_HISTORY = ModuleManifest(
+    id="config-history",
+    version=VERSION,
+    name="Configuration History & Backup",
+    category=C.SECURITY,
+    description="A snapshot of each site's configuration whenever it changes, semantic diffs, a pinned baseline and drift.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    nav=[NavEntry(label="Config history", href="/config", icon="history", section="Security")],
+    publishes=[CONFIG_CHANGED],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=2),
+    data_ownership=["config_snapshots"],
+    warnings=[
+        "The official API keeps no change log, so a diff shows what changed between two syncs, not who changed it. "
+        "Snapshots are documentation of observed configuration, not restorable controller backups."
+    ],
+)
+
+COMPLIANCE = ModuleManifest(
+    id="compliance",
+    version=VERSION,
+    name="Policy & Compliance",
+    category=C.SECURITY,
+    description=(
+        "Built-in controls (MFA, segmentation, firewall hygiene, firmware, drift) evaluated with evidence, audited waivers and CSV export."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    optional=["firewall", "config-history", "servers"],
+    permissions=["compliance:manage"],
+    nav=[NavEntry(label="Compliance", href="/compliance", icon="clipboard", section="Security")],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["compliance_results"],
+    warnings=["Custom baselines are not implemented yet; the built-in controls are fixed."],
+)
+
 PLANNED: list[ModuleManifest] = [
     _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
@@ -437,14 +493,6 @@ PLANNED: list[ModuleManifest] = [
         ["switching"],
     ),
     _planned(
-        "firewall",
-        "Firewall & Policy Manager",
-        C.SECURITY,
-        5,
-        "Zone policy inventory, ordering, shadowing analysis and change history.",
-        ["inventory"],
-    ),
-    _planned(
         "flows",
         "Traffic & Flow Analytics",
         C.OBSERVABILITY,
@@ -464,18 +512,7 @@ PLANNED: list[ModuleManifest] = [
     ),
     _planned("soc", "Security Operations Center", C.SECURITY, 5, "Findings, posture, IDS/IPS events and security incidents.", ["logs"]),
     _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
-    _planned(
-        "config-history",
-        "Configuration History & Backup",
-        C.AUTOMATION,
-        5,
-        "Snapshots, semantic diffs, drift and attribution.",
-        ["unifi-network"],
-    ),
     _planned("investigations", "Investigation Workbench", C.SECURITY, 5, "Pivot from alerts to clients, flows, logs and changes.", ["soc"]),
-    _planned(
-        "compliance", "Policy & Compliance", C.SECURITY, 5, "Custom baselines, evidence collection and drift alerts.", ["config-history"]
-    ),
     _planned(
         "change-engine",
         "Change Approval & Recovery",
@@ -531,6 +568,9 @@ CATALOG: dict[str, ModuleManifest] = {
         TOPOLOGY,
         DOCS,
         SERVERS,
+        FIREWALL,
+        CONFIG_HISTORY,
+        COMPLIANCE,
         *PLANNED,
     ]
 }

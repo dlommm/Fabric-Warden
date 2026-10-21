@@ -21,6 +21,7 @@ class P(StrEnum):
     NOTIFICATIONS_MANAGE = "notifications:manage"  # channels hold delivery secrets
     CONTROLLERS_READ = "controllers:read"
     CONTROLLERS_MANAGE = "controllers:manage"
+    COMPLIANCE_MANAGE = "compliance:manage"  # waive controls
     SERVERS_MANAGE = "servers:manage"  # host connections hold API credentials; read-only access to the hosts
     MODULES_READ = "modules:read"
     MODULES_MANAGE = "modules:manage"
