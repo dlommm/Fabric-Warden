@@ -8,6 +8,7 @@ import { Dialog } from "radix-ui";
 import { useEffect, useMemo, useState } from "react";
 import { get } from "@/lib/api";
 import { useSession } from "@/lib/session";
+import { DemoTag } from "../ui/signs";
 import { NAV } from "./nav";
 
 interface Result {
@@ -16,6 +17,7 @@ interface Result {
   title: string;
   subtitle: string;
   href: string;
+  is_demo?: boolean;
 }
 
 const KIND_ICON = { device: Router, client: Laptop, network: Network };
@@ -89,7 +91,7 @@ export function CommandPalette() {
                 if (e.key === "Enter") go(results[cursor]);
               }}
               placeholder="Name, IP, MAC or page"
-              className="h-12 flex-1 bg-transparent text-md outline-none placeholder:text-ink-3"
+              className="h-12 flex-1 bg-transparent text-md outline-none placeholder:text-ink-3 focus-visible:outline-none"
               aria-label="Search"
               role="combobox"
               aria-expanded
@@ -118,6 +120,7 @@ export function CommandPalette() {
                     <span className="block truncate font-semibold">{r.title}</span>
                     <span className="block truncate font-mono text-xs text-ink-3">{r.subtitle}</span>
                   </span>
+                  {r.is_demo && <DemoTag />}
                   <span className="text-xs text-ink-3 capitalize">{r.kind}</span>
                 </li>
               );

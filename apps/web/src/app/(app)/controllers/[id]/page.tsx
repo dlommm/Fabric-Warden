@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Ban, Check, ChevronLeft, CircleDashed, Lock, RefreshCw, Trash2 } from "lucide-react";
+import { Ban, Check, ChevronLeft, CircleCheck, CircleDashed, Lock, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -47,7 +47,7 @@ export default function ControllerPage() {
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
             <StateLabel tone={controllerTone(c.status)}>{titleCase(c.status)}</StateLabel>
-            <span className="font-mono text-sm">{c.application_version ? `UniFi Network ${c.application_version}` : "Version unknown"}</span>
+            <span>{c.application_version ? <>UniFi Network <span className="font-mono text-sm">{c.application_version}</span></> : "Version unknown"}</span>
             {c.is_demo && <DemoTag />}
           </span>
         }
@@ -79,10 +79,10 @@ export default function ControllerPage() {
         <Panel title="Connection" id="connection">
           <KeyValue
             items={[
-              ["Address", <span key="a" className="font-mono">{c.is_demo ? "Built-in simulator (no network access)" : c.base_url}</span>],
+              ["Address", c.is_demo ? "Built-in simulator (no network access)" : <span key="a" className="font-mono">{c.base_url}</span>],
               ["Write mode", <span key="w" className="inline-flex items-center gap-1.5 font-semibold"><Lock className="size-4 text-ok" aria-hidden /> Read-only</span>],
               ["TLS", c.is_demo ? "—" : c.verify_tls ? (c.has_ca_bundle ? "Verified against pinned CA" : "Verified (system trust)") : "Not verified"],
-              ["API key", c.credential_fingerprint ? <span key="k" className="font-mono text-sm">fingerprint {c.credential_fingerprint}</span> : "—"],
+              ["API key", c.credential_fingerprint ? <span key="k">Stored encrypted · fingerprint <span className="font-mono text-sm">{c.credential_fingerprint}</span></span> : "—"],
               ["Poll interval", `${c.poll_interval_seconds} s`],
               ["Sites / devices / clients", `${c.site_count} / ${c.device_count} / ${c.client_count}`],
               ["Last sync", c.last_sync_at ? `${dateTime(c.last_sync_at)} (${ago(c.last_sync_at)})` : "Never"],
@@ -109,10 +109,18 @@ export default function ControllerPage() {
         {caps.length === 0 ? (
           <p className="p-4 text-ink-3">Run a sync to detect capabilities.</p>
         ) : (
+          <>
+          <p className="flex flex-wrap gap-x-5 gap-y-1 border-b border-rule px-4 py-2.5 text-sm text-ink-3">
+            <span className="inline-flex items-center gap-1.5"><CircleCheck className="size-4 text-ok" aria-hidden /> Verified by a successful read</span>
+            <span className="inline-flex items-center gap-1.5"><Check className="size-4 text-ink-2" aria-hidden /> Supported per API spec</span>
+            <span className="inline-flex items-center gap-1.5"><Lock className="size-4" aria-hidden /> Available but disabled</span>
+            <span className="inline-flex items-center gap-1.5"><Ban className="size-4" aria-hidden /> Needs a newer controller</span>
+          </p>
           <div className="grid grid-cols-1 lg:grid-cols-2">
             <CapList title="Read" items={reads} />
             <CapList title="Write (gated by the change engine)" items={writes} className="border-t border-rule lg:border-t-0 lg:border-l" />
           </div>
+          </>
         )}
         {c.capabilities.not_exposed && (
           <div className="border-t border-rule px-4 py-4">
@@ -141,8 +149,14 @@ function CapList({ title, items, className }: { title: string; items: [string, C
           const ok = cap.status === "supported";
           return (
             <li key={id} className="flex min-h-[var(--row-h)] items-center gap-3 border-b border-rule px-4 py-1.5 last:border-b-0">
-              {ok ? <Check className="size-4 shrink-0 text-ok" strokeWidth={2.5} aria-label="Supported" /> : cap.status === "unknown" ? <CircleDashed className="size-4 shrink-0 text-ink-3" aria-label="Unknown" /> : <Ban className="size-4 shrink-0 text-ink-3" aria-label="Not supported" />}
-              <span className={clsx("flex-1", !ok && "text-ink-3")}>{cap.title}</span>
+              {ok && cap.write ? (
+                <Lock className="size-4 shrink-0 text-ink-3" aria-label="Available on this version, disabled" />
+              ) : ok && cap.verified ? (
+                <CircleCheck className="size-4 shrink-0 text-ok" strokeWidth={2.5} aria-label="Verified by a successful read" />
+              ) : ok ? (
+                <Check className="size-4 shrink-0 text-ink-2" strokeWidth={2.5} aria-label="Supported per API spec, not yet exercised" />
+              ) : cap.status === "unknown" ? <CircleDashed className="size-4 shrink-0 text-ink-3" aria-label="Unknown" /> : <Ban className="size-4 shrink-0 text-ink-3" aria-label="Not supported" />}
+              <span className={clsx("flex-1", (!ok || cap.write) && "text-ink-3")}>{cap.title}</span>
               {ok && !cap.write && (
                 <span className={clsx("text-xs font-semibold", cap.verified ? "text-ok" : "text-ink-3")}>{cap.verified ? "verified" : "per spec"}</span>
               )}

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import Link from "next/link";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/ui/layout-bits";
-import { DemoTag, StateLabel, ZonePatch } from "@/components/ui/signs";
+import { DemoTag, StateLabel, VlanPatch, ZonePatch } from "@/components/ui/signs";
 import { type Column, DataTable } from "@/components/ui/table";
 import { get } from "@/lib/api";
 import type { NetworkRow } from "@/lib/types";
@@ -22,7 +22,7 @@ export default function NetworksPage() {
   const fw = useQuery({ queryKey: ["firewall"], queryFn: () => get<Firewall>("/api/inventory/firewall") });
 
   const columns: Column<NetworkRow>[] = [
-    { key: "vlan", header: "VLAN", align: "right", sort: (n) => n.vlan_id, cell: (n) => <span className="font-mono font-bold">{n.vlan_id ?? "—"}</span>, className: "w-16" },
+    { key: "vlan", header: "VLAN", align: "right", sort: (n) => n.vlan_id, cell: (n) => (n.vlan_id != null ? <VlanPatch id={n.vlan_id} /> : <span className="text-ink-3">—</span>), className: "w-16" },
     {
       key: "name",
       header: "Name",

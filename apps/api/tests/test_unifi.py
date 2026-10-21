@@ -179,3 +179,8 @@ async def test_device_list_resolves_uplinks(demo, owner):
     assert items["Gateway"]["uplink_id"] is None
     assert items["Core Aggregation"]["uplink_id"] == items["Gateway"]["id"]
     assert items["AP Garage"]["uplink_id"] == items["Office Switch"]["id"]
+
+
+async def test_search_results_carry_demo_label(demo, owner):
+    res = (await owner.get("/api/inventory/search?q=gateway")).json()["results"]
+    assert res and all(r["is_demo"] is True for r in res)

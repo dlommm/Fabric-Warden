@@ -56,15 +56,16 @@ function Devices() {
       key: "name",
       header: "Name",
       sort: (d) => d.name.toLowerCase(),
+      className: "min-w-44",
       cell: (d) => (
-        <Link href={`/inventory/devices/${d.id}`} className="font-bold hover:underline">
+        <Link href={`/inventory/devices/${d.id}`} className="font-bold whitespace-nowrap hover:underline">
           {d.name}
         </Link>
       ),
     },
-    { key: "state", header: "State", sort: (d) => ["crit", "warn", "muted", "ok"].indexOf(deviceTone(d.state)), cell: (d) => <DeviceState state={d.state} /> },
-    { key: "role", header: "Role", sort: (d) => deviceRole(d.features), cell: (d) => <span className="text-ink-2">{ROLE_LABEL[deviceRole(d.features)]}</span> },
-    { key: "model", header: "Model", sort: (d) => d.model, cell: (d) => d.model },
+    { key: "state", header: "State", sort: (d) => ["crit", "warn", "muted", "ok"].indexOf(deviceTone(d.state)), cell: (d) => <span className="whitespace-nowrap"><DeviceState state={d.state} /></span> },
+    { key: "role", header: "Role", sort: (d) => deviceRole(d.features), cell: (d) => <span className="whitespace-nowrap text-ink-2">{ROLE_LABEL[deviceRole(d.features)]}</span> },
+    { key: "model", header: "Model", sort: (d) => d.model, cell: (d) => <span className="whitespace-nowrap">{d.model}</span> },
     { key: "ip", header: "IP address", sort: (d) => d.ip_address?.split(".").map((p) => p.padStart(3, "0")).join(".") ?? null, cell: (d) => <span className="font-mono text-sm">{d.ip_address ?? "—"}</span> },
     { key: "mac", header: "MAC", cell: (d) => <span className="font-mono text-sm text-ink-2">{d.mac_address}</span> },
     {

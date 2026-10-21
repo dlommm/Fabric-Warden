@@ -391,6 +391,7 @@ async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1
             "title": d.name,
             "subtitle": f"{d.model} · {d.ip_address or d.mac_address}",
             "href": f"/inventory/devices/{d.id}",
+            "is_demo": d.is_demo,
         }
         for d in devices
     ]
@@ -401,6 +402,7 @@ async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1
             "title": c.name,
             "subtitle": c.ip_address or c.mac_address or c.type,
             "href": f"/inventory/clients?q={c.name}",
+            "is_demo": c.is_demo,
         }
         for c in clients
     ]
@@ -411,6 +413,7 @@ async def search(db: DB, principal: Reader, q: Annotated[str, Query(min_length=1
             "title": n.name,
             "subtitle": f"VLAN {n.vlan_id}" if n.vlan_id else n.management,
             "href": "/inventory/networks",
+            "is_demo": n.is_demo,
         }
         for n in networks
     ]

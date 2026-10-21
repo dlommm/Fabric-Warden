@@ -57,6 +57,9 @@ export function DataTable<T extends { id: string }>({
 
   return (
     <div className="overflow-x-auto">
+      {columns.length > 4 && (
+        <p className="border-b border-rule px-4 py-1.5 text-xs text-ink-3 md:hidden">Scroll sideways for {columns.length - 3} more columns →</p>
+      )}
       <table className="w-full border-collapse text-left">
         {caption && <caption className="sr-only">{caption}</caption>}
         <thead>

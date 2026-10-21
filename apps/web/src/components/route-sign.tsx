@@ -1,10 +1,11 @@
 // The signature move: a path through the network drawn as a map-type
-// direction sign. Hops are flat sign panels joined by a route line; a hop that
-// needs attention becomes a yellow temporary-sign panel, a failed hop a white
-// panel with a red border, and the line into it changes with it.
+// direction sign. One sign-blue panel with an inset white border carries one
+// heavy route line; hops are destinations along it. A hop that needs
+// attention sits on the line as a yellow patch, a failed hop as a white patch
+// with a red border. The Internet is always at the head of the route.
 import { clsx } from "clsx";
 import Link from "next/link";
-import { Fragment, type ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Tone } from "./ui/signs";
 
 export interface Hop {
@@ -14,73 +15,85 @@ export interface Hop {
   href?: string;
   tone?: Tone;
   count?: number;
+  /** Marks the hop the page is about ("you are here"). */
+  current?: boolean;
 }
 
-const panel: Record<Tone, string> = {
-  ok: "bg-[#0b3d91] text-white",
-  info: "bg-[#0b3d91] text-white",
-  muted: "bg-[#3d5266] text-white",
-  warn: "bg-warn text-warn-ink",
-  crit: "bg-white text-[#14171a] ring-2 ring-inset ring-[#c8102e]",
-};
+function Marker({ tone, current }: { tone: Tone; current?: boolean }) {
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        "relative z-10 block shrink-0 rounded-[3px]",
+        current ? "size-7" : "size-5",
+        tone === "warn" && "bg-[#ffd200] ring-2 ring-[#14171a]",
+        tone === "crit" && "bg-white ring-[3px] ring-[#c8102e]",
+        (tone === "ok" || tone === "info") && "bg-white ring-2 ring-[#0b3d91] ring-inset",
+        tone === "muted" && "rounded-full bg-white",
+      )}
+    />
+  );
+}
 
-function HopPanel({ hop }: { hop: Hop }) {
+function Label({ hop }: { hop: Hop }) {
   const tone = hop.tone ?? "ok";
+  const patch = tone === "warn" || tone === "crit";
   const body = (
-    <span className={clsx("sign flex w-full flex-col rounded-[4px] px-3.5 py-2.5 sm:min-w-32", panel[tone])}>
-      <span className="flex items-baseline justify-between gap-3">
-        <span className="truncate text-base font-bold">{hop.label}</span>
-        {hop.count !== undefined && <span className="tabular text-sm font-bold opacity-90">{hop.count}</span>}
+    <span
+      className={clsx(
+        "inline-flex max-w-full flex-col rounded-[3px] text-left sm:items-center sm:text-center",
+        patch && "px-2 py-1",
+        tone === "warn" && "bg-[#ffd200] text-[#14171a]",
+        tone === "crit" && "bg-white text-[#14171a] ring-2 ring-[#c8102e]",
+        !patch && "text-white",
+      )}
+    >
+      <span className={clsx("font-bold", hop.current ? "text-md underline decoration-2 underline-offset-4" : "text-base")}>
+        {hop.label}
+        {hop.count !== undefined && <span className="tabular ml-1.5 font-semibold opacity-80">{hop.count}</span>}
       </span>
-      {hop.sub && <span className="mt-0.5 line-clamp-2 text-xs opacity-85">{hop.sub}</span>}
+      {hop.sub && <span className={clsx("text-xs", patch ? "text-[#434c55]" : "text-[#c9d6ef]")}>{hop.sub}</span>}
     </span>
   );
   return hop.href ? (
-    <Link href={hop.href} className="flex rounded-[4px] transition-transform duration-150 hover:-translate-y-0.5">
+    <Link href={hop.href} className="max-w-full rounded-[3px] hover:[&>span>span:first-child]:underline">
       {body}
     </Link>
   ) : (
-    <span className="flex">{body}</span>
+    body
   );
 }
 
-function RouteLine({ tone }: { tone: Tone }) {
-  const color = tone === "crit" ? "#c8102e" : tone === "warn" ? "#ffd200" : "var(--ok)";
+export function RouteSign({ hops, label, footer }: { hops: Hop[]; label: string; footer?: ReactNode }) {
   return (
-    <span className="relative mx-auto flex h-8 w-6 flex-col items-center sm:mx-0 sm:h-14 sm:w-auto sm:min-w-6 sm:flex-1 sm:flex-row" aria-hidden>
-      <span
-        className="h-full w-1.5 rounded-full sm:h-1.5 sm:w-full"
-        style={
-          tone === "warn"
-            ? { backgroundImage: `repeating-linear-gradient(var(--dash-dir, 180deg), ${color} 0 8px, transparent 8px 14px)` }
-            : { backgroundColor: color }
-        }
-      />
-      <span
-        className="absolute bottom-0 size-0 rotate-90 border-y-[7px] border-l-[10px] border-y-transparent sm:right-0 sm:bottom-auto sm:rotate-0"
-        style={{ borderLeftColor: color }}
-      />
-    </span>
-  );
-}
-
-export function RouteSign({ hops, label }: { hops: Hop[]; label: string }) {
-  return (
-    <nav aria-label={label} className="[--dash-dir:180deg] sm:[--dash-dir:90deg]">
-      <ol className="flex flex-col items-stretch gap-1 py-1 sm:flex-row sm:items-center">
-        {hops.map((hop, i) => (
-          <Fragment key={hop.key}>
-            {i > 0 && (
-              <li aria-hidden className="flex sm:min-w-6 sm:flex-1">
-                <RouteLine tone={hop.tone === "crit" || hop.tone === "warn" ? hop.tone : "ok"} />
-              </li>
-            )}
-            <li className="min-w-0 sm:max-w-60 sm:shrink">
-              <HopPanel hop={hop} />
+    <figure
+      className="sign rounded-[6px] bg-[#0b3d91] px-5 pt-5 pb-4 text-white sm:pr-12"
+      style={{ "--n": hops.length } as CSSProperties}
+    >
+      <nav aria-label={label}>
+        <div className="relative">
+          {/* The route: vertical on phones, horizontal from first to last destination on wider screens. */}
+          <span
+            aria-hidden
+            className="absolute top-2 bottom-2 left-[8px] w-2 bg-white sm:top-[6px] sm:bottom-auto sm:left-[calc(100%/(2*var(--n)))] sm:h-2 sm:w-auto sm:right-[calc(100%/(2*var(--n))-30px)]"
+          />
+          <span
+            aria-hidden
+            className="absolute bottom-[-6px] left-[2px] size-0 border-x-[10px] border-t-[14px] border-x-transparent border-t-white sm:top-[-1px] sm:bottom-auto sm:left-auto sm:right-[calc(100%/(2*var(--n))-44px)] sm:border-y-[11px] sm:border-r-0 sm:border-l-[16px] sm:border-y-transparent sm:border-t-transparent sm:border-l-white"
+          />
+        <ol className="relative flex flex-col gap-4 sm:grid sm:gap-0 sm:[grid-template-columns:repeat(var(--n),minmax(0,1fr))]">
+          {hops.map((hop) => (
+            <li key={hop.key} className="relative flex min-w-0 items-start gap-3 sm:flex-col sm:items-center sm:gap-2.5 sm:px-1.5">
+              <span className="flex w-6 justify-center sm:h-5 sm:w-auto sm:items-center">
+                <Marker tone={hop.tone ?? "ok"} current={hop.current} />
+              </span>
+              <Label hop={hop} />
             </li>
-          </Fragment>
-        ))}
-      </ol>
-    </nav>
+          ))}
+        </ol>
+        </div>
+      </nav>
+      {footer && <figcaption className="mt-4 border-t border-white/25 pt-3 text-sm text-[#c9d6ef]">{footer}</figcaption>}
+    </figure>
   );
 }

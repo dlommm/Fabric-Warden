@@ -122,7 +122,16 @@ export default function AuditPage() {
                         <span className="font-semibold">{r.actor_name}</span> <span className="text-xs text-ink-3">{r.actor_type}</span>
                       </td>
                       <td className="px-[var(--row-pad)] font-mono text-sm">{r.action}</td>
-                      <td className="px-[var(--row-pad)] text-sm text-ink-2">{r.target_type ? `${r.target_type} ${r.target_id?.slice(0, 8) ?? ""}` : "—"}</td>
+                      <td className="px-[var(--row-pad)] text-sm text-ink-2">
+                        {r.target_type ? (
+                          <span className="inline-flex max-w-[18rem] items-baseline gap-1.5" title={r.target_id ?? undefined}>
+                            <span className="shrink-0">{r.target_type}</span>
+                            {r.target_id && <span className="truncate font-mono text-xs text-ink-3">{r.target_id}</span>}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
                       <td className="px-[var(--row-pad)]">
                         <StateLabel tone={r.outcome === "success" ? "ok" : r.outcome === "denied" ? "warn" : "crit"}>{r.outcome}</StateLabel>
                       </td>

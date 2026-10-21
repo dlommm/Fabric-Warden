@@ -54,11 +54,19 @@ export default function LoginPage() {
   return (
     <AuthFrame
       aside={
-        <div className="mt-auto hidden max-w-[34ch] lg:block">
-          <p className="text-xl leading-snug font-bold">Every fact shows where it came from.</p>
-          <p className="mt-3 text-base text-rail-ink-2">
-            Read-only by default. Nothing on your controller changes without an explicit, audited request.
-          </p>
+        <div className="mt-auto hidden lg:block">
+          <ul className="flex max-w-[22rem] flex-col gap-2.5" aria-label="How Fabric Warden works">
+            {[
+              ["Read-only by default", "Nothing on your controller changes without an explicit, audited request."],
+              ["Evidence on every fact", "Each record shows its source, how fresh it is, and whether it's demo data."],
+              ["Runs without the cloud", "Self-hosted. No subscriptions, no phone-home."],
+            ].map(([t, d]) => (
+              <li key={t} className="sign rounded-[4px] bg-white/8 px-4 py-3" style={{ outlineColor: "rgb(255 255 255 / 0.55)" }}>
+                <p className="font-bold">{t}</p>
+                <p className="mt-0.5 text-sm text-rail-ink-2">{d}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       }
     >

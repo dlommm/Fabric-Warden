@@ -62,6 +62,21 @@ export function zoneColor(name: string): string {
   return ZONE_COLORS[idx];
 }
 
+/** A VLAN id as a route-number patch: black on white with a black border. */
+export function VlanPatch({ id }: { id: number }) {
+  return (
+    <span className="inline-flex h-5 min-w-7 items-center justify-center rounded-[3px] border-2 border-ink bg-surface px-1 font-mono text-xs font-bold text-ink" title={`VLAN ${id}`}>
+      {id}
+    </span>
+  );
+}
+
+const ZONE_ACRONYMS = new Set(["dmz", "vpn", "iot", "wan", "lan"]);
+
+export function zoneLabel(name: string): string {
+  return ZONE_ACRONYMS.has(name.toLowerCase()) ? (name.toLowerCase() === "iot" ? "IoT" : name.toUpperCase()) : name;
+}
+
 /** A zone rendered as a road-class patch: flat colour, inset white border. */
 export function ZonePatch({ name, size = "sm" }: { name: string; size?: "sm" | "md" }) {
   return (
@@ -72,7 +87,7 @@ export function ZonePatch({ name, size = "sm" }: { name: string; size?: "sm" | "
       )}
       style={{ backgroundColor: zoneColor(name) }}
     >
-      {name}
+      {zoneLabel(name)}
     </span>
   );
 }
@@ -105,9 +120,9 @@ export function ProvenanceLine({ p, className }: { p: Provenance; className?: st
   );
 }
 
-export function Chip({ children, className }: { children: ReactNode; className?: string }) {
+export function Chip({ children, className, dashed }: { children: ReactNode; className?: string; dashed?: boolean }) {
   return (
-    <span className={clsx("inline-flex h-6 items-center rounded-[3px] border border-rule-strong bg-surface-2 px-2 text-xs font-semibold text-ink-2", className)}>
+    <span className={clsx("inline-flex h-6 items-center rounded-[3px] border px-2 text-xs font-semibold text-ink-2", dashed ? "border-dashed border-ink-3 bg-transparent" : "border-rule-strong bg-surface-2", className)}>
       {children}
     </span>
   );

@@ -64,8 +64,12 @@ export default function DevicePage() {
       />
 
       <div className="flex flex-col gap-[var(--gap)]">
-        <Panel title="Upstream route" id="route">
-          <RouteSign hops={upstream(d, all.data?.items ?? [])} label={`Path from ${d.name} to the internet`} />
+        <Panel title="Route from the internet" id="route">
+          <RouteSign
+            hops={upstream(d, all.data?.items ?? [])}
+            label={`Path from the internet to ${d.name}`}
+            footer={hopsFooter(d, all.data?.items ?? [])}
+          />
         </Panel>
 
         <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -100,8 +104,8 @@ export default function DevicePage() {
         )}
 
         {d.radios.length > 0 && (
-          <Panel title="Radios" id="radios" bodyClassName="p-0">
-            <table className="w-full text-left">
+          <Panel title="Radios" id="radios" bodyClassName="overflow-x-auto p-0">
+            <table className="w-full text-left whitespace-nowrap">
               <thead>
                 <tr className="border-b border-rule text-xs font-bold tracking-wide text-ink-2 uppercase">
                   <th scope="col" className="h-9 px-4">Band</th>
@@ -189,15 +193,25 @@ function upstream(d: DeviceDetail, all: DeviceSummary[]): Hop[] {
     chain.push(cur);
     cur = cur.uplink_id ? byId.get(cur.uplink_id) : undefined;
   }
-  const hops: Hop[] = chain.map((x) => ({
+  const hops: Hop[] = chain.reverse().map((x) => ({
     key: x.id,
     label: x.name,
-    sub: x.model,
+    sub: x.id === d.id ? "You are here" : x.model,
     href: x.id === d.id ? undefined : `/inventory/devices/${x.id}`,
     tone: deviceTone(x.state),
+    current: x.id === d.id,
   }));
-  if (chain.at(-1)?.features.includes("gateway")) hops.push({ key: "wan", label: "Internet", sub: "via WAN", tone: "muted" });
+  if (chain[0]?.features.includes("gateway")) hops.unshift({ key: "wan", label: "Internet", sub: "via WAN", tone: "muted" });
   return hops;
+}
+
+function hopsFooter(d: DeviceDetail, all: DeviceSummary[]) {
+  const hops = upstream(d, all);
+  const reachesInternet = hops[0]?.key === "wan";
+  const n = hops.length - 1;
+  return reachesInternet
+    ? `${n} hop${n === 1 ? "" : "s"} from the internet, following uplinks reported by the controller.`
+    : "The controller doesn't report a complete uplink chain to the gateway for this device.";
 }
 
 function portLabel(p: Port) {

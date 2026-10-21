@@ -176,7 +176,7 @@ function ModuleRow({ m, name, manage, busy, onToggle }: { m: ModuleInfo; name: (
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className={clsx("font-bold", planned && "text-ink-2")}>{m.name}</h3>
-            {planned ? <Chip>Planned · release {m.roadmap_phase}</Chip> : m.maturity === "preview" ? <Chip>Preview</Chip> : null}
+            {planned ? <Chip dashed>Planned · release {m.roadmap_phase}</Chip> : m.maturity === "preview" ? <Chip>Preview</Chip> : null}
             {m.always_enabled && <Chip><Lock className="mr-1 size-3" aria-hidden /> Required</Chip>}
           </div>
           <p className={clsx("mt-0.5 max-w-[80ch] text-base", planned ? "text-ink-3" : "text-ink-2")}>{m.description}</p>

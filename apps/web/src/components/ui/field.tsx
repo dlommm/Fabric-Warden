@@ -1,4 +1,5 @@
 import { clsx } from "clsx";
+import { ChevronDown } from "lucide-react";
 import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useId } from "react";
 
 export const inputClass =
@@ -49,8 +50,11 @@ export function Textarea({ className, ...rest }: TextareaHTMLAttributes<HTMLText
 
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
-    <select className={clsx(inputClass, "h-9 pr-8", className)} {...rest}>
-      {children}
-    </select>
+    <span className={clsx("relative inline-flex", className?.includes("w-") ? undefined : "w-full")}>
+      <select className={clsx(inputClass, "h-9 cursor-pointer appearance-none pr-9 font-semibold", className)} {...rest}>
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute top-1/2 right-2.5 size-4 -translate-y-1/2 text-ink-3" aria-hidden />
+    </span>
   );
 }

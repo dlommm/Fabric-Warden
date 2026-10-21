@@ -8,7 +8,7 @@ import { useState } from "react";
 import { type Hop, RouteSign } from "@/components/route-sign";
 import { Button, ButtonLink } from "@/components/ui/button";
 import { EmptyState, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
-import { DemoTag, StateLabel, type Tone, controllerTone, deviceTone } from "@/components/ui/signs";
+import { DemoTag, StateLabel, type Tone, VlanPatch, controllerTone, deviceTone } from "@/components/ui/signs";
 import { get, post } from "@/lib/api";
 import { describeEvent, eventHref } from "@/lib/events";
 import { ago, titleCase } from "@/lib/format";
@@ -74,11 +74,11 @@ export default function OverviewPage() {
           </EmptyState>
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-2">
+        <div className="gap-[var(--gap)] xl:columns-2 [&>*]:mb-[var(--gap)]">
           {panels.map((id) => {
             const wide = id === "attention" || id === "route";
             return (
-              <div key={id} className={clsx(wide && "xl:col-span-2")}>
+              <div key={id} className={clsx("break-inside-avoid", wide && "[column-span:all]")}>
                 {id === "attention" && <AttentionPanel s={s} />}
                 {id === "route" && <RoutePanel devices={devices.data?.items} s={s} />}
                 {id === "health" && <HealthPanel s={s} devices={devices.data?.items} />}
@@ -170,24 +170,26 @@ function AttentionPanel({ s }: { s?: Summary }) {
     );
   }
   const severe = issues.filter((i) => i.tone === "crit" || i.tone === "warn").length;
+  const notes = issues.length - severe;
   return (
     <section aria-labelledby="attention-h" className="sign rounded-[var(--radius)] bg-warn text-warn-ink" style={{ outlineColor: "#14171a" }}>
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 pt-4 pb-2">
         <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
         <h2 id="attention-h" className="text-lg font-bold">
-          {severe > 0 ? `${severe} thing${severe > 1 ? "s" : ""} need${severe > 1 ? "" : "s"} attention` : "For your information"}
+          {severe > 0 ? `${severe} thing${severe > 1 ? "s" : ""} need${severe > 1 ? "" : "s"} attention` : "Nothing urgent"}
         </h2>
+        {notes > 0 && <span className="text-base font-semibold">and {notes} notice{notes > 1 ? "s" : ""}</span>}
       </div>
-      <ul className="mx-2 mb-2 rounded-[3px] bg-white text-[#14171a]">
+      <ul className="mx-2 mb-2 rounded-[3px] bg-surface text-ink">
         {issues.map((i) => (
-          <li key={i.key} className="border-b border-[#e3e0d0] last:border-b-0">
-            <Link href={i.href ?? "#"} className="flex min-h-[var(--row-h)] flex-wrap items-center gap-x-4 gap-y-0.5 px-3 py-2 hover:bg-[#fff8d6]">
+          <li key={i.key} className="border-b border-rule last:border-b-0">
+            <Link href={i.href ?? "#"} className="flex min-h-[var(--row-h)] flex-wrap items-center gap-x-4 gap-y-0.5 px-3 py-2 hover:bg-warn-soft">
               <span className="font-bold sm:min-w-[13rem]">
-                <StateLabel tone={i.tone} className={i.tone === "warn" ? "!text-[#7a5a00]" : i.tone === "info" ? "!text-[#0b3d91]" : i.tone === "crit" ? "!text-[#c8102e]" : undefined}>
-                  <span className="text-[#14171a]">{i.title}</span>
+                <StateLabel tone={i.tone}>
+                  <span className="text-ink">{i.title}</span>
                 </StateLabel>
               </span>
-              <span className="text-[#434c55]">{i.detail}</span>
+              <span className="text-ink-2">{i.detail}</span>
             </Link>
           </li>
         ))}
@@ -219,8 +221,11 @@ function RoutePanel({ devices, s }: { devices?: DeviceSummary[]; s?: Summary }) 
   hops.push({ key: "clients", label: "Clients", sub: Object.entries(s.clients.by_type).map(([t, n]) => `${n} ${t.toLowerCase()}`).join(" · "), count: s.clients.total, href: "/inventory/clients", tone: "muted" });
   return (
     <Panel title="Route to the internet" id="route">
-      <RouteSign hops={hops} label="Network path from internet to clients" />
-      <p className="mt-3 text-sm text-ink-3">Upstream links as reported by the controller. Yellow and red hops have devices that are not online.</p>
+      <RouteSign
+        hops={hops}
+        label="Network path from the internet to clients"
+        footer="Upstream links as reported by the controller. A yellow or red destination has devices that are not online."
+      />
     </Panel>
   );
 }
@@ -239,11 +244,11 @@ function HealthPanel({ s, devices }: { s?: Summary; devices?: DeviceSummary[] })
         <caption className="sr-only">Devices by role and state</caption>
         <thead>
           <tr className="border-b border-rule text-xs font-bold tracking-wide text-ink-2 uppercase">
-            <th scope="col" className="h-9 px-4">Role</th>
-            <th scope="col" className="px-4 text-right">Online</th>
-            <th scope="col" className="px-4 text-right">Attention</th>
-            <th scope="col" className="px-4 text-right">Offline</th>
-            <th scope="col" className="px-4 text-right">Avg CPU</th>
+            <th scope="col" className="h-9 px-2 sm:px-4">Role</th>
+            <th scope="col" className="px-2 text-right sm:px-4">Online</th>
+            <th scope="col" className="px-2 text-right sm:px-4"><span className="sm:hidden">Attn.</span><span className="hidden sm:inline">Attention</span></th>
+            <th scope="col" className="px-2 text-right sm:px-4">Offline</th>
+            <th scope="col" className="px-2 text-right sm:px-4">CPU</th>
           </tr>
         </thead>
         <tbody>
@@ -254,14 +259,14 @@ function HealthPanel({ s, devices }: { s?: Summary; devices?: DeviceSummary[] })
             const cpus = g.items.map((d) => d.cpu_pct).filter((x): x is number => x != null);
             return (
               <tr key={g.label} className="border-b border-rule last:border-b-0">
-                <th scope="row" className="h-[var(--row-h)] px-4 font-bold">
-                  <Link href={`/inventory/devices?role=${g.role}`} className="hover:underline">{g.label}</Link>{" "}
-                  <span className="font-normal text-ink-3">({g.items.length})</span>
+                <th scope="row" className="h-[var(--row-h)] px-2 font-bold sm:px-4">
+                  <Link href={`/inventory/devices?role=${g.role}`} className="whitespace-nowrap hover:underline">{g.label}</Link>{" "}
+                  <span className="font-normal text-ink-3">{g.items.length}</span>
                 </th>
-                <td className="tabular px-4 text-right font-semibold text-ok">{on}</td>
-                <td className={clsx("tabular px-4 text-right font-semibold", warn ? "text-warn-text" : "text-ink-3")}>{warn}</td>
-                <td className={clsx("tabular px-4 text-right font-semibold", off ? "text-crit" : "text-ink-3")}>{off}</td>
-                <td className="tabular px-4 text-right text-ink-2">{cpus.length ? `${Math.round(cpus.reduce((a, b) => a + b, 0) / cpus.length)}%` : "—"}</td>
+                <td className="tabular px-2 text-right font-semibold text-ok sm:px-4">{on}</td>
+                <td className={clsx("tabular px-2 text-right font-semibold sm:px-4", warn ? "text-warn-text" : "text-ink-3")}>{warn}</td>
+                <td className={clsx("tabular px-2 text-right font-semibold sm:px-4", off ? "text-crit" : "text-ink-3")}>{off}</td>
+                <td className="tabular px-2 text-right text-ink-2 sm:px-4">{cpus.length ? `${Math.round(cpus.reduce((a, b) => a + b, 0) / cpus.length)}%` : "—"}</td>
               </tr>
             );
           })}
@@ -292,7 +297,7 @@ function ChangesPanel({ s }: { s?: Summary }) {
             return (
               <li key={e.id} className="flex min-h-[var(--row-h)] items-center gap-3 border-b border-rule px-4 py-1.5 last:border-b-0">
                 <time dateTime={e.occurred_at} className="w-24 shrink-0 text-sm text-ink-3" title={new Date(e.occurred_at).toLocaleString()}>{ago(e.occurred_at)}</time>
-                <span className="min-w-0 flex-1 truncate">
+                <span className="min-w-0 flex-1">
                   {tone !== "muted" ? <StateLabel tone={tone}><span className="font-normal text-ink">{text}</span></StateLabel> : text}
                 </span>
                 {href && <Link href={href} className="shrink-0 text-sm font-semibold text-accent hover:underline">View</Link>}
@@ -318,7 +323,7 @@ function ControllersPanel({ s }: { s?: Summary }) {
             <Link href={`/controllers/${c.id}`} className="min-w-40 font-bold hover:underline">{c.name}</Link>
             {c.is_demo && <DemoTag />}
             <StateLabel tone={controllerTone(c.status)}>{titleCase(c.status)}</StateLabel>
-            <span className="font-mono text-sm text-ink-3">{c.application_version ? `Network ${c.application_version}` : "version unknown"}</span>
+            <span className="text-sm text-ink-3">{c.application_version ? <>Network <span className="font-mono">{c.application_version}</span></> : "version unknown"}</span>
             <span className="text-sm text-ink-3">synced {ago(c.last_sync_at)}</span>
             {can("jobs:run") && (
               <Button size="sm" variant="ghost" className="ml-auto" icon={<RefreshCw className={clsx(sync.isPending && sync.variables === c.id && "animate-spin")} />} onClick={() => sync.mutate(c.id)} disabled={sync.isPending}>
@@ -346,9 +351,9 @@ function ClientsPanel() {
       ) : (
         <ul className="flex flex-col gap-2.5">
           {rows.map((n) => (
-            <li key={n.id} className="grid grid-cols-[9rem_1fr_2.5rem] items-center gap-3">
+            <li key={n.id} className="grid grid-cols-[10rem_1fr_2.5rem] items-center gap-3">
               <Link href={`/inventory/clients?network=${n.id}`} className="truncate font-semibold hover:underline">
-                {n.name} <span className="font-normal text-ink-3">{n.vlan_id ?? ""}</span>
+                {n.vlan_id != null && <VlanPatch id={n.vlan_id} />} {n.name}
               </Link>
               <span className="h-3 rounded-[2px] bg-surface-3" aria-hidden>
                 <span className="block h-full rounded-[2px] bg-[#00704a]" style={{ width: `${(n.active_clients / max) * 100}%` }} />
