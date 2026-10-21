@@ -100,3 +100,26 @@ export function KeyValue({ items, className }: { items: [ReactNode, ReactNode][]
     </dl>
   );
 }
+
+/** Shown in place of a page whose module is switched off. */
+export function ModuleOff({ title, name, children, canManage }: { title: string; name: string; children: ReactNode; canManage: boolean }) {
+  return (
+    <>
+      <PageHeader title={title} />
+      <section className="rounded-[var(--radius)] border border-rule bg-surface">
+        <EmptyState
+          title={`${name} is switched off`}
+          action={
+            canManage ? (
+              <a href="/modules" className="inline-flex h-9 items-center rounded-[var(--radius)] bg-accent px-3.5 font-semibold text-accent-ink hover:bg-accent-hover">
+                Open Module Center
+              </a>
+            ) : undefined
+          }
+        >
+          {children}
+        </EmptyState>
+      </section>
+    </>
+  );
+}

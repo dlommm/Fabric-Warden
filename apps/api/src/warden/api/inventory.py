@@ -193,6 +193,7 @@ async def get_device(device_id: str, db: DB, principal: Reader) -> dict:
         ],
         "radios": [
             {
+                "id": r.id,
                 "frequency_ghz": r.frequency_ghz,
                 "channel": r.channel,
                 "channel_width_mhz": r.channel_width_mhz,

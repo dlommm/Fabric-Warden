@@ -6,6 +6,7 @@ import { ChevronLeft, Pencil, Plus, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { MetricWidget, RangePicker } from "@/components/analytics";
 import { type Hop, RouteSign } from "@/components/route-sign";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
@@ -15,7 +16,7 @@ import { ApiError, get, patch } from "@/lib/api";
 import { describeEvent } from "@/lib/events";
 import { ROLE_LABEL, ago, bps, dateTime, deviceRole, speed, uptime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AssetRecord, DeviceDetail, DeviceSummary, Port } from "@/lib/types";
+import type { AlertItem, AssetRecord, DeviceDetail, DeviceSummary, Port, RangeKey, Widget } from "@/lib/types";
 
 export default function DevicePage() {
   const { id } = useParams<{ id: string }>();
@@ -95,6 +96,8 @@ export default function DevicePage() {
             <MetadataPanel d={d} />
           </div>
         </div>
+
+        <DeviceHistory d={d} />
 
         {d.ports.length > 0 && (
           <Panel title={`Ports (${d.ports.filter((p) => p.state === "UP").length} of ${d.ports.length} up)`} id="ports">
@@ -410,4 +413,43 @@ function AssetPanel({ d }: { d: DeviceDetail }) {
 
 function dateOnly(v?: string) {
   return v ? new Date(`${v}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";
+}
+
+const METRIC_MODULES = ["analytics-studio", "monitoring", "wan"];
+
+/** Metric history for this device, when a module that records it is enabled. */
+function DeviceHistory({ d }: { d: DeviceDetail }) {
+  const { moduleEnabled } = useSession();
+  const [range, setRange] = useState<RangeKey>("24h");
+  const on = METRIC_MODULES.some(moduleEnabled);
+  const alerts = useQuery({
+    queryKey: ["alerts", "entity", d.id],
+    queryFn: () => get<{ items: AlertItem[] }>(`/api/monitoring/alerts?entity_id=${d.id}`),
+    enabled: moduleEnabled("monitoring"),
+    refetchInterval: 60_000,
+  });
+  if (!on) return null;
+  const firing = alerts.data?.items.filter((a) => a.state === "firing") ?? [];
+  const w = (id: string, metric: string, title: string, entity_ids = [d.id], size: Widget["size"] = "third"): Widget => ({ id, metric, title, kind: "line", entity_ids, size, limit: 6 });
+  const widgets: Widget[] = [w("cpu", "device.cpu_pct", "CPU"), w("mem", "device.mem_pct", "Memory"), w("load", "device.load_1m", "Load (1 min)")];
+  if (d.uplink) widgets.push(w("rx", "device.uplink_rx_bps", "Uplink receive", [d.id], "half"), w("tx", "device.uplink_tx_bps", "Uplink transmit", [d.id], "half"));
+  if (d.radios.length) widgets.push(w("retries", "radio.tx_retries_pct", "Wi-Fi retries per radio", d.radios.map((r) => r.id), "half"), w("clients", "device.clients", "Attached clients", [d.id], "half"));
+  return (
+    <section aria-labelledby="history-h" className="flex flex-col gap-[var(--gap)]">
+      {firing.map((a) => (
+        <Notice key={a.id} tone={a.severity === "critical" ? "crit" : "warn"} title={`${a.rule} is firing`} action={<Link href="/alerts" className="font-semibold text-accent hover:underline">Open alerts</Link>}>
+          {a.summary} · since {ago(a.fired_at)}{a.acknowledged_by ? ` · acknowledged by ${a.acknowledged_by}` : ""}
+        </Notice>
+      ))}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="history-h" className="text-md font-bold">Metric history</h2>
+        <RangePicker value={range} onChange={setRange} />
+      </div>
+      <div className="grid grid-cols-1 gap-[var(--gap)] md:grid-cols-6">
+        {widgets.map((x) => (
+          <MetricWidget key={x.id} widget={x} range={range} label={x.title} height={160} />
+        ))}
+      </div>
+    </section>
+  );
 }

@@ -10,10 +10,13 @@ PostgreSQL in deployment, SQLite for development and tests. Schema managed by Al
 
 `clients` and `devices` also carry user-owned fields discovery never overwrites: `labels`, client `alias`/`owner`/`notes`, device `notes` and `asset` (JSON asset record).
 
+## Phase 3 tables
+`metric_series`, `metric_samples` (tiered metric history), `dashboards`, `alert_rules`, `alerts`, `maintenance_windows`, `notification_channels` (secrets in `credentials`), `notification_deliveries`. See [ANALYTICS.md](ANALYTICS.md).
+
 ## Phase 2 tables
 `client_sightings` (Client Intelligence: continuous stretches of a client at one IP/uplink/type), `ip_prefixes`, `ip_reservations`, `vlan_records` (IPAM documentation, user-owned). See [IPAM.md](IPAM.md).
 
 Observed rows share: `external_id` (controller id), `source` (`unifi-integration-api@<version>` or `simulator@<version>`), `is_demo`, `first_seen_at`, `observed_at`, `present`, `raw` (last payload). Identity is `(site_id, external_id)`; platform `id` is stable across syncs.
 
 ## Retention
-Events and audit records are kept indefinitely for now; job runs older than 30 days and expired sessions are pruned by `core.housekeeping`. Partitioned metric storage arrives with Phase 3.
+Events and audit records are kept indefinitely for now; job runs older than 30 days and expired sessions are pruned by `core.housekeeping`. Metric samples follow the tier retention in [ANALYTICS.md](ANALYTICS.md) (`core.metrics`); notification deliveries are kept 30 days and resolved alerts one year.

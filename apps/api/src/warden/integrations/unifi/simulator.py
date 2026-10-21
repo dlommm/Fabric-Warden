@@ -377,27 +377,36 @@ def _overview(device: dict[str, Any]) -> dict[str, Any]:
 
 def _stats(device: dict[str, Any], now: float) -> dict[str, Any]:
     n = int(device["id"][-12:], 16)
-    phase = now / 300.0 + n
-    cpu = round(12 + 8 * n % 20 + 6 * math.sin(phase), 1)
-    mem = round(35 + 4 * n % 30 + 3 * math.cos(phase / 2), 1)
+    # A daily load cycle per device plus a little short-term jitter, so sampled
+    # history looks like a network rather than noise.
+    day = 2 * math.pi * (now % 86_400) / 86_400 + n
+    phase = now / 900.0 + n
+    cpu = round(12 + 8 * n % 20 + 7 * math.sin(day) + 1.5 * math.sin(phase), 1)
+    mem = round(35 + 4 * n % 30 + 3 * math.sin(day + 1) + 0.5 * math.cos(phase), 1)
     stats: dict[str, Any] = {
         "uptimeSec": int(1_200_000 + n * 86_400 + now % 86_400),
         "lastHeartbeatAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - 7)),
         "nextHeartbeatAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now + 23)),
-        "loadAverage1Min": round(0.2 + n * 0.05 + 0.1 * math.sin(phase), 2),
+        "loadAverage1Min": round(0.2 + n * 0.05 + 0.12 * math.sin(day) + 0.03 * math.sin(phase), 2),
         "loadAverage5Min": round(0.2 + n * 0.05, 2),
         "loadAverage15Min": round(0.18 + n * 0.05, 2),
         "cpuUtilizationPct": max(cpu, 1.0),
         "memoryUtilizationPct": max(mem, 5.0),
         "interfaces": {
             "radios": [
-                {"frequencyGHz": r["frequencyGHz"], "txRetriesPct": round(4 + 3 * abs(math.sin(phase + r["frequencyGHz"])), 1)}
+                {
+                    "frequencyGHz": r["frequencyGHz"],
+                    "txRetriesPct": round(4 + 2.5 * abs(math.sin(day + r["frequencyGHz"])) + 0.5 * abs(math.sin(phase)), 1),
+                }
                 for r in device["interfaces"]["radios"]
             ]
         },
     }
     if device.get("uplink"):
-        stats["uplink"] = {"txRateBps": int(4e6 + 3e6 * abs(math.sin(phase))), "rxRateBps": int(2.5e7 + 2e7 * abs(math.cos(phase)))}
+        stats["uplink"] = {
+            "txRateBps": int(4e6 + 3e6 * abs(math.sin(day)) + 4e5 * abs(math.sin(phase))),
+            "rxRateBps": int(2.5e7 + 2e7 * abs(math.sin(day)) + 2e6 * abs(math.cos(phase))),
+        }
     return stats
 
 

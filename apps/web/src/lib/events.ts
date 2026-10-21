@@ -21,6 +21,10 @@ export function describeEvent(e: WardenEvent): string {
       return `Controller status ${p.from} → ${p.to}${p.detail ? `: ${p.detail}` : ""}`;
     case "controller.sync.completed":
       return "Controller sync completed";
+    case "monitoring.alert.firing":
+      return `Alert: ${p.summary}${(p.silenced as unknown) ? " (silenced)" : ""}`;
+    case "monitoring.alert.resolved":
+      return `Resolved: ${p.summary}`;
     case "module.enabled":
       return `Module ${p.module_id} enabled`;
     case "module.disabled":

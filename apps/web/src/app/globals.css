@@ -39,6 +39,15 @@
   --focus: #0b3d91;
   --selection: #ffe680;
 
+  /* Chart series, fixed order (validated for colour-vision deficiency in both
+     themes). Status colours are never series colours. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #6250d6;
+
   --row-h: 40px;
   --row-pad: 12px;
   --gap: 16px;
@@ -80,6 +89,12 @@
     --muted-state: #8e9aa6;
     --focus: #8cb1ef;
     --selection: #4a3f0a;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #9085e9;
     color-scheme: dark;
   }
 }
@@ -110,6 +125,12 @@
   --muted-state: #8e9aa6;
   --focus: #8cb1ef;
   --selection: #4a3f0a;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #9085e9;
   color-scheme: dark;
 }
 

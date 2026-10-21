@@ -42,7 +42,8 @@ API keys are per console: a key from a gateway does not authenticate against a s
 | Client OS / device-type fingerprint | Client Intelligence reports no fingerprint (`null`) rather than guessing |
 | LLDP neighbours | Topology uses controller-reported uplinks only |
 | IDS/IPS events | Needs syslog/CEF ingestion (Log Management, Phase 5) |
-| Historical statistics | Only `statistics/latest`; history must be collected by Fabric Warden |
+| Historical statistics | Only `statistics/latest`; Fabric Warden samples it on every sync (see ANALYTICS.md), so history starts when a metrics module is enabled |
+| WAN state, addresses, throughput, failover | `GET /v1/sites/{siteId}/wans` (10.0.162+) lists id and name only; WAN latency/loss come from Warden's own probe |
 | Device actions beyond `RESTART`; port actions beyond `POWER_CYCLE` | Port enable/disable, profiles, VLAN changes not available via this API |
 
 ## Endpoint availability by version

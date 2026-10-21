@@ -67,6 +67,7 @@ export interface Port {
 }
 
 export interface Radio {
+  id: string;
   frequency_ghz: number;
   channel: number | null;
   channel_width_mhz: number;
@@ -368,4 +369,212 @@ export interface VlanRow {
   observed_networks: { id: string; name: string; subnet: string | null; enabled: boolean; is_demo: boolean }[];
   prefixes: { id: string; cidr: string; status: IpStatus }[];
   name_mismatch: boolean;
+}
+
+// -- Phase 3: metrics, dashboards, alerts, notifications, WAN --------------------------
+
+export type MetricUnit = "pct" | "bps" | "count" | "ms" | "bool" | "load";
+export type RangeKey = "1h" | "6h" | "24h" | "7d" | "30d" | "90d";
+export type Severity = "critical" | "warning" | "info";
+
+export interface MetricDef {
+  id: string;
+  label: string;
+  unit: MetricUnit;
+  entity_type: string;
+  description: string;
+  higher_is_worse: boolean;
+  alarm: boolean;
+}
+
+export interface SeriesInfo {
+  id: string;
+  entity_type: string;
+  entity_id: string;
+  label: string;
+  is_demo: boolean;
+  last_value: number | null;
+  last_ts: string | null;
+  stale: boolean;
+}
+
+export interface MetricCatalog {
+  items: (MetricDef & { series: SeriesInfo[] })[];
+  ranges: RangeKey[];
+  retention: { raw_hours: number; five_minute_days: number; hourly_days: number };
+}
+
+/** [epoch seconds, avg, min, max] */
+export type Point = [number, number, number, number];
+
+export interface QuerySeries extends SeriesInfo {
+  points: Point[];
+  summary: { avg: number | null; min: number | null; max: number | null };
+}
+
+export interface QueryResult {
+  metric: MetricDef;
+  range: RangeKey;
+  tier: "raw" | "5m" | "1h";
+  step: number;
+  from: number;
+  to: number;
+  series: QuerySeries[];
+  total_series: number;
+}
+
+export type WidgetKind = "line" | "stat" | "top";
+export type WidgetSize = "third" | "half" | "full";
+
+export interface Widget {
+  id: string;
+  title: string;
+  kind: WidgetKind;
+  metric: string;
+  entity_ids: string[];
+  size: WidgetSize;
+  limit: number;
+}
+
+export interface DashboardRow {
+  id: string;
+  name: string;
+  description: string;
+  default_range: RangeKey;
+  template: string | null;
+  widget_count: number;
+  created_by: string | null;
+  updated_at: string;
+}
+
+export interface Dashboard extends DashboardRow {
+  widgets: Widget[];
+}
+
+export interface DashboardTemplate {
+  id: string;
+  name: string;
+  description: string;
+  widgets: Widget[];
+}
+
+export interface AlertItem {
+  id: string;
+  rule_id: string;
+  rule: string | null;
+  metric: string | null;
+  unit: MetricUnit | "";
+  comparator: "gt" | "lt" | null;
+  entity_type: string;
+  entity_id: string;
+  series_id: string | null;
+  label: string;
+  state: "pending" | "firing" | "resolved";
+  severity: Severity;
+  value: number | null;
+  threshold: number;
+  summary: string;
+  pending_since: string;
+  fired_at: string | null;
+  resolved_at: string | null;
+  resolution: "recovered" | "no_data" | "rule_changed" | null;
+  acknowledged_at: string | null;
+  acknowledged_by: string | null;
+  silenced: boolean;
+  is_demo: boolean;
+}
+
+export interface AlertCounts {
+  firing: number;
+  pending: number;
+  critical: number;
+  unacknowledged: number;
+  silenced: number;
+}
+
+export interface AlertRuleRow {
+  id: string;
+  name: string;
+  description: string;
+  metric: string;
+  metric_label: string;
+  unit: MetricUnit | "";
+  entity_type: string | null;
+  entity_ids: string[];
+  comparator: "gt" | "lt";
+  threshold: number;
+  for_seconds: number;
+  severity: Severity;
+  enabled: boolean;
+  channel_ids: string[];
+  builtin: boolean;
+  active_alerts: number;
+  updated_at: string;
+}
+
+export interface MaintenanceWindowRow {
+  id: string;
+  name: string;
+  starts_at: string;
+  ends_at: string;
+  entity_ids: string[];
+  reason: string;
+  created_by: string | null;
+  state: "active" | "scheduled" | "ended";
+}
+
+export type ChannelKind = "webhook" | "ntfy" | "email";
+
+export interface ChannelRow {
+  id: string;
+  name: string;
+  kind: ChannelKind;
+  enabled: boolean;
+  min_severity: Severity;
+  display: string;
+  config: Record<string, unknown>;
+  has_secret: boolean;
+  last_status: "ok" | "failed" | null;
+  last_error: string | null;
+  last_sent_at: string | null;
+  updated_at: string;
+}
+
+export interface Delivery {
+  id: string;
+  channel_id: string;
+  alert_id: string | null;
+  kind: "firing" | "resolved" | "test";
+  status: "sent" | "failed";
+  error: string | null;
+  created_at: string;
+}
+
+export interface ProbeTarget {
+  host: string;
+  port: number;
+  label: string;
+}
+
+export interface WanOverview {
+  wans: { id: string; name: string; site: string | null; observed_at: string; present: boolean; is_demo: boolean }[];
+  gateways: {
+    id: string;
+    name: string;
+    model: string;
+    state: string;
+    ip_address: string | null;
+    firmware_version: string | null;
+    cpu_pct: number | null;
+    mem_pct: number | null;
+    uptime_sec: number | null;
+    stats_observed_at: string | null;
+    is_demo: boolean;
+  }[];
+  probe: {
+    targets: ProbeTarget[];
+    attempts: number;
+    timeout_ms: number;
+    results: { target: string; host: string; port: number; label: string; latency_ms: number | null; loss_pct: number | null; last_ts: string | null; stale: boolean }[];
+  };
 }

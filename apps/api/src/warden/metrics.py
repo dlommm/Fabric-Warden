@@ -43,6 +43,8 @@ class MetricDef:
     description: str
     # Larger is worse; drives sort order of "top" widgets.
     higher_is_worse: bool = True
+    # Any value above zero is a problem (a count of bad things), so readings carry state.
+    alarm: bool = False
 
 
 METRICS: dict[str, MetricDef] = {
@@ -60,7 +62,7 @@ METRICS: dict[str, MetricDef] = {
         MetricDef("site.clients_wired", "Wired clients", "count", "site", "Clients on a wired connection.", False),
         MetricDef("site.clients_wireless", "Wireless clients", "count", "site", "Clients on Wi-Fi.", False),
         MetricDef("site.devices_online", "Devices online", "count", "site", "Adopted devices reported online.", False),
-        MetricDef("site.devices_offline", "Devices offline", "count", "site", "Adopted devices not online."),
+        MetricDef("site.devices_offline", "Devices offline", "count", "site", "Adopted devices not online.", alarm=True),
         MetricDef("network.clients", "Clients per network", "count", "network", "Clients whose address falls in the network's subnet."),
         MetricDef("controller.reachable", "Controller reachable", "bool", "controller", "1 when the last sync succeeded.", False),
         MetricDef("wan.latency_ms", "Latency", "ms", "probe", "TCP connect time from the Warden host to a probe target."),

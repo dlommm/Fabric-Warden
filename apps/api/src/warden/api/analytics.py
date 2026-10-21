@@ -10,7 +10,7 @@ import secrets
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import select
 
 from warden import audit, metrics
@@ -31,6 +31,7 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"], dependencies=[De
 
 Reader = Allowed(P.INVENTORY_READ)
 Editor = Allowed(P.ANALYTICS_EDIT)
+LINE_MAX = 6
 RangeKey = Literal["1h", "6h", "24h", "7d", "30d", "90d"]
 
 
@@ -49,6 +50,7 @@ def _def(m: metrics.MetricDef) -> dict[str, Any]:
         "entity_type": m.entity_type,
         "description": m.description,
         "higher_is_worse": m.higher_is_worse,
+        "alarm": m.alarm,
     }
 
 
@@ -149,6 +151,13 @@ class Widget(BaseModel):
             raise ValueError(f"unknown metric {v}")
         return v
 
+    @model_validator(mode="after")
+    def readable(self) -> Widget:
+        # Six fixed series colours; more lines than that stop being distinguishable.
+        if self.kind == "line" and (self.limit > LINE_MAX or len(self.entity_ids) > LINE_MAX):
+            raise ValueError(f"a line chart shows at most {LINE_MAX} series")
+        return self
+
 
 def W(metric: str, kind: str = "line", size: str = "half", title: str = "", limit: int = 5) -> dict[str, Any]:  # noqa: N802
     return Widget(metric=metric, kind=kind, size=size, title=title, limit=limit).model_dump()  # type: ignore[arg-type]
@@ -186,7 +195,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
             W("site.clients_wireless", "stat", "third", "Wireless"),
             W("site.clients_wired", "stat", "third", "Wired"),
             W("site.clients", "stat", "third", "All clients"),
-            W("network.clients", "line", "full", "Clients per network", 8),
+            W("network.clients", "line", "full", "Clients per network", 6),
             W("device.clients", "top", "full", "Clients per device", 10),
         ],
     },
@@ -194,7 +203,7 @@ TEMPLATES: dict[str, dict[str, Any]] = {
         "name": "Wi-Fi",
         "description": "Retry rates per radio and client load per access point.",
         "widgets": lambda: [
-            W("radio.tx_retries_pct", "line", "full", "Transmit retries per radio", 8),
+            W("radio.tx_retries_pct", "line", "full", "Transmit retries per radio", 6),
             W("device.clients", "top", "half", "Clients per access point"),
             W("site.clients_wireless", "line", "half", "Wireless clients"),
         ],

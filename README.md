@@ -2,7 +2,7 @@
 
 Self-hosted, modular network operations for UniFi: inventory, analytics, configuration history, security investigation, rack/DCIM documentation and optional AI agents in one web interface. The UniFi controller stays the authoritative control plane; Fabric Warden reads it through the **official** Integration API and is **read-only by default**.
 
-> **Status: Phases 1 (core platform) and 2 (inventory and IPAM) implemented.** Most modules in the catalog are declared but *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: Phases 1 (core platform), 2 (inventory and IPAM) and 3 (analytics and alerting) implemented.** Most modules in the catalog are declared but *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What works today
 
@@ -17,6 +17,9 @@ Self-hosted, modular network operations for UniFi: inventory, analytics, configu
 - Hash-chained, tamper-evident audit trail
 - Client Intelligence: Client 360 with route, address/attachment history and user-owned identity
 - IPAM: documented prefixes, reservations and VLANs checked against the network (conflicts, duplicates, VLAN mismatches, pool overlaps), with a keyboard-operable address map; device asset records
+- Analytics: metric history sampled on every sync (raw, 5-minute and hourly tiers), dashboards with templates, device history charts
+- Alerts: threshold rules with hold times, acknowledgement and maintenance windows; notifications to webhooks (HMAC-signed), ntfy and email
+- WAN: interfaces, gateway health and an opt-in latency/loss probe
 - Web UI: customizable Overview (exceptions first), devices, device detail with upstream route, clients, networks + zones, controllers + capability matrix, Module Center, audit, users, account; light/dark, comfortable/compact
 - Deterministic simulated UniFi controller for demos and tests (always labelled *Demo data*)
 

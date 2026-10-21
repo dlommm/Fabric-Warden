@@ -13,7 +13,7 @@ import { get, post } from "@/lib/api";
 import { describeEvent, eventHref } from "@/lib/events";
 import { ago, titleCase } from "@/lib/format";
 import { DEFAULT_PREFS, useSession } from "@/lib/session";
-import type { ClientRow, DeviceSummary, NetworkRow, OverviewPanel, Summary } from "@/lib/types";
+import type { AlertItem, ClientRow, DeviceSummary, NetworkRow, OverviewPanel, Summary } from "@/lib/types";
 
 const PANEL_LABEL: Record<OverviewPanel, string> = {
   attention: "Needs attention",
@@ -64,6 +64,12 @@ export default function OverviewPage() {
   const inventoryOn = moduleEnabled("inventory");
   const summary = useQuery({ queryKey: ["summary"], queryFn: () => get<Summary>("/api/inventory/summary"), enabled: inventoryOn, refetchInterval: 30_000 });
   const devices = useQuery({ queryKey: ["devices", "all"], queryFn: () => get<{ items: DeviceSummary[] }>("/api/inventory/devices"), enabled: inventoryOn });
+  const alerts = useQuery({
+    queryKey: ["alerts", "active"],
+    queryFn: () => get<{ items: AlertItem[] }>("/api/monitoring/alerts"),
+    enabled: moduleEnabled("monitoring"),
+    refetchInterval: 30_000,
+  });
 
   if (modules.length > 0 && !inventoryOn) {
     return (
@@ -85,7 +91,7 @@ export default function OverviewPage() {
   const panels = prefs.overview_panels;
   const renderPanel = (id: OverviewPanel) => (
     <>
-      {id === "attention" && <AttentionPanel s={s} />}
+      {id === "attention" && <AttentionPanel s={s} alerts={alerts.data?.items} />}
       {id === "route" && <RoutePanel devices={devices.data?.items} s={s} />}
       {id === "health" && <HealthPanel s={s} devices={devices.data?.items} />}
       {id === "changes" && <ChangesPanel s={s} />}
@@ -172,6 +178,8 @@ function Customizer({ panels, onChange }: { panels: OverviewPanel[]; onChange: (
   );
 }
 
+const SEVERITY_TONE: Record<AlertItem["severity"], Tone> = { critical: "crit", warning: "warn", info: "info" };
+
 interface Issue {
   key: string;
   tone: Tone;
@@ -180,8 +188,25 @@ interface Issue {
   href?: string;
 }
 
-function issuesFrom(s: Summary): Issue[] {
+function issuesFrom(s: Summary, alerts: AlertItem[] = []): Issue[] {
   const out: Issue[] = [];
+  // Firing alerts lead; a device already listed for its state is not repeated.
+  const listed = new Set(s.attention.filter((d) => d.state !== "ONLINE").map((d) => d.id));
+  const offlineAlert = new Map<string, AlertItem>();
+  for (const a of alerts) {
+    if (a.state !== "firing" || a.silenced) continue;
+    if (a.entity_type === "device" && listed.has(a.entity_id) && a.metric === "device.online") {
+      offlineAlert.set(a.entity_id, a);
+      continue;
+    }
+    out.push({
+      key: `a-${a.id}`,
+      tone: a.severity === "critical" ? "crit" : a.severity === "warning" ? "warn" : "info",
+      title: `${a.rule}: ${a.label}`,
+      detail: `${a.summary.replace(`${a.label}: `, "")} · fired ${ago(a.fired_at)}${a.acknowledged_by ? ` · acknowledged by ${a.acknowledged_by}` : ""}`,
+      href: "/alerts",
+    });
+  }
   for (const c of s.controllers) {
     if (c.status !== "ok" && c.status !== "unknown") {
       out.push({ key: `c-${c.id}`, tone: controllerTone(c.status), title: `${c.name} is ${c.status}`, detail: c.status_detail || "The last sync failed.", href: `/controllers/${c.id}` });
@@ -193,7 +218,15 @@ function issuesFrom(s: Summary): Issue[] {
   }
   for (const d of s.attention) {
     if (d.state !== "ONLINE") {
-      out.push({ key: `d-${d.id}`, tone: deviceTone(d.state), title: `${d.name} is ${d.state === "CONNECTION_INTERRUPTED" ? "interrupted" : d.state.toLowerCase()}`, detail: `${d.model} · ${d.ip_address ?? d.mac_address}`, href: `/inventory/devices/${d.id}` });
+      // When an offline alert is firing for this device, the row carries the alert's severity so Overview and Alerts agree.
+      const a = offlineAlert.get(d.id);
+      out.push({
+        key: `d-${d.id}`,
+        tone: a ? SEVERITY_TONE[a.severity] : deviceTone(d.state),
+        title: `${d.name} is ${d.state === "CONNECTION_INTERRUPTED" ? "interrupted" : d.state.toLowerCase()}`,
+        detail: `${d.model} · ${d.ip_address ?? d.mac_address}${a ? ` · ${a.rule} alert firing, fired ${ago(a.fired_at)}` : ""}`,
+        href: a ? "/alerts" : `/inventory/devices/${d.id}`,
+      });
     }
   }
   const fw = s.attention.filter((d) => d.firmware_updatable);
@@ -204,9 +237,9 @@ function issuesFrom(s: Summary): Issue[] {
   return out.sort((a, b) => order[a.tone] - order[b.tone]);
 }
 
-function AttentionPanel({ s }: { s?: Summary }) {
+function AttentionPanel({ s, alerts }: { s?: Summary; alerts?: AlertItem[] }) {
   if (!s) return <Skeleton className="h-28 w-full" />;
-  const issues = issuesFrom(s);
+  const issues = issuesFrom(s, alerts);
   if (issues.length === 0) {
     return (
       <section aria-label="Needs attention" className="flex items-center gap-3 rounded-[var(--radius)] border border-ok/40 bg-ok-soft px-5 py-4">
