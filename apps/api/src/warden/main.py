@@ -13,7 +13,27 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete
 
 from warden import __version__, metrics, monitoring
-from warden.api import alerts, analytics, auth, clients, controllers, inventory, ipam, modules, notifications, system, users, wan
+from warden.api import (
+    alerts,
+    analytics,
+    assets,
+    auth,
+    cabling,
+    clients,
+    controllers,
+    dcim,
+    demo_infra,
+    docs,
+    inventory,
+    ipam,
+    modules,
+    notifications,
+    power,
+    system,
+    topology,
+    users,
+    wan,
+)
 from warden.app_state import AppState
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
@@ -127,6 +147,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         alerts.router,
         notifications.router,
         wan.router,
+        dcim.router,
+        cabling.router,
+        power.router,
+        assets.router,
+        topology.router,
+        docs.router,
+        demo_infra.router,
         system.router,
     ):
         app.include_router(r)

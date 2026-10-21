@@ -282,6 +282,114 @@ WAN = ModuleManifest(
     ],
 )
 
+DCIM = ModuleManifest(
+    id="dcim",
+    version=VERSION,
+    name="Rack & DCIM Manager",
+    category=C.INFRASTRUCTURE,
+    description="Locations, racks and rack elevations with occupancy validation; rack items link to observed devices for live state.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "inventory"],
+    permissions=["dcim:edit"],
+    nav=[NavEntry(label="Racks", href="/dcim", icon="rack", section="Infrastructure")],
+    resources=ResourceEstimate(memory_mb=16),
+    data_ownership=["dcim_locations", "dcim_racks", "dcim_rack_items"],
+    uninstall_behavior="Disabling hides racks; documented layouts are retained.",
+    warnings=["Rack layouts are documentation. The official API reports no physical location, so placement is entered by hand."],
+)
+
+CABLING = ModuleManifest(
+    id="cabling",
+    version=VERSION,
+    name="Cabling & Fiber Documentation",
+    category=C.INFRASTRUCTURE,
+    description="Cables between device ports, patch panels and outlets; end-to-end path tracing, cable schedule export and label text.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "dcim"],
+    permissions=["dcim:edit"],
+    nav=[NavEntry(label="Cabling", href="/dcim/cables", icon="cable", section="Infrastructure")],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["dcim_cables", "dcim_cable_ends"],
+    warnings=[
+        "The official API exposes no LLDP neighbours or uplink port numbers, so cables cannot be discovered; "
+        "documented paths are only checked against which device each device reports as its uplink."
+    ],
+)
+
+POWER = ModuleManifest(
+    id="power",
+    version=VERSION,
+    name="Power & Environment",
+    category=C.INFRASTRUCTURE,
+    description="Feeds, UPS and PDU chains, load roll-up with A/B failover, headroom, projected load and UPS runtime estimates.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "dcim"],
+    permissions=["dcim:edit"],
+    nav=[NavEntry(label="Power", href="/dcim/power", icon="plug", section="Infrastructure")],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["dcim_power_feeds", "dcim_power_links"],
+    warnings=[
+        "Loads are documented typical draw, not measurements: no UPS/PDU integration (SNMP/NUT) exists yet. "
+        "The official API reports PoE state but not wattage, so PoE load is an upper bound. "
+        "Temperature and humidity sensors are not implemented."
+    ],
+)
+
+ASSET_LIFECYCLE = ModuleManifest(
+    id="asset-lifecycle",
+    version=VERSION,
+    name="Asset Lifecycle",
+    category=C.INFRASTRUCTURE,
+    description=(
+        "Hardware, spares, licences and subscriptions with purchase data, warranty/support/end-of-life dates and a renewal calendar."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "inventory"],
+    permissions=["dcim:edit"],
+    nav=[NavEntry(label="Assets", href="/assets", icon="package", section="Infrastructure")],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["assets"],
+    warnings=["Licence keys are not stored here; keep them in the credential vault and reference them."],
+)
+
+TOPOLOGY = ModuleManifest(
+    id="topology",
+    version=VERSION,
+    name="Network Topology",
+    category=C.NETWORK,
+    description="Physical uplink tree and logical network view with live health and a VLAN overlay.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core", "inventory"],
+    optional=["monitoring", "dcim"],
+    nav=[NavEntry(label="Topology", href="/topology", icon="share", section="Network")],
+    resources=ResourceEstimate(memory_mb=8),
+    warnings=[
+        "Edges come from each device's reported uplink; the official API does not say which port. "
+        "The VLAN overlay is inferred from client attachment, not switch port VLAN configuration."
+    ],
+)
+
+DOCS = ModuleManifest(
+    id="docs",
+    version=VERSION,
+    name="Documentation & Wiki",
+    category=C.INFRASTRUCTURE,
+    description="Versioned Markdown runbooks and architecture pages with live [[device:…]] inventory references and backlinks.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=4,
+    requires=["core"],
+    permissions=["docs:edit"],
+    nav=[NavEntry(label="Docs", href="/docs", icon="book", section="Infrastructure")],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["doc_pages", "doc_versions"],
+    uninstall_behavior="Disabling hides pages; pages and their full history are retained.",
+)
+
 PLANNED: list[ModuleManifest] = [
     _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
@@ -303,37 +411,7 @@ PLANNED: list[ModuleManifest] = [
         ["switching"],
     ),
     _planned(
-        "dcim",
-        "Rack & DCIM Manager",
-        C.INFRASTRUCTURE,
-        4,
-        "Sites, rooms, rack elevations, drag-and-drop design and occupancy validation.",
-        ["inventory"],
-    ),
-    _planned(
-        "cabling", "Cabling & Fiber Documentation", C.INFRASTRUCTURE, 4, "Patch panels, cable tracing, schedules and labels.", ["dcim"]
-    ),
-    _planned("power", "Power & Environment", C.INFRASTRUCTURE, 4, "UPS/PDU inventory, power chains, PoE and load forecasting.", ["dcim"]),
-    _planned(
         "servers", "Servers & Virtualization", C.INFRASTRUCTURE, 4, "Proxmox, Unraid, Docker and Linux host integrations.", ["inventory"]
-    ),
-    _planned(
-        "topology", "Network Topology", C.NETWORK, 4, "Physical and logical topology with VLAN overlays and live health.", ["inventory"]
-    ),
-    _planned(
-        "docs",
-        "Documentation & Wiki",
-        C.INFRASTRUCTURE,
-        4,
-        "Versioned Markdown runbooks and architecture pages with live inventory references.",
-    ),
-    _planned(
-        "asset-lifecycle",
-        "Asset Lifecycle",
-        C.INFRASTRUCTURE,
-        4,
-        "Purchases, warranties, licences, spares and end-of-life tracking.",
-        ["inventory"],
     ),
     _planned(
         "firewall",
@@ -412,7 +490,25 @@ PLANNED: list[ModuleManifest] = [
 ]
 
 CATALOG: dict[str, ModuleManifest] = {
-    m.id: m for m in [CORE, UNIFI_NETWORK, INVENTORY, CLIENT_INTEL, IPAM, ANALYTICS, MONITORING, NOTIFICATIONS, WAN, *PLANNED]
+    m.id: m
+    for m in [
+        CORE,
+        UNIFI_NETWORK,
+        INVENTORY,
+        CLIENT_INTEL,
+        IPAM,
+        ANALYTICS,
+        MONITORING,
+        NOTIFICATIONS,
+        WAN,
+        DCIM,
+        CABLING,
+        POWER,
+        ASSET_LIFECYCLE,
+        TOPOLOGY,
+        DOCS,
+        *PLANNED,
+    ]
 }
 
 PRESETS: dict[str, dict[str, object]] = {

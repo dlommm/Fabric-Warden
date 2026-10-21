@@ -14,9 +14,12 @@ from warden import audit
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
 from warden.models import (
+    Asset,
+    Cable,
     Client,
     Controller,
     Device,
+    DocPage,
     EventRecord,
     FirewallPolicy,
     FirewallZone,
@@ -24,6 +27,8 @@ from warden.models import (
     IpReservation,
     Network,
     Port,
+    Rack,
+    RackItem,
     Radio,
     Site,
     Wan,
@@ -486,6 +491,7 @@ async def search(db: DB, state: State, principal: Reader, q: Annotated[str, Quer
     ]
     if await state.modules.is_enabled(db, "ipam"):
         results += await _search_ipam(db, like, addr)
+    results += await _search_infra(db, state, like)
 
     def rank(h: dict[str, Any]) -> int:
         # Exact hits first (an IP, a hostname), then prefixes that contain the address.
@@ -521,3 +527,51 @@ async def _search_ipam(db: DB, like: str, addr: ipaddress.IPv4Address | ipaddres
         for r in reservations
     ]
     return out[:12]
+
+
+async def _search_infra(db: DB, state: State, like: str) -> list[dict[str, Any]]:
+    """Phase 4 documentation: racks and rack items, cables, assets and wiki pages."""
+    out: list[dict[str, Any]] = []
+    if await state.modules.is_enabled(db, "dcim"):
+        for r in await db.scalars(select(Rack).where(func.lower(Rack.name).like(like)).limit(5)):
+            out.append(_hit("rack", r.id, r.name, f"Rack · {r.u_height} U", f"/dcim/racks/{r.id}", r.is_demo))
+        items = await db.scalars(
+            select(RackItem)
+            .where(or_(func.lower(RackItem.name).like(like), func.lower(RackItem.serial).like(like), func.lower(RackItem.model).like(like)))
+            .limit(5)
+        )
+        for i in items:
+            where = f"U{i.position}" if i.position else "zero-U"
+            out.append(
+                _hit("rack_item", i.id, i.name, f"{i.kind.replace('_', ' ')} · {where}", f"/dcim/racks/{i.rack_id}?item={i.id}", i.is_demo)
+            )
+    if await state.modules.is_enabled(db, "cabling"):
+        cables = await db.scalars(
+            select(Cable).where(or_(func.lower(Cable.label).like(like), func.lower(Cable.description).like(like))).limit(5)
+        )
+        for c in cables:
+            out.append(_hit("cable", c.id, c.label, f"{c.type} · {c.status}", f"/dcim/cables?q={c.label}", c.is_demo))
+    if await state.modules.is_enabled(db, "asset-lifecycle"):
+        assets = await db.scalars(
+            select(Asset)
+            .where(
+                or_(
+                    func.lower(Asset.name).like(like),
+                    func.lower(Asset.asset_tag).like(like),
+                    func.lower(Asset.serial).like(like),
+                    func.lower(Asset.order_ref).like(like),
+                )
+            )
+            .limit(5)
+        )
+        for a in assets:
+            out.append(
+                _hit("asset", a.id, a.name, " · ".join(x for x in (a.asset_tag, a.kind, a.status) if x), f"/assets/{a.id}", a.is_demo)
+            )
+    if await state.modules.is_enabled(db, "docs"):
+        pages = await db.scalars(
+            select(DocPage).where(or_(func.lower(DocPage.title).like(like), func.lower(DocPage.body).like(like))).limit(5)
+        )
+        for p in pages:
+            out.append(_hit("page", p.id, p.title, f"Docs · v{p.version}", f"/docs/{p.slug}", p.is_demo))
+    return out
