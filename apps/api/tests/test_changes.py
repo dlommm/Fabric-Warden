@@ -302,7 +302,8 @@ async def test_policy_risk_and_system_policies(changes, owner, demo):
         r = await owner.post("/api/changes", json={"operation": op, "target_id": system, "params": params})
         assert r.status_code == 409 and "System-defined" in r.json()["detail"]
     derived = (await _policy(owner, "Allow Internal to Servers (Return)"))["id"]
-    r = await owner.post("/api/changes", json={"operation": "firewall_policy.set_enabled", "target_id": derived, "params": {"enabled": False}})
+    body = {"operation": "firewall_policy.set_enabled", "target_id": derived, "params": {"enabled": False}}
+    r = await owner.post("/api/changes", json=body)
     assert r.status_code == 409 and "derives this policy" in r.json()["detail"]
 
 
