@@ -25,6 +25,8 @@ class P(StrEnum):
     SOC_MANAGE = "soc:manage"  # open and work security cases
     SERVERS_MANAGE = "servers:manage"  # host connections hold API credentials; read-only access to the hosts
     SNMP_MANAGE = "snmp:manage"  # SNMP profiles hold credentials; polling is read-only
+    INTEGRATIONS_MANAGE = "integrations:manage"  # Protect / Home Assistant connections hold credentials; reads only
+    MCP_USE = "mcp:use"  # call the read-only MCP tools; each tool also needs its own read permission
     MODULES_READ = "modules:read"
     MODULES_MANAGE = "modules:manage"
     JOBS_READ = "jobs:read"
@@ -60,12 +62,14 @@ ROLES: dict[str, frozenset[P]] = {
             P.JOBS_RUN,
             P.TOKENS_MANAGE_OWN,
             P.CHANGES_PROPOSE,
+            P.MCP_USE,
             P.SYSTEM_READ,
         }
     ),
     "auditor": frozenset(
         {
             P.INVENTORY_READ,
+            P.MCP_USE,
             P.CONTROLLERS_READ,
             P.MODULES_READ,
             P.JOBS_READ,

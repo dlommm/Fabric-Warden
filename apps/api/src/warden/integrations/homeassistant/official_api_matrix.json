@@ -1,0 +1,30 @@
+{
+  "retrieved": "2026-10-21",
+  "note": "Every Home Assistant REST API endpoint Fabric Warden calls, with the published documentation it was checked against. All calls are GET.",
+  "sources": [
+    "https://developers.home-assistant.io/docs/api/rest/",
+    "https://developers.home-assistant.io/docs/core/entity/device-tracker",
+    "https://developers.home-assistant.io/docs/core/entity/sensor",
+    "https://developers.home-assistant.io/docs/core/entity/binary-sensor",
+    "https://github.com/home-assistant/core/blob/dev/homeassistant/components/device_tracker/const.py (state attribute names ip, mac, host_name, source_type)"
+  ],
+  "base": "http://<host>:8123 (or :80 behind the Supervisor); the REST API is under /api/",
+  "auth": "Authorization: Bearer <long-lived access token> (created on the user's profile, under Security). A non-admin user is enough: every endpoint used is readable without the Admin marker, and results follow the user's permissions.",
+  "endpoints": [
+    {"method": "GET", "path": "/api/", "used_for": "Connection test: {\"message\": \"API running.\"} (the trailing slash matters)", "admin": false},
+    {"method": "GET", "path": "/api/config", "used_for": "version, location_name, unit_system.temperature", "admin": false},
+    {"method": "GET", "path": "/api/states", "used_for": "Every entity's state; Fabric Warden keeps only the selected categories below", "admin": false}
+  ],
+  "entity_selection": {
+    "temperature": "sensor.* with attributes.device_class == \"temperature\"",
+    "ups": "sensor.* whose entity_id or friendly_name contains the word \"ups\" (inferred from the name; Home Assistant has no UPS device class)",
+    "connectivity": "binary_sensor.* with attributes.device_class == \"connectivity\" (on = connected)",
+    "tracker": "device_tracker.* whose attributes.source_type is router, or that carries ip/mac attributes (ScannerEntity); GPS trackers are skipped so no location is stored"
+  },
+  "attributes_kept": ["friendly_name", "unit_of_measurement", "device_class", "state_class", "source_type", "ip", "mac", "host_name"],
+  "not_used": [
+    "Every POST endpoint (states, events, services/actions, template, config check, intents)",
+    "GET /api/history/period, /api/logbook, /api/error_log, /api/camera_proxy, /api/calendars",
+    "The WebSocket API"
+  ]
+}

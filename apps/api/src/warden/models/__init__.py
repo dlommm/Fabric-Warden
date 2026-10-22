@@ -11,6 +11,7 @@ from warden.models.analytics import (
 from warden.models.changes import ChangeRequest
 from warden.models.config import ComplianceResult, ConfigSnapshot
 from warden.models.dcim import Asset, Cable, CableEnd, DocPage, DocVersion, Location, PowerFeed, PowerLink, Rack, RackItem
+from warden.models.ecosystem import HaEntity, IntegrationConnection, ProtectDevice
 from warden.models.inventory import (
     Client,
     ClientSighting,
@@ -96,4 +97,7 @@ __all__ = [
     "SnmpProfile",
     "SnmpTarget",
     "ChangeRequest",
+    "HaEntity",
+    "IntegrationConnection",
+    "ProtectDevice",
 ]

@@ -576,6 +576,80 @@ INVESTIGATIONS = ModuleManifest(
     resources=ResourceEstimate(memory_mb=8),
 )
 
+
+UNIFI_PROTECT = ModuleManifest(
+    id="unifi-protect",
+    version=VERSION,
+    name="UniFi Protect",
+    category=C.INTEGRATION,
+    description=(
+        "Read-only cameras and NVR from the official Protect Integration API, matched to network clients by MAC, "
+        "with the uplink switch and, where a cable is documented, the switch port and its PoE state."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=9,
+    requires=["core", "inventory"],
+    optional=["cabling"],
+    permissions=["integrations:manage"],
+    nav=[NavEntry(label="Cameras", href="/protect", icon="cctv", section="Infrastructure")],
+    jobs=[JobDecl(id="unifi-protect.sync", title="Poll UniFi Protect", default_interval_seconds=60)],
+    external_integrations=["UniFi Protect Integration API (5.3.38 to 7.3.70 specs)"],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=1),
+    data_ownership=["integration_connections", "protect_devices"],
+    uninstall_behavior="Disabling stops polling; cameras and the API key are retained until the connection is deleted.",
+    warnings=[
+        "Read-only: only GET meta/info, cameras and nvrs are called. The published API reports no camera IP, "
+        "NVR storage or disk health, so those are not shown.",
+    ],
+)
+
+HOME_ASSISTANT = ModuleManifest(
+    id="home-assistant",
+    version=VERSION,
+    name="Home Assistant",
+    category=C.INTEGRATION,
+    description=(
+        "Read-only UPS and temperature sensors, connectivity sensors and router-based device trackers from the "
+        "Home Assistant REST API; trackers are matched to network clients."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=9,
+    requires=["core", "inventory"],
+    permissions=["integrations:manage"],
+    nav=[NavEntry(label="Home Assistant", href="/home-assistant", icon="home", section="Infrastructure")],
+    jobs=[JobDecl(id="home-assistant.sync", title="Poll Home Assistant", default_interval_seconds=60)],
+    external_integrations=["Home Assistant REST API (GET /api/, /api/config, /api/states)"],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=1),
+    data_ownership=["integration_connections", "ha_entities"],
+    uninstall_behavior="Disabling stops polling; entities and the token are retained until the connection is deleted.",
+    warnings=[
+        "Read-only: no actions or services are called. Only selected entities and allow-listed attributes are kept; "
+        "GPS trackers are skipped, so no location is stored.",
+    ],
+)
+
+MCP = ModuleManifest(
+    id="mcp",
+    version=VERSION,
+    name="MCP Gateway",
+    category=C.AI,
+    description=(
+        "A Model Context Protocol endpoint (/api/mcp, Streamable HTTP) with read-only tools over inventory, clients, "
+        "alerts, firewall findings, cameras and Home Assistant, authenticated with API tokens."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=9,
+    requires=["core", "inventory"],
+    optional=["monitoring", "firewall", "servers", "unifi-protect", "home-assistant"],
+    permissions=["mcp:use"],
+    resources=ResourceEstimate(memory_mb=8),
+    uninstall_behavior="Disabling makes /api/mcp answer 409; nothing is stored apart from audit records of tool calls.",
+    warnings=[
+        "Tools are read-only. A token needs mcp:use plus each tool's read permission; narrowed tokens see fewer tools. "
+        "Write tools (change proposals through the change engine) and the Paperclip gateway are planned, not built.",
+    ],
+)
+
 PLANNED: list[ModuleManifest] = [
     _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
     _planned(
@@ -621,17 +695,6 @@ PLANNED: list[ModuleManifest] = [
         ["ai-providers"],
         memory_mb=256,
     ),
-    _planned(
-        "unifi-protect",
-        "UniFi Protect",
-        C.INTEGRATION,
-        9,
-        "Cameras, NVR health and PoE correlation via the official Protect Integration API.",
-    ),
-    _planned("home-assistant", "Home Assistant", C.INTEGRATION, 9, "Sensors and automations from Home Assistant."),
-    _planned(
-        "mcp", "MCP & Paperclip Gateway", C.AI, 9, "Expose permission-scoped tools to MCP clients and Paperclip agents.", ["ai-providers"]
-    ),
 ]
 
 CATALOG: dict[str, ModuleManifest] = {
@@ -661,6 +724,9 @@ CATALOG: dict[str, ModuleManifest] = {
         LOGS,
         SOC,
         INVESTIGATIONS,
+        UNIFI_PROTECT,
+        HOME_ASSISTANT,
+        MCP,
         *PLANNED,
     ]
 }

@@ -1263,3 +1263,81 @@ export interface ChangeSettings {
   require_second_person: boolean;
   controllers: { id: string; name: string; write_mode: "read_only" | "changes"; is_demo: boolean; application_version: string | null }[];
 }
+
+// -- Phase 9: UniFi Protect, Home Assistant, MCP ------------------------------------------
+
+export type IntegrationKind = "unifi-protect" | "home-assistant";
+
+export interface IntegrationConnection {
+  id: string;
+  name: string;
+  kind: IntegrationKind;
+  base_url: string;
+  credential_fingerprint: string | null;
+  verify_tls: boolean;
+  enabled: boolean;
+  status: string;
+  status_detail: string;
+  version: string | null;
+  last_sync_at: string | null;
+  is_demo: boolean;
+}
+
+export interface IntegrationFinding {
+  kind: string;
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail?: string;
+  target: { type: string; id: string; name: string; entity_id?: string };
+  is_demo: boolean;
+}
+
+type MatchReason = "ip" | "mac" | "hostname" | null;
+
+export interface ProtectDevice {
+  id: string;
+  kind: "camera" | "nvr";
+  name: string;
+  type: string;
+  model_key: string;
+  mac_address: string | null;
+  state: string;
+  extra: {
+    smart_detect_types?: string[];
+    smart_detect_enabled?: string[];
+    has_mic?: boolean | null;
+    mic_enabled?: boolean | null;
+    arm_status?: string | null;
+    breach_event_count?: number | null;
+  };
+  connection: { id: string; name: string; status: string } | null;
+  client: { id: string; name: string; ip_address: string | null; type: string; match: MatchReason } | null;
+  uplink: { id: string; name: string; model: string; state: string; poe_ports_up: number | null } | null;
+  link: "wired" | "wifi" | null;
+  port: { idx: number; state: string | null; speed_mbps: number | null; poe: { enabled?: boolean; standard?: string; state?: string } | null; basis: "documented"; cable: string } | null;
+  port_note: string | null;
+  provenance: Provenance;
+  is_demo: boolean;
+}
+
+export type HaCategory = "ups" | "temperature" | "tracker" | "connectivity";
+
+export interface HaEntity {
+  id: string;
+  entity_id: string;
+  domain: string;
+  category: HaCategory;
+  category_basis: "device_class" | "domain" | "name";
+  name: string;
+  state: string;
+  value: number | null;
+  unit: string;
+  device_class: string;
+  attributes: { source_type?: string; ip?: string; mac?: string; host_name?: string; [k: string]: unknown };
+  last_changed: string | null;
+  available: boolean;
+  client: { id: string; name: string; ip_address: string | null; match: MatchReason } | null;
+  connection: { id: string; name: string; status: string } | null;
+  provenance: Provenance & { stale: boolean };
+  is_demo: boolean;
+}

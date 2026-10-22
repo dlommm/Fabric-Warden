@@ -6,7 +6,7 @@ Fabric Warden only uses **official, versioned, documented** UniFi APIs. Nothing 
 
 - UniFi Network **Integration API** — published per application version at developer.ui.com; retrieved 2026-10-20 via the unofficial mirror `opastorello/unifi-api-docs` (OpenAPI JSON per version). Versions analysed: 9.1.120, 9.2.87, 9.3.45, 9.4.19, 9.5.21, 10.0.162, 10.1.84, 10.3.58, 10.4.57, 10.5.67, 10.6.106.
 - Machine-readable matrix: `apps/api/src/warden/integrations/unifi/official_api_matrix.json` (generated from those specs; used at runtime by capability detection).
-- UniFi Protect Integration API (v7.3.70 spec analysed) — integration planned for Phase 9.
+- UniFi Protect Integration API — specs 5.3.38 to 7.3.70 from the same mirror; used read-only by the Phase 9 Cameras module (see [UniFi Protect](#unifi-protect)).
 
 **Live validation against a real console is pending** — all development used the simulator.
 
@@ -176,3 +176,31 @@ Observed on live UniFi switches and access points (2026-10-21):
 ifAlias carries the operator's own port name on these switches ("SFP28 1", a custom label), so it is shown but never used to number ports. Some UniFi devices answer "Unknown USM user": their agent runs but did not take the site's SNMP v3 user.
 
 Not published, so not assumed: which MIBs each model implements, how `ifName`/`ifDescr` map to front-panel ports (Fabric Warden matches "Port N" names and labels the match inferred), and any optics or FEC MIB.
+
+## UniFi Protect
+
+Phase 9 reads the **UniFi Protect Integration API** (`https://<console>/proxy/protect/integration`, `X-API-KEY`). Checked on 2026-10-21 against the OpenAPI documents published at developer.ui.com, via the automated mirror `opastorello/unifi-api-docs` (36 Protect versions, 5.3.38 to 7.3.70). The list with fields used is `apps/api/src/warden/integrations/protect/official_api_matrix.json`; details in [PROTECT.md](PROTECT.md).
+
+| Method | Path | In every spec since | Used for |
+|---|---|---|---|
+| `GET` | `/v1/meta/info` | 5.3.38 | `applicationVersion`; connection test |
+| `GET` | `/v1/cameras` | 5.3.38 | id, name, type, MAC, state, smart-detection types |
+| `GET` | `/v1/nvrs` | 5.3.38 | id, name, type, MAC, arm mode |
+
+Published in 7.3.70 but not used: every PATCH/POST/DELETE (camera, light, sensor, chime, siren, relay, speaker, bridge settings; PTZ; RTSPS streams; talkback; alarm manager; arm profiles; file upload; POS ingest), snapshots, the device and event WebSocket subscriptions, viewers, live views, users. **Not published at all:** camera IP address, firmware, uptime, recording state; NVR storage and disk health; the switch port a camera uses.
+
+## Home Assistant
+
+Phase 9 reads the **Home Assistant REST API** ([developer docs](https://developers.home-assistant.io/docs/api/rest/), retrieved 2026-10-21), `Authorization: Bearer <long-lived access token>`. Details in [HOME_ASSISTANT.md](HOME_ASSISTANT.md); list in `apps/api/src/warden/integrations/homeassistant/official_api_matrix.json`.
+
+| Method | Path | Admin only | Used for |
+|---|---|---|---|
+| `GET` | `/api/` | no | connection test (`{"message": "API running."}`) |
+| `GET` | `/api/config` | no | version, location name, temperature unit |
+| `GET` | `/api/states` | no | entity states; only temperature, UPS (by name), connectivity and router-tracker entities are kept |
+
+Tracker attribute names (`ip`, `mac`, `host_name`, `source_type`) are from [`device_tracker/const.py`](https://github.com/home-assistant/core/blob/dev/homeassistant/components/device_tracker/const.py); device classes from the [sensor](https://developers.home-assistant.io/docs/core/entity/sensor) and [binary sensor](https://developers.home-assistant.io/docs/core/entity/binary-sensor) docs. No POST endpoint (states, events, services, template) is used.
+
+## MCP
+
+The Phase 9 MCP gateway implements the Model Context Protocol Streamable HTTP transport, [specification 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18) (retrieved 2026-10-21), with read-only tools. See [MCP.md](MCP.md).
