@@ -49,17 +49,8 @@ coverage/
 playwright-report/
 test-results/
 
-# -- Claude Code: local settings and session state (settings.json is shared) -----
-.claude/settings.local.json
-.claude/scheduled_tasks.*
-.claude/routines/.state/
-.claude/worktrees/
-.claude/checkpoints/
-.claude/mailbox/
-.claude/agent-registry.json
-.claude/agent-memory-local
-.claude/first-run
-.claude/assistant-daemon-state.json
+# -- Claude Code: all project settings and session state stay local --------------
+.claude/
 
 # -- Impeccable: local runtime state and review screenshots (the design system,
 #    config.json, design.json and surfaces/ are shared) ---------------------------
