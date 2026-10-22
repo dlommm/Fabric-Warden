@@ -93,7 +93,7 @@ export default function SnmpPage() {
           />
         )}
         {!!targetItems?.length && <Interfaces />}
-        <Targets items={targetItems} loading={targets.isLoading} manage={manage} />
+        <Targets items={targetItems} loading={targets.isLoading} manage={manage} profiles={profileItems ?? []} />
         <Profiles items={profileItems} loading={profiles.isLoading} manage={manage} onAdd={() => setForm("profile")} />
       </div>
       <Confirm open={confirmDemo} onOpenChange={setConfirmDemo} title="Remove the demo agents?" confirmLabel="Remove demo agents" onConfirm={() => undemo.mutate()}>
@@ -180,13 +180,22 @@ function Interfaces() {
   );
 }
 
-function Targets({ items, loading, manage }: { items?: SnmpTarget[]; loading: boolean; manage: boolean }) {
+function Targets({ items, loading, manage, profiles }: { items?: SnmpTarget[]; loading: boolean; manage: boolean; profiles: SnmpProfile[] }) {
   const qc = useQueryClient();
   const [pending, setPending] = useState<SnmpTarget | null>(null);
   const done = () => qc.invalidateQueries({ queryKey: ["snmp"] });
   const poll = useMutation({ mutationFn: (id: string) => post(`/api/snmp/targets/${id}/poll`), onSuccess: done });
   const toggle = useMutation({ mutationFn: (t: SnmpTarget) => patch(`/api/snmp/targets/${t.id}`, { enabled: !t.enabled }), onSuccess: done });
   const remove = useMutation({ mutationFn: (id: string) => del(`/api/snmp/targets/${id}`), onSuccess: done });
+  // Switching credentials re-polls at once, so the row shows whether the other credentials work.
+  const switchCreds = useMutation({
+    mutationFn: async ({ id, profile_id }: { id: string; profile_id: string }) => {
+      await patch(`/api/snmp/targets/${id}`, { profile_id });
+      return post(`/api/snmp/targets/${id}/poll`);
+    },
+    onSuccess: done,
+  });
+  const live = profiles.filter((p) => !p.is_demo);
   return (
     <Panel title="Polled devices" bodyClassName="p-0">
       {loading ? (
@@ -202,7 +211,22 @@ function Targets({ items, loading, manage }: { items?: SnmpTarget[]; loading: bo
                 <span className="truncate text-sm text-ink-3">{t.device?.model ?? (t.sys_name || "Not in the inventory")}</span>
               </span>
               <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-mono text-xs text-ink-2">{t.host}:{t.port} · {t.profile ? `${t.profile.name}, SNMP ${t.profile.version}` : "no credentials"}</span>
+                {manage && !t.is_demo && live.length > 1 ? (
+                  <span className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="font-mono text-xs text-ink-2">{t.host}:{t.port}</span>
+                    <Select
+                      aria-label={`Credentials for ${t.name}`}
+                      className="h-8 w-56 text-sm"
+                      value={t.profile?.id ?? ""}
+                      disabled={switchCreds.isPending && switchCreds.variables?.id === t.id}
+                      onChange={(e) => switchCreds.mutate({ id: t.id, profile_id: e.target.value })}
+                    >
+                      {live.map((p) => <option key={p.id} value={p.id}>{p.name} (SNMP {p.version})</option>)}
+                    </Select>
+                  </span>
+                ) : (
+                  <span className="truncate font-mono text-xs text-ink-2">{t.host}:{t.port} · {t.profile ? `${t.profile.name}, SNMP ${t.profile.version}` : "no credentials"}</span>
+                )}
                 {t.status === "ok" && (
                   <span className="text-sm text-ink-3 tabular">
                     {t.interfaces_up} of {t.interfaces} ports up · {bps(t.rx_bps)} in, {bps(t.tx_bps)} out{t.uptime_s != null ? ` · agent up ${uptime(t.uptime_s)}` : ""}
@@ -230,8 +254,8 @@ function Targets({ items, loading, manage }: { items?: SnmpTarget[]; loading: bo
           ))}
         </ul>
       )}
-      {(poll.error || toggle.error || remove.error) && (
-        <div className="border-t border-rule p-4"><Notice tone="crit">{((poll.error || toggle.error || remove.error) as Error).message}</Notice></div>
+      {(poll.error || toggle.error || remove.error || switchCreds.error) && (
+        <div className="border-t border-rule p-4"><Notice tone="crit">{((poll.error || toggle.error || remove.error || switchCreds.error) as Error).message}</Notice></div>
       )}
       {items?.some((t) => t.status !== "ok" && t.hint) && (
         <div className="border-t border-rule p-4">
