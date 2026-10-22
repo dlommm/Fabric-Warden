@@ -183,7 +183,7 @@ export default function NetworksPage() {
                         <StateLabel tone={p.action === "ALLOW" ? "ok" : p.action === "BLOCK" ? "crit" : "warn"}>{p.action.toLowerCase()}</StateLabel>
                       </td>
                       <td className="px-4 text-ink-2">{p.logging_enabled ? "on" : "off"}</td>
-                      <td className="px-4 text-sm text-ink-3">{p.origin === "SYSTEM_DEFINED" ? "built-in" : "custom"}</td>
+                      <td className="px-4 text-sm text-ink-3">{p.origin === "SYSTEM_DEFINED" ? "built-in" : p.origin === "DERIVED" ? "derived" : "custom"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -77,7 +77,8 @@ def _build_devices() -> list[dict[str, Any]]:
             model="UDM Beast",
             ip="10.0.1.1",
             fw="5.0.12",
-            features=["gateway", "switching"],
+            # As a real UDM Beast reports it on 10.6.106: no "gateway" feature, although the schema has one.
+            features=["switching"],
             ports=gw_ports,
             uplink=None,
             state="ONLINE",
@@ -308,6 +309,8 @@ def _build_policies() -> list[dict[str, Any]]:
         _policy(8, "Allow IoT to Internal DNS", "iot", "internal", "ALLOW", dst_filter=_ports(53)),
         # Covered by "Allow Internal to IoT" with the same action (redundant).
         _policy(9, "Allow Internal to IoT web", "internal", "iot", "ALLOW", dst_filter=_ports(80, 443)),
+        # UniFi adds a derived "(Return)" policy for return traffic of some user rules and keeps it in step.
+        _policy(10, "Allow Internal to Servers (Return)", "servers", "internal", "ALLOW", origin="DERIVED"),
     ]
 
 

@@ -61,7 +61,7 @@ async def candidates(db: AsyncSession, operation: str) -> list[dict[str, Any]]:
                 }
             )
     elif operation.startswith("firewall_policy."):
-        q = select(FirewallPolicy).where(FirewallPolicy.present.is_(True), FirewallPolicy.origin != "SYSTEM_DEFINED")
+        q = select(FirewallPolicy).where(FirewallPolicy.present.is_(True), FirewallPolicy.origin == "USER_DEFINED")
         for p in await db.scalars(q.order_by(FirewallPolicy.index)):
             out.append(
                 {

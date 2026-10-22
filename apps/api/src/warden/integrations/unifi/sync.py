@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 from functools import partial
@@ -41,6 +42,18 @@ def _ts(value: str | None) -> datetime | None:
     if not value:
         return None
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+# Gateway families. A UDM Beast on Network 10.6.106 lists only "switching" in its features although the published
+# schema has a "gateway" value (observed 2026-10-22), so a gateway is also recognised by its model.
+_GATEWAY_MODEL = re.compile(r"^(UDM|UDR|UDW|UCG|UXG|EFG|UX\b|Dream |Cloud Gateway|Gateway )", re.IGNORECASE)
+
+
+def device_features(item: dict[str, Any]) -> list[str]:
+    features = set(item.get("features") or [])
+    if _GATEWAY_MODEL.match(item.get("model") or ""):
+        features.add("gateway")
+    return sorted(features)
 
 
 class SiteSync:
@@ -117,7 +130,7 @@ class SiteSync:
         d.firmware_version = item.get("firmwareVersion")
         d.firmware_updatable = bool(item.get("firmwareUpdatable"))
         d.state = item.get("state", "UNKNOWN")
-        d.features = sorted(item.get("features") or [])
+        d.features = device_features(item)
         d.uplink_device_external_id = (item.get("uplink") or {}).get("deviceId")
         if d.labels is None:
             d.labels = []

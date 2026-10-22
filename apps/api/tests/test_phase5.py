@@ -26,7 +26,7 @@ async def test_firewall_analysis(sec, owner):
     assert dns["relation"] == "shadowed" and dns["covered_by"] == "Block IoT to Internal" and dns["filter_summary"] == "to port 53"
     web = pol["Allow Internal to IoT web"]
     assert web["relation"] == "redundant" and web["covered_by"] == "Allow Internal to IoT" and web["filter_summary"] == "to ports 80, 443"
-    assert [p["name"] for p in site["system_policies"]] == ["Allow established/related"]
+    assert [p["name"] for p in site["system_policies"]] == ["Allow established/related", "Allow Internal to Servers (Return)"]
     assert any(p["name"] == "Legacy allow IoT to Servers" for p in site["disabled"])
     kinds = {f["kind"] for f in data["findings"]}
     assert {"shadowed", "redundant", "disabled", "block_without_logging"} <= kinds
@@ -36,7 +36,7 @@ async def test_firewall_analysis(sec, owner):
 
 async def test_config_history_snapshots_diff_and_drift(sec, owner, app):
     snaps = (await owner.get("/api/config/snapshots")).json()["items"]
-    assert len(snaps) == 1 and snaps[0]["is_baseline"] and snaps[0]["summary"]["policies"] == 9
+    assert len(snaps) == 1 and snaps[0]["is_baseline"] and snaps[0]["summary"]["policies"] == 10
     # An unchanged sync stores nothing.
     await owner.post(f"/api/controllers/{sec['id']}/sync")
     assert len((await owner.get("/api/config/snapshots")).json()["items"]) == 1

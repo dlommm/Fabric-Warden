@@ -8,6 +8,8 @@ First release candidate: Phases 1–7 and 9 plus Phase 10 hardening. Validated a
 - `warden-admin reset-password <user> [--clear-mfa]`: reset a forgotten password from the server shell; signs out the account's sessions and is audited.
 
 ### Changed
+- Gateways are recognised by model when the console omits the `gateway` feature (a live UDM Beast on 10.6.106 does), so gateway restarts stay high-risk and protected. The simulator's gateway now reports features the same way.
+- The change engine refuses `DERIVED` firewall policies (UniFi's "(Return)" rules); only `USER_DEFINED` ones are changeable or flagged by analysis. The simulator includes one.
 - SNMP: a target added by address before its controller was synced attaches to the live device at that address on its next poll (or, for a gateway listed under its WAN address, the device whose MAC one of its interfaces reports), so it gains port matching and the device-page panel without being re-added.
 
 ### Security

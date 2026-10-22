@@ -137,6 +137,15 @@ Only these writes are sent, only by the change engine, and only to a controller 
 | `network.devices.restart` | `POST /v1/sites/{siteId}/devices/{deviceId}/actions` | 9.1.120 | `{"action": "RESTART"}` |
 | `network.ports.power_cycle` | `POST /v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions` | 9.1.120 | `{"action": "POWER_CYCLE"}` |
 
+## Observed on a live console
+
+First read-only sync against a real console (UDM Beast, Network 10.6.106, 2026-10-22). Where it differs from what the published schema suggests, Fabric Warden follows the console:
+
+- **Gateway feature missing.** The device list's `features` enum includes `gateway`, but the UDM Beast reports only `["switching"]` (and the details endpoint's `features` object has only `switching`). Fabric Warden also recognises a gateway by model family (UDM, UDR, UDW, UCG, UXG, EFG, UX) so restart risk, the twin, topology and roles stay right.
+- **Gateway address is the WAN address.** `ipAddress` for the gateway is its public WAN address, not a LAN address. SNMP targets added by LAN address attach to it by interface MAC instead.
+- **Derived firewall policies.** Besides `USER_DEFINED` and `SYSTEM_DEFINED`, policies with `metadata.origin = DERIVED` appear: the "(Return)" halves UniFi keeps in step with a user rule. The change engine refuses to change them and analysis does not flag them.
+- **ISP modem as a device.** A UniFi-integrated cable modem ("Cable Internet") is listed as an adopted device with no features and is the root of the uplink tree.
+
 ## Servers and virtualization
 
 Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoints were verified on 2026-10-21 against the published sources below; the machine-readable list with required permissions is `apps/api/src/warden/integrations/hosts/official_api_matrix.json`. Everything is read-only (see [SERVERS.md](SERVERS.md)).

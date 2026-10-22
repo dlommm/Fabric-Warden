@@ -198,7 +198,8 @@ export default function FirewallPage() {
 /** The changes a user-defined policy offers, stacked; an open change replaces them with its link. */
 function PolicyChanges({ p, siteId }: { p: FwPolicy; siteId?: string }) {
   const open = useOpenChange(p.id);
-  if (p.origin === "SYSTEM_DEFINED") return <span className="text-sm text-ink-3">Managed by UniFi</span>;
+  if (p.origin === "DERIVED") return <span className="text-sm text-ink-3">Follows its rule</span>;
+  if (p.origin !== "USER_DEFINED") return <span className="text-sm text-ink-3">Managed by UniFi</span>;
   if (open) return <OpenChangeLink c={open} />;
   return (
     <span className="flex flex-col items-start">
@@ -210,7 +211,7 @@ function PolicyChanges({ p, siteId }: { p: FwPolicy; siteId?: string }) {
 
 /** Propose switching a policy's logging; the change is reviewed and approved on its own page. */
 function LoggingChange({ p, siteId }: { p: FwPolicy; siteId?: string }) {
-  if (p.origin === "SYSTEM_DEFINED") return null; // UniFi manages system policies; Fabric Warden never changes them
+  if (p.origin !== "USER_DEFINED") return null; // UniFi manages system and derived policies; Fabric Warden never changes them
   const on = !p.logging;
   return (
     <ProposeChange
@@ -231,7 +232,7 @@ function LoggingChange({ p, siteId }: { p: FwPolicy; siteId?: string }) {
 
 /** Propose enabling or disabling a user-defined policy; sent as a checked read-modify-write. */
 function EnabledChange({ p, siteId }: { p: FwPolicy; siteId?: string }) {
-  if (p.origin === "SYSTEM_DEFINED") return null;
+  if (p.origin !== "USER_DEFINED") return null;
   const on = !p.enabled;
   const blocks = p.action !== "ALLOW";
   return (

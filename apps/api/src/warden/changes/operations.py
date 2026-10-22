@@ -125,7 +125,10 @@ async def _user_policy(db: AsyncSession, target_id: str, target_type: str) -> Ta
     p = await db.get(FirewallPolicy, target_id)
     if p is None or not p.present:
         raise ChangeRefused("That firewall policy is not in the current inventory")
-    if p.origin == "SYSTEM_DEFINED":
+    if p.origin == "DERIVED":
+        # UniFi derives these (the "(Return)" half of a rule) from a user rule and keeps them in step with it.
+        raise ChangeRefused("UniFi derives this policy from another rule and keeps it in step; change that rule instead")
+    if p.origin != "USER_DEFINED":
         # The published API does not say whether system policies accept edits, so Fabric Warden never tries.
         raise ChangeRefused("System-defined policies are managed by UniFi; Fabric Warden only changes user-defined ones")
     controller, site = await _controller_site(db, p.site_id)

@@ -189,7 +189,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                         "subject": v.p.name,
                     }
                 )
-            if v.p.action in BLOCKISH and not v.p.logging_enabled and v.p.origin != "SYSTEM_DEFINED":
+            if v.p.action in BLOCKISH and not v.p.logging_enabled and v.p.origin == "USER_DEFINED":
                 out.append(
                     {
                         "key": f"nolog:{v.p.id}",
@@ -214,7 +214,7 @@ async def findings(db: AsyncSession, analyses: list[SiteAnalysis] | None = None)
                     }
                 )
         for v in sa.disabled:
-            if v.p.origin != "SYSTEM_DEFINED":
+            if v.p.origin == "USER_DEFINED":
                 out.append(
                     {
                         "key": f"disabled:{v.p.id}",

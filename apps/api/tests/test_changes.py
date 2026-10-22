@@ -301,6 +301,17 @@ async def test_policy_risk_and_system_policies(changes, owner, demo):
     for op, params in (("firewall_policy.set_enabled", {"enabled": False}), ("firewall_policy.set_logging", {"enabled": True})):
         r = await owner.post("/api/changes", json={"operation": op, "target_id": system, "params": params})
         assert r.status_code == 409 and "System-defined" in r.json()["detail"]
+    derived = (await _policy(owner, "Allow Internal to Servers (Return)"))["id"]
+    r = await owner.post("/api/changes", json={"operation": "firewall_policy.set_enabled", "target_id": derived, "params": {"enabled": False}})
+    assert r.status_code == 409 and "derives this policy" in r.json()["detail"]
+
+
+async def test_gateway_without_gateway_feature_is_still_the_gateway(changes, owner, demo):
+    """The simulator's UDM Beast, like the real one, lists only "switching"; restarting it is still high risk."""
+    gw = next(d for d in (await owner.get("/api/inventory/devices")).json()["items"] if d["model"] == "UDM Beast")
+    assert "gateway" in gw["features"]
+    cr = await _propose(owner, "device.restart", gw["id"])
+    assert cr["risk"] == "high" and cr["protected"] is True and any("gateway" in r for r in cr["risk_reasons"])
 
 
 async def test_operation_support_follows_the_controller_version(changes, owner, demo):
