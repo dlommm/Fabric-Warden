@@ -187,7 +187,7 @@ def _device_ref(d: Device | None) -> dict[str, Any] | None:
 
 async def _target_out(db: AsyncSession, t: SnmpTarget) -> dict[str, Any]:
     ifaces = list(await db.scalars(select(SnmpInterface).where(SnmpInterface.target_id == t.id, SnmpInterface.present.is_(True))))
-    phys = [i for i in ifaces if i.port_idx is not None or is_physical(i.if_type, i.name or i.descr)]
+    phys = [i for i in ifaces if i.port_idx is not None or is_physical(i.if_type, i.name or i.descr, i.oper_status)]
     stale = t.last_poll_at is None or t.last_poll_at < utcnow() - STALE
     profile = await db.get(SnmpProfile, t.profile_id)
     return {
@@ -381,7 +381,7 @@ def _iface(i: SnmpInterface, t: SnmpTarget | None = None, d: Device | None = Non
         "name": i.name or i.descr,
         "descr": i.descr,
         "alias": i.alias,
-        "physical": is_physical(i.if_type, i.name or i.descr),
+        "physical": is_physical(i.if_type, i.name or i.descr, i.oper_status),
         "port_idx": i.port_idx,
         "mac_address": i.mac_address,
         "admin_up": i.admin_up,
@@ -466,7 +466,7 @@ async def findings(db: DB, principal: Reader) -> dict:
     macs: dict[str, set[str]] = {}
     for i in await db.scalars(select(SnmpInterface).where(SnmpInterface.present.is_(True), SnmpInterface.target_id.in_(list(by_id)))):
         t = by_id[i.target_id]
-        if i.mac_address and is_physical(i.if_type, i.name or i.descr):
+        if i.mac_address and is_physical(i.if_type, i.name or i.descr, i.oper_status):
             macs.setdefault(t.id, set()).add(i.mac_address)
         name = f"{t.name} {i.name or i.descr}"
         base = {"target_id": t.id, "interface_id": i.id, "is_demo": i.is_demo}

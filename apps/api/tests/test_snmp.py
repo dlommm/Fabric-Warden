@@ -120,6 +120,13 @@ def test_port_matching_is_by_name_only():
     assert port_number("Port 7", "") == 7
     assert port_number("", "Slot: 0 Port: 12 Gigabit - Level") == 12
     assert port_number("eth3", "eth3") is None and port_number("switch0", "") is None
+    # Observed on live UniFi switches: Enterprise Campus / Pro XG unit-1 ports use the ifIndex;
+    # USW Enterprise uses slot 0; ifAlias (the operator's label) is never read.
+    assert port_number("tw1/0/1", "TwoPointFiveGigabitEthernet1/0/1", 1) == 1
+    assert port_number("te1/0/31", "TenGigabitEthernet1/0/31", 47) == 47
+    assert port_number("tf1/0/1", "TwentyFiveGigaEthernet1/0/1", 49) == 49
+    assert port_number("tf2/0/1", "TwentyFiveGigaEthernet2/0/1", 81) is None  # another stack unit
+    assert port_number("0/47", "Slot: 0 Port: 47 2.5G - Level", 47) == 47
 
 
 def test_collector_is_read_only():
@@ -190,7 +197,11 @@ def test_virtual_interfaces_on_linux_agents_are_not_ports():
     # Names and types as a UniFi gateway on UniFi OS 5.1 reports them (all ifType 6 unless noted).
     assert all(is_physical(6, n) for n in ("eth2", "eth8", "eth13", "Port 7"))
     virtual = ["eth13.100", "br0", "br100", "switch0", "switch0.1", "ifb0", "gretap0", "erspan0", "enP2p1s0v3", "wgsrv1"]
+    # And as U6/U7 access points report their Wi-Fi side.
+    virtual += ["wifi0ap3", "wifi2ap16", "mld-wifi0", "ra0", "rai4", "wds0", "apcli0", "apclii0", "ra4.90"]
     assert not any(is_physical(6, n) for n in virtual)
+    assert all(is_physical(6, n) for n in ("tw1/0/1", "tf1/0/32", "0/47"))
+    assert not is_physical(6, "gi2/0/5", "notPresent")  # an absent stack member's port
     assert not is_physical(24, "lo") and not is_physical(131, "gre1")
 
 

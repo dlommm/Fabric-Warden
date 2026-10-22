@@ -131,7 +131,7 @@ async def poll_target(db: AsyncSession, state: AppState, target: SnmpTarget) -> 
             row.oper_status,
             row.speed_mbps,
         )
-        iface.port_idx = port_number(row.name, row.descr) if row.physical else None
+        iface.port_idx = port_number(row.name, row.descr, row.if_index) if row.physical else None
         iface.counters, iface.counters_at = row.counters, now
         iface.rx_bps, iface.tx_bps = r["rx_bps"], r["tx_bps"]
         iface.errors_per_min, iface.discards_per_min = r["errors_per_min"], r["discards_per_min"]

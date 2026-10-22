@@ -40,16 +40,24 @@ OPER_STATUS = {1: "up", 2: "down", 3: "testing", 4: "unknown", 5: "dormant", 6: 
 # ethernetCsmacd, gigabitEthernet, fastEther, fastEtherFX: the types switch and gateway ports report.
 PHYSICAL_TYPES = {6, 62, 69, 117}
 # Linux-based agents (UniFi gateways among them) report VLAN subinterfaces, bridges, the switch CPU port,
-# IFB queues, tunnels and SR-IOV virtual functions as ethernetCsmacd too. Observed on a UniFi gateway
-# running UniFi OS 5.1: eth13.100, br0, switch0, ifb0, gretap0, wgsrv1, enP2p1s0v3.
+# IFB queues, tunnels and SR-IOV virtual functions as ethernetCsmacd too, and access points report their
+# Wi-Fi VAPs, WDS links and client-mode interfaces the same way. Observed on UniFi OS 5.1 gateways and
+# U6/U7 access points: eth13.100, br0, switch0, ifb0, gretap0, wgsrv1, enP2p1s0v3, wifi0ap3, mld-wifi0,
+# ra0, rai4, wds0, apcli0, apclii0.
 _VIRTUAL_NAME = re.compile(
-    r"\.\d+$|^(lo|br|switch|ifb|gre|gretap|erspan|wg|ip_vti|ip6|sit|tun|tap|veth|docker|vxlan|dummy|ppp|bond|enP\d+p\d+s\d+v)",
+    r"\.\d+$|^(lo|br|switch|ifb|gre|gretap|erspan|wg|ip_vti|ip6|sit|tun|tap|veth|docker|vxlan|dummy|ppp|bond"
+    r"|enP\d+p\d+s\d+v|wifi\d|mld-|rai?\d|wds|apcli|dumtxvap|ath\d|wlan|miireg)",
     re.I,
 )
 
 
-def is_physical(if_type: int | None, name: str) -> bool:
-    """A front-panel or uplink port, by ifType and, for Linux agents, by name. A heuristic."""
+def is_physical(if_type: int | None, name: str, oper_status: str | None = None) -> bool:
+    """A front-panel or uplink port, by ifType and, for Linux agents, by name. A heuristic.
+
+    Stackable switches list every possible member's ports; the absent ones are `notPresent` and are not ports.
+    """
+    if oper_status == "notPresent":
+        return False
     return if_type in PHYSICAL_TYPES and not _VIRTUAL_NAME.search(name or "")
 
 
@@ -220,7 +228,7 @@ class IfData:
 
     @property
     def physical(self) -> bool:
-        return is_physical(self.if_type, self.name or self.descr)
+        return is_physical(self.if_type, self.name or self.descr, self.oper_status)
 
 
 @dataclass
@@ -245,14 +253,24 @@ def _mac(v: Any) -> str | None:
 
 
 _PORT_RE = re.compile(r"\bport:?\s*(\d{1,3})\b", re.I)
+# Stack unit 1 ports on UniFi Enterprise Campus / Pro XG switches: gi1/0/5, tw1/0/1, te1/0/31, tf1/0/4.
+# Their numbering restarts per speed class, so the front-panel number is the ifIndex (observed: ECS-48-PoE
+# ports 1–52 are ifIndex 1–52, SFP28 1 = ifIndex 49; Pro XG Aggregation tf1/0/1–32 = ifIndex 1–32).
+_UNIT1_RE = re.compile(r"^[a-z]{2}1/0/\d+$", re.I)
+# USW Enterprise (FASTPATH-style): 0/47, with ifDescr "Slot: 0 Port: 47 2.5G - Level".
+_SLOT0_RE = re.compile(r"^0/(\d{1,3})$")
 
 
-def port_number(name: str, descr: str) -> int | None:
-    """The front-panel port number when the interface name says it ("Port 7", "Slot: 0 Port: 7 ...").
+def port_number(name: str, descr: str, if_index: int | None = None) -> int | None:
+    """The front-panel port number when the interface's name says it. A heuristic, labelled as inferred.
 
-    A heuristic: names such as eth3 or switch0 are left unmatched because their
-    numbering does not reliably follow the front panel.
+    Names such as eth3 or switch0 are left unmatched because their numbering does not reliably
+    follow the front panel. ifAlias is never used: it is the operator's own port label.
     """
+    if if_index is not None and _UNIT1_RE.match(name or ""):
+        return if_index
+    if m := _SLOT0_RE.match(name or ""):
+        return int(m.group(1))
     for text in (name, descr):
         if m := _PORT_RE.search(text or ""):
             return int(m.group(1))

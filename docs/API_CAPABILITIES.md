@@ -152,4 +152,14 @@ Observed on a live UniFi gateway (UniFi OS 5.1.33, Linux 6.6, 2026-10-21):
 - The built-in switch ports `eth2`–`eth9` report ifHighSpeed 50000 whether up or down, so their utilisation is understated; the SFP28 port reported 25000 as expected.
 - The agent answers on every gateway address, so the same device can be added twice; a finding says so.
 
+Observed on live UniFi switches and access points (2026-10-21):
+
+| Family (firmware) | Port names | Front-panel number | Notes |
+|---|---|---|---|
+| Enterprise Campus ECS-48-PoE, Pro XG Aggregation (AC5P 7.5.15) | `tw1/0/1`, `te1/0/31`, `tf1/0/4`, `gi1/0/5` | ifIndex (numbering restarts per speed class) | Lists 432 ports for every possible stack member; absent ones are `notPresent` and are ignored. LAGs are `Po1`… (ifType 161) |
+| USW Enterprise 48 PoE (7.5.15) | `0/47` | the number after `0/`; ifDescr "Slot: 0 Port: 47 2.5G - Level" | LAGs are `3/N`; CPU interface `5/1` |
+| U6 / U7 access points | `eth0` | not matched | Wi-Fi VAPs (`wifi0ap3`, `ra0`, `rai4`), WDS and client-mode interfaces report ifType 6 and are excluded by name |
+
+ifAlias carries the operator's own port name on these switches ("SFP28 1", a custom label), so it is shown but never used to number ports. Some UniFi devices answer "Unknown USM user": their agent runs but did not take the site's SNMP v3 user.
+
 Not published, so not assumed: which MIBs each model implements, how `ifName`/`ifDescr` map to front-panel ports (Fabric Warden matches "Port N" names and labels the match inferred), and any optics or FEC MIB.
