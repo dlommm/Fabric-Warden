@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 from fastapi import FastAPI
 
+from warden.ai.simulator import AiSimState, create_openai_app
 from warden.config import Settings
 from warden.db import Database
 from warden.events import EventBus
@@ -25,7 +26,7 @@ from warden.integrations.snmp.simulator import SnmpSimState
 from warden.integrations.unifi.client import UniFiNetworkClient
 from warden.integrations.unifi.simulator import SimulatorState, create_simulator_app
 from warden.jobs import Scheduler
-from warden.models import Controller, HostConnection, IntegrationConnection
+from warden.models import AiProvider, Controller, HostConnection, IntegrationConnection
 from warden.modules.service import ModuleService
 from warden.security.vault import Vault
 
@@ -54,6 +55,10 @@ class AppState:
     smtp_send: Callable[[dict[str, Any], str, Any], Awaitable[None]] | None = None  # (config, password, EmailMessage)
     probe_connect: Callable[[str, int, float], Awaitable[float | None]] | None = None  # host, port, timeout -> ms
     snmp_session: Callable[[str, int, Any], Any] | None = None  # host, port, Credentials -> snmp Session
+    ai_transport: httpx.AsyncBaseTransport | None = None  # AI providers (tests point this at an in-process fake)
+    ai_sim: AiSimState = field(default_factory=AiSimState)
+    _ai_sim_app: FastAPI | None = None
+    ai_stop: bool = False  # in-process mirror of the AI kill switch, checked between agent turns
 
     def simulator_transport(self) -> httpx.AsyncBaseTransport:
         if self._sim_app is None:
@@ -84,6 +89,14 @@ class AppState:
             else:
                 self._integration_sim_apps[conn.kind] = create_home_assistant_app(self.ha_sim)
         return httpx.ASGITransport(app=self._integration_sim_apps[conn.kind])
+
+    def ai_transport_for(self, provider: AiProvider) -> httpx.AsyncBaseTransport | None:
+        """The demo provider is the in-process offline model; real providers use the network (or the test seam)."""
+        if provider.is_demo:
+            if self._ai_sim_app is None:
+                self._ai_sim_app = create_openai_app(self.ai_sim)
+            return httpx.ASGITransport(app=self._ai_sim_app)
+        return self.ai_transport
 
     def unifi_client(self, controller: Controller, api_key: str) -> UniFiNetworkClient:
         if controller.kind == "unifi-simulator":

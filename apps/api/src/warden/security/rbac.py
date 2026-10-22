@@ -37,6 +37,8 @@ class P(StrEnum):
     TOKENS_MANAGE_OWN = "tokens:manage_own"
     CHANGES_PROPOSE = "changes:propose"
     CHANGES_APPROVE = "changes:approve"
+    AI_USE = "ai:use"  # run read-only agents and read their runs; engage (never release) the AI kill switch
+    AI_MANAGE = "ai:manage"  # AI providers hold API keys; agent autonomy, budgets and kill switches
     SYSTEM_READ = "system:read"
     SYSTEM_MANAGE = "system:manage"
 
@@ -63,6 +65,7 @@ ROLES: dict[str, frozenset[P]] = {
             P.TOKENS_MANAGE_OWN,
             P.CHANGES_PROPOSE,
             P.MCP_USE,
+            P.AI_USE,
             P.SYSTEM_READ,
         }
     ),

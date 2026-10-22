@@ -1467,3 +1467,153 @@ export interface HaEntity {
   provenance: Provenance & { stale: boolean };
   is_demo: boolean;
 }
+
+// -- Phase 7: AI providers and the Agent Center ---------------------------------------
+
+export type AiProviderKind = "anthropic" | "openai_compatible" | "ollama" | "demo";
+
+export interface AiModel {
+  id: string;
+  name: string;
+}
+
+export interface AiProvider {
+  id: string;
+  name: string;
+  kind: AiProviderKind;
+  base_url: string;
+  key_fingerprint: string | null;
+  default_model: string;
+  enabled: boolean;
+  verify_tls: boolean;
+  status: "ok" | "error" | "unknown";
+  status_detail: string;
+  last_checked_at: string | null;
+  models: AiModel[];
+  monthly_token_limit: number | null;
+  monthly_cost_limit_usd: number | null;
+  price_input_per_mtok: number;
+  price_output_per_mtok: number;
+  refusal_fallback: boolean | null;
+  local: boolean;
+  usage: { since: string; tokens: number; cost_usd: number };
+  is_demo: boolean;
+}
+
+export interface AiProviderKindInfo {
+  id: Exclude<AiProviderKind, "demo">;
+  label: string;
+  default_base_url: string;
+  needs_key: boolean;
+  local: boolean;
+  suggested_models: string[];
+}
+
+export interface AiProbe {
+  ok: boolean;
+  models: AiModel[];
+  error_kind?: string;
+  error?: string;
+  hint?: string;
+}
+
+export interface AiUsageReport {
+  since: string;
+  tokens: number;
+  cost_usd: number;
+  monthly_token_limit: number | null;
+  monthly_cost_limit_usd: number | null;
+  budget_problem: string | null;
+  items: { at: string; model: string; input_tokens: number; output_tokens: number; cost_usd: number; run: string | null; run_id: string | null }[];
+}
+
+export type AiAutonomy = "off" | "explain" | "propose";
+
+export interface AiAgentConfig {
+  enabled: boolean;
+  autonomy: AiAutonomy;
+  provider_id: string | null;
+  model: string;
+  max_tokens_per_run: number;
+  max_tool_calls: number;
+  max_turns: number;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+export type AiRunStatus = "running" | "succeeded" | "failed" | "budget_exceeded" | "stopped";
+
+export interface AiAgent {
+  key: string;
+  name: string;
+  summary: string;
+  subject: { key: string; label: string; kind: "alert" | "client" | "site" | "device"; required: boolean }[];
+  tools: { name: string; description: string; permission: string; proposes: boolean }[];
+  max_autonomy: AiAutonomy;
+  allowed_operations: string[];
+  default_question: string;
+  requires_modules: string[];
+  missing_modules: string[];
+  config: AiAgentConfig;
+  last_run: { id: string; ref: string; status: AiRunStatus; started_at: string } | null;
+}
+
+export interface AiKillSwitch {
+  engaged: boolean;
+  reason?: string;
+  by?: string;
+  at?: string;
+}
+
+export interface AiAgentsResponse {
+  items: AiAgent[];
+  kill_switch: AiKillSwitch;
+  autonomy_levels: { id: string; label: string; built: boolean }[];
+}
+
+export interface AiTranscriptEntry {
+  at: string;
+  kind: "system" | "user" | "model" | "tool" | "finish";
+  text?: string;
+  turn?: number;
+  name?: string;
+  arguments?: Record<string, unknown>;
+  ok?: boolean;
+  result?: string;
+  tool_calls?: { id: string; name: string; arguments: Record<string, unknown> }[];
+  stop_reason?: string;
+  input_tokens?: number;
+  output_tokens?: number;
+  status?: AiRunStatus;
+  error?: string;
+}
+
+export interface AiRun {
+  id: string;
+  number: number;
+  ref: string;
+  agent_key: string;
+  agent_name: string;
+  provider_id: string | null;
+  provider_name: string;
+  model: string;
+  autonomy: AiAutonomy;
+  status: AiRunStatus;
+  requested_by: string;
+  subject: Record<string, string>;
+  question: string;
+  output: string;
+  ai_generated: true;
+  proposals: { id: string; ref: string; title: string; risk: "low" | "medium" | "high" }[];
+  tool_call_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  error: string;
+  started_at: string;
+  finished_at: string | null;
+  is_demo: boolean;
+  system_prompt?: string;
+  transcript?: AiTranscriptEntry[];
+  tool_calls?: { turn: number; name: string; arguments: Record<string, unknown>; ok: boolean; summary: string | null }[];
+}

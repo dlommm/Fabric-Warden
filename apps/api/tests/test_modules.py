@@ -92,8 +92,10 @@ async def test_full_preset_reports_unavailable(owner):
         "unifi-protect",
         "home-assistant",
         "mcp",
+        "ai-providers",
+        "ai-agents",
     }
-    assert "flows" in r["unavailable"] and "ai-agents" in r["unavailable"]
+    assert "flows" in r["unavailable"] and "ndr" in r["unavailable"]
 
 
 async def test_module_listing_shape(owner):

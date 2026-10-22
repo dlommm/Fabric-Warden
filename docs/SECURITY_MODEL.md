@@ -9,7 +9,7 @@
 
 ## Trust boundaries
 
-Browser ↔ web (TLS via reverse proxy) · web ↔ api (private network) · api ↔ database/redis · api ↔ UniFi console (TLS, API key) · future: api ↔ AI providers, collectors.
+Browser ↔ web (TLS via reverse proxy) · web ↔ api (private network) · api ↔ database/redis · api ↔ UniFi console (TLS, API key) · api ↔ AI providers (optional; TLS and API key for Anthropic) · future: collectors.
 
 ## Threats and mitigations (implemented)
 
@@ -22,6 +22,8 @@ Browser ↔ web (TLS via reverse proxy) · web ↔ api (private network) · api 
 | Privilege escalation | Permission checks on every route; admins can't grant owner; last owner protected; API tokens can only narrow the owner's permissions and can't mint tokens |
 | Audit tampering | Hash chain over every record; UI and health check show chain status. Tamper-evident, not tamper-proof (DB writer can rewrite the chain); off-host export is roadmap |
 | SSRF via controller URL | Only users with `controllers:manage` can set URLs; scheme validated. Residual risk accepted (admin-trusted) |
+| AI agent exceeds its brief (prompt injection, bad model output) | Fixed tool list per agent and autonomy; schema-validated arguments; every tool checks the running person's permissions; no tool approves, applies or writes; the only change path is a proposal through the change engine; global and per-agent kill switches; budgets; every run, refusal and denied tool call audited |
+| AI provider key theft / data leaving the network | Keys in the vault, fingerprint only; local providers keep data on the LAN; the UI states where prompts go for each provider |
 | Demo data mistaken for real | `is_demo` provenance on every row; brown *Demo data* tag everywhere it renders |
 | Clickjacking / sniffing | `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: same-origin` |
 
@@ -31,4 +33,4 @@ Browser ↔ web (TLS via reverse proxy) · web ↔ api (private network) · api 
 - Site-scoped role assignments exist in the schema but are not enforced.
 - No OIDC/SSO yet; no secrets-rotation scheduler for the vault master key (MultiFernet supports it).
 - Rate limiting is in-process (per API replica).
-- Future AI/log content must be treated as untrusted input (prompt-injection tests are planned with the AI runtime).
+- AI tool results are treated as untrusted input; prompt-injection tests cover injected tool calls, but no live model has been red-teamed yet.

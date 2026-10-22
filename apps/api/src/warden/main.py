@@ -15,6 +15,7 @@ from sqlalchemy import delete
 from warden import __version__, metrics, monitoring
 from warden import automation as automation_engine
 from warden.api import (
+    ai,
     alerts,
     analytics,
     assets,
@@ -201,6 +202,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         batches.router,
         automation.router,
         twin.router,
+        ai.providers_router,
+        ai.agents_router,
         firewall.router,
         config_history.router,
         compliance.router,
