@@ -17,6 +17,21 @@ def test_parsers():
     assert c.fmt == "cef" and c.fields["src"] == "1.2.3.4" and c.fields["msg"] == "scan seen" and c.category == "ids" and c.severity == 1
     sd = parse('<14>1 - h app - - [meta x="1" y="two"] hello', "1.1.1.1")
     assert sd.fields == {"meta": {"x": "1", "y": "two"}} and sd.message == "hello"
+    # UniFi gateway firewall line (format observed from a real gateway): no PRI, host repeated, rule prefix.
+    fw = parse(
+        'Oct 21 20:07:29 Home Home [CUSTOM6_LOCAL-D-10003] DESCR="IoT-Block-Gateway" IN=br90 OUT= '
+        "MAC=ff:ff:ff:ff:ff:ff:d0:c2:4e:c0:0b:bc:08:00 SRC=172.16.90.20 DST=172.16.90.255 PROTO=UDP SPT=5353 DPT=5353",
+        "172.16.0.1",
+    )
+    assert (
+        fw.host,
+        fw.category,
+        fw.fields["action"],
+        fw.fields["rule_id"],
+        fw.fields["descr"],
+        fw.fields["src_mac"],
+        fw.fields["dpt"],
+    ) == ("Home", "firewall", "block", "10003", "IoT-Block-Gateway", "d0:c2:4e:c0:0b:bc", "5353")
     raw = parse(b"\xff\xfe not syslog at all", "1.1.1.1")
     assert raw.fmt == "raw" and raw.severity == 6
 

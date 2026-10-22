@@ -32,6 +32,11 @@ log = logging.getLogger(__name__)
 PRI = re.compile(r"^<(\d{1,3})>")
 R5424 = re.compile(r"^1 (\S+) (\S+) (\S+) (\S+) (\S+) (-|(?:\[.*?\])+) ?(.*)$", re.S)
 R3164 = re.compile(r"^([A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d) (\S+) ([^:\[\s]+)(?:\[\d+\])?: ?(.*)$", re.S)
+# Some senders (UniFi gateways, observed) repeat the host instead of naming an app and omit the colon.
+R3164_NOAPP = re.compile(r"^([A-Z][a-z]{2} [ \d]\d \d\d:\d\d:\d\d) (\S+) (?:\S+ )?(?=\[)(.*)$", re.S)
+# Kernel firewall line with the UniFi rule prefix [RULESET-A|D-RULEID]; format observed from a UniFi gateway, not a published spec.
+FW_PREFIX = re.compile(r"^\[([A-Za-z0-9_]+)-([AD])-(\d+)\]\s*")
+FW_KV = re.compile(r'(\w+)=("[^"]*"|\S*)')
 CEF = re.compile(r"CEF:(\d+)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|([^|]*)\|(.*)$", re.S)
 CEF_KV = re.compile(r"(\w+)=((?:[^=\\]|\\.)*?)(?=\s+\w+=|$)")
 SD = re.compile(r'\[([^\s\]]+)((?:\s+[^=\s]+="(?:[^"\\]|\\.)*")*)\]')
@@ -83,6 +88,23 @@ def _cef(text: str, p: Parsed) -> None:
         pass
 
 
+def _firewall(p: Parsed) -> None:
+    """Extract rule, action and the connection 5-tuple from a kernel firewall log line."""
+    m = FW_PREFIX.match(p.message)
+    kv = {k.upper(): v.strip('"') for k, v in FW_KV.findall(p.message)}
+    if not m and not ("SRC" in kv and "DST" in kv):
+        return
+    f: dict[str, Any] = {k.lower(): v for k, v in kv.items() if k in ("DESCR", "IN", "OUT", "SRC", "DST", "PROTO", "SPT", "DPT", "LEN")}
+    if m:
+        f |= {"ruleset": m.group(1), "action": "allow" if m.group(2) == "A" else "block", "rule_id": m.group(3)}
+    mac = kv.get("MAC", "").split(":")
+    if len(mac) >= 12:
+        f["src_mac"] = ":".join(mac[6:12]).lower()
+    p.fields = f
+    p.app = p.app or "firewall"
+    p.category = "firewall"
+
+
 def parse(raw: bytes | str, source_ip: str) -> Parsed:
     text = raw.decode("utf-8", "replace") if isinstance(raw, bytes) else raw
     text = text.strip().lstrip("\ufeff")
@@ -107,8 +129,15 @@ def parse(raw: bytes | str, source_ip: str) -> Parsed:
             now = datetime.now(UTC)
             ts = datetime.strptime(f"{now.year} {m.group(1)}", "%Y %b %d %H:%M:%S").replace(tzinfo=UTC)
             p.logged_at = ts if ts <= now + timedelta(days=1) else ts.replace(year=now.year - 1)
+    elif m := R3164_NOAPP.match(text):
+        p.fmt, p.host, p.message = "3164", m.group(2), m.group(3)
+        with contextlib.suppress(ValueError):
+            now = datetime.now(UTC)
+            ts = datetime.strptime(f"{now.year} {m.group(1)}", "%Y %b %d %H:%M:%S").replace(tzinfo=UTC)
+            p.logged_at = ts if ts <= now + timedelta(days=1) else ts.replace(year=now.year - 1)
     else:
         p.message = text
+    _firewall(p)
     _cef(p.message if "CEF:" in p.message else text, p)
     haystack = f"{p.app} {p.message} {p.fields.get('name', '')}"
     p.category = next((c for c, rx in CATEGORY_RULES if rx.search(haystack)), "other")
@@ -150,13 +179,15 @@ class Ingest:
             if not await self.state.modules.is_enabled(db, "logs"):
                 self.dropped += len(batch)
                 return 0
-            ips = {p.source_ip for p in batch}
+            ips = {p.source_ip for p in batch} | {p.fields["src"] for p in batch if p.fields.get("src")}
+            macs = {p.fields["src_mac"] for p in batch if p.fields.get("src_mac")}
             devices = {
                 d.ip_address: d.id for d in await db.scalars(select(Device).where(Device.ip_address.in_(ips), Device.present.is_(True)))
             }
             clients = {
                 c.ip_address: c.id for c in await db.scalars(select(Client).where(Client.ip_address.in_(ips), Client.present.is_(True)))
             }
+            by_mac = {c.mac_address: c.id for c in await db.scalars(select(Client).where(Client.mac_address.in_(macs)))} if macs else {}
             db.add_all(
                 LogEvent(
                     # Demo lines keep their synthetic time so the day has a shape; real lines are stamped on arrival.
@@ -172,7 +203,7 @@ class Ingest:
                     fmt=p.fmt,
                     fields=p.fields,
                     device_id=devices.get(p.source_ip),
-                    client_id=clients.get(p.source_ip),
+                    client_id=clients.get(p.source_ip) or clients.get(p.fields.get("src", "")) or by_mac.get(p.fields.get("src_mac", "")),
                     is_demo=demo,
                 )
                 for p in batch
