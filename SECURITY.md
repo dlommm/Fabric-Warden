@@ -1,6 +1,6 @@
 # Security policy
 
-Fabric Warden manages credentials for network infrastructure. Please report vulnerabilities privately to the maintainer (open a GitHub security advisory once the repository is public) rather than in a public issue. Include the version (System page or `/api/system/health`), the deployment shape (compose, reverse proxy) and steps to reproduce. Please do not test against equipment you don't own.
+Fabric Warden manages credentials for network infrastructure. Please report vulnerabilities privately through GitHub: **Security → Report a vulnerability** on this repository (private vulnerability reporting), not in a public issue. Include the version (System page or `/api/system/health`), the deployment shape (compose, reverse proxy) and steps to reproduce. Please do not test against equipment you don't own.
 
 Supported versions: the latest release candidate / release only (currently 1.0.0-rc.1).
 
