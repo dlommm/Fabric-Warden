@@ -42,6 +42,34 @@ export function RiskLabel({ risk, protectedPath }: { risk: ChangeRequest["risk"]
   return <span className={clsx("font-semibold", risk === "medium" ? "text-ink" : "text-ink-3")}>{risk === "medium" ? "Medium risk" : "Low risk"}</span>;
 }
 
+interface OperationSupport {
+  support: Record<string, Record<string, { supported: boolean; min_version: string | null }>>;
+  sites: Record<string, string>;
+}
+
+/** Whether the controller behind a site offers an operation at its detected version. */
+export function useOperationSupport() {
+  const q = useQuery({ queryKey: ["changes", "operations"], queryFn: () => get<OperationSupport>("/api/changes/operations"), staleTime: 300_000 });
+  return (operation: string, siteId: string | undefined) => {
+    const controller = siteId ? q.data?.sites[siteId] : undefined;
+    return controller ? q.data?.support[controller]?.[operation] : undefined;
+  };
+}
+
+/** The open change for a target, if any (the engine allows one at a time). */
+export function useOpenChange(targetId: string): ChangeRequest | undefined {
+  const pending = useQuery({ queryKey: ["changes", "open"], queryFn: () => get<{ items: ChangeRequest[] }>("/api/changes?view=open") });
+  return pending.data?.items.find((c) => c.target.id === targetId);
+}
+
+export function OpenChangeLink({ c }: { c: ChangeRequest }) {
+  return (
+    <Link href={`/changes/${c.id}`} className="inline-flex items-baseline gap-1.5 text-sm font-semibold whitespace-nowrap text-accent hover:underline" title={c.title}>
+      <span className="font-mono text-xs">{c.ref}</span> {STATUS[c.status][1].toLowerCase()}
+    </Link>
+  );
+}
+
 export function useCanPropose() {
   const { can, moduleEnabled } = useSession();
   return moduleEnabled("change-engine") && can("changes:propose");
@@ -54,6 +82,7 @@ export function useCanPropose() {
 export function ProposeChange({
   operation,
   targetId,
+  siteId,
   params = {},
   title,
   summary,
@@ -61,6 +90,8 @@ export function ProposeChange({
 }: {
   operation: ChangeRequest["operation"];
   targetId: string;
+  /** The target's site; when its controller lacks the operation, say so instead of offering it. */
+  siteId?: string;
   params?: Record<string, unknown>;
   title: string;
   summary: ReactNode;
@@ -69,8 +100,8 @@ export function ProposeChange({
   const router = useRouter();
   const [open, setOpen] = useState(false);
   // One open change per target: show that one instead of offering a proposal the engine would refuse.
-  const pending = useQuery({ queryKey: ["changes", "open"], queryFn: () => get<{ items: ChangeRequest[] }>("/api/changes?view=open") });
-  const existing = pending.data?.items.find((c) => c.target.id === targetId);
+  const existing = useOpenChange(targetId);
+  const support = useOperationSupport()(operation, siteId);
   const [reason, setReason] = useState("");
   const m = useMutation({
     mutationFn: () => post<ChangeRequest>("/api/changes", { operation, target_id: targetId, params, reason: reason.trim() }),
@@ -79,13 +110,10 @@ export function ProposeChange({
       router.push(`/changes/${cr.id}`);
     },
   });
-  if (existing) {
-    return (
-      <Link href={`/changes/${existing.id}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:underline" title={existing.title}>
-        <span className="font-mono text-xs">{existing.ref}</span> {STATUS[existing.status][1].toLowerCase()}
-      </Link>
-    );
+  if (support && !support.supported) {
+    return <span className="text-sm text-ink-3" title="The controller's Network version does not offer this through the official API">Needs Network {support.min_version}</span>;
   }
+  if (existing) return <OpenChangeLink c={existing} />;
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (!o) m.reset(); }}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>

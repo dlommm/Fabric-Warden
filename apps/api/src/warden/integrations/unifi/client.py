@@ -168,6 +168,10 @@ class UniFiNetworkClient:
             "PATCH", f"/v1/sites/{site_id}/firewall/policies/{policy_id}", json={"loggingEnabled": enabled}, authorization=authorization
         )
 
+    async def put_firewall_policy(self, site_id: str, policy_id: str, body: dict[str, Any], *, authorization: WriteAuthorization) -> Any:
+        """Update Firewall Policy: a full replacement; the caller sends the object it read, minus server-managed fields."""
+        return await self._request("PUT", f"/v1/sites/{site_id}/firewall/policies/{policy_id}", json=body, authorization=authorization)
+
     async def restart_device(self, site_id: str, device_id: str, *, authorization: WriteAuthorization) -> Any:
         return await self._request(
             "POST", f"/v1/sites/{site_id}/devices/{device_id}/actions", json={"action": "RESTART"}, authorization=authorization

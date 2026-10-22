@@ -30,13 +30,18 @@ async def _allow_changes(owner, controller_id: str) -> None:
     assert r.status_code == 200, r.text
 
 
+def _quiet_user_policy(sim) -> str:
+    """A user-defined policy without logging; system policies are never changed."""
+    return next(p["name"] for p in sim.policies if not p["loggingEnabled"] and p["metadata"]["origin"] == "USER_DEFINED")
+
+
 def _sim_policy(sim, name: str) -> dict:
     return next(p for p in sim.policies if p["name"] == name)
 
 
 async def test_logging_change_full_lifecycle_and_revert(changes, owner, demo):
     sim = changes
-    name = next(p["name"] for p in sim.policies if not p["loggingEnabled"] and p.get("source", {}) is not None)
+    name = _quiet_user_policy(sim)
     pol = await _policy(owner, name)
 
     r = await owner.post(
@@ -94,7 +99,7 @@ async def test_logging_change_full_lifecycle_and_revert(changes, owner, demo):
 async def test_drift_since_proposal_is_a_conflict_and_nothing_is_sent(changes, owner, demo):
     sim = changes
     await _allow_changes(owner, demo["id"])
-    name = next(p["name"] for p in sim.policies if not p["loggingEnabled"])
+    name = _quiet_user_policy(sim)
     cr = (
         await owner.post(
             "/api/changes",
@@ -112,7 +117,7 @@ async def test_write_that_does_not_take_effect_is_reverted(changes, owner, demo)
     sim = changes
     await _allow_changes(owner, demo["id"])
     sim.faults.add("patch_ignored")
-    name = next(p["name"] for p in sim.policies if not p["loggingEnabled"])
+    name = _quiet_user_policy(sim)
     cr = (
         await owner.post(
             "/api/changes",
@@ -130,7 +135,7 @@ async def test_controller_error_fails_the_change(changes, owner, demo):
     sim = changes
     await _allow_changes(owner, demo["id"])
     sim.faults.add("writes_fail")
-    name = next(p["name"] for p in sim.policies if not p["loggingEnabled"])
+    name = _quiet_user_policy(sim)
     cr = (
         await owner.post(
             "/api/changes",
@@ -206,7 +211,7 @@ async def test_poe_power_cycle(changes, owner, demo):
 async def test_second_person_rule_and_role_limits(changes, owner, demo, app):
     sim = changes
     assert (await owner.put("/api/changes/settings/current", json={"require_second_person": True})).status_code == 200
-    name = next(p["name"] for p in sim.policies if not p["loggingEnabled"])
+    name = _quiet_user_policy(sim)
     cr = (
         await owner.post(
             "/api/changes",
@@ -235,6 +240,76 @@ async def test_operations_unsupported_by_the_controller_version_are_refused(chan
     pols = (await owner.get("/api/inventory/firewall")).json()["policies"]
     assert pols  # synced earlier; the controller simply no longer offers the PATCH
     r = await owner.post(
-        "/api/changes", json={"operation": "firewall_policy.set_logging", "target_id": pols[0]["id"], "params": {"enabled": True}}
+        "/api/changes",
+        json={
+            "operation": "firewall_policy.set_logging",
+            "target_id": next(p["id"] for p in pols if p["origin"] == "USER_DEFINED"),
+            "params": {"enabled": True},
+        },
     )
     assert r.status_code == 409 and "needs 10.1.84" in r.json()["detail"]
+
+
+# -- 6b: enable/disable by read-modify-write -------------------------------------------------
+
+
+async def _propose(owner, op: str, target_id: str, **params) -> dict:
+    r = await owner.post("/api/changes", json={"operation": op, "target_id": target_id, "params": params})
+    assert r.status_code == 201, r.text
+    return r.json()
+
+
+async def test_enable_policy_sends_back_exactly_what_was_read(changes, owner, demo):
+    sim = changes
+    await _allow_changes(owner, demo["id"])
+    original = {k: v for k, v in _sim_policy(sim, "Legacy allow IoT to Servers").items()}
+    pol = await _policy(owner, "Legacy allow IoT to Servers")
+    cr = await _propose(owner, "firewall_policy.set_enabled", pol["id"], enabled=True)
+    assert cr["diff"][0] == {"field": "Policy", "before": "Disabled", "after": "Enabled"} and cr["reversible"] is True
+    assert "IoT → Servers" in cr["risk_reasons"][0]
+    await owner.post(f"/api/changes/{cr['id']}/approve", json={})
+    out = (await owner.post(f"/api/changes/{cr['id']}/apply")).json()
+    assert out["status"] == "succeeded", out["evidence"]
+    put = sim.writes[-1]
+    assert put["method"] == "PUT" and not {"id", "index", "metadata"} & set(put["body"])
+    assert put["body"] == {**{k: v for k, v in original.items() if k not in ("id", "index", "metadata")}, "enabled": True}
+    now = _sim_policy(sim, "Legacy allow IoT to Servers")
+    assert {k: v for k, v in now.items() if k != "enabled"} == {k: v for k, v in original.items() if k != "enabled"}
+    assert (await _policy(owner, "Legacy allow IoT to Servers"))["enabled"] is True
+
+
+async def test_put_that_moves_another_field_is_put_back(changes, owner, demo):
+    sim = changes
+    await _allow_changes(owner, demo["id"])
+    original = dict(_sim_policy(sim, "Allow Internal to Servers"))
+    sim.faults.add("put_alters_other_field")
+    cr = await _propose(owner, "firewall_policy.set_enabled", (await _policy(owner, "Allow Internal to Servers"))["id"], enabled=False)
+    await owner.post(f"/api/changes/{cr['id']}/approve", json={})
+    out = (await owner.post(f"/api/changes/{cr['id']}/apply")).json()
+    assert out["status"] == "reverted"
+    assert any("also changed connectionStateFilter" in e["text"] for e in out["evidence"])
+    assert [w["method"] for w in sim.writes] == ["PUT", "PUT"]
+    assert _sim_policy(sim, "Allow Internal to Servers") == original  # the original object, field for field
+
+
+async def test_policy_risk_and_system_policies(changes, owner, demo):
+    blocker = await _propose(owner, "firewall_policy.set_enabled", (await _policy(owner, "Block IoT to Internal"))["id"], enabled=False)
+    assert blocker["risk"] == "high" and blocker["protected"] is False and "may allow it" in blocker["risk_reasons"][0]
+    gw = await _propose(owner, "firewall_policy.set_enabled", (await _policy(owner, "Block Guest to Gateway admin"))["id"], enabled=False)
+    assert gw["protected"] is True and any("Gateway zone" in r for r in gw["risk_reasons"])
+    system = (await _policy(owner, "Allow established/related"))["id"]
+    for op, params in (("firewall_policy.set_enabled", {"enabled": False}), ("firewall_policy.set_logging", {"enabled": True})):
+        r = await owner.post("/api/changes", json={"operation": op, "target_id": system, "params": params})
+        assert r.status_code == 409 and "System-defined" in r.json()["detail"]
+
+
+async def test_operation_support_follows_the_controller_version(changes, owner, demo):
+    body = (await owner.get("/api/changes/operations")).json()
+    sup = body["support"][demo["id"]]
+    assert sup["firewall_policy.set_enabled"]["supported"] is True and sup["device.restart"]["supported"] is True
+    assert set(body["sites"].values()) == {demo["id"]}
+    changes.version = "10.0.162"
+    await owner.post(f"/api/controllers/{demo['id']}/sync")
+    sup = (await owner.get("/api/changes/operations")).json()["support"][demo["id"]]
+    assert sup["firewall_policy.set_enabled"] == {"supported": False, "min_version": "10.1.84"}
+    assert sup["device.restart"]["supported"] is True

@@ -17,7 +17,8 @@ from warden import audit
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.changes import engine
 from warden.changes.operations import OPERATIONS, ChangeRefused
-from warden.models import ChangeRequest, Controller, Setting
+from warden.integrations.unifi.capabilities import evaluate
+from warden.models import ChangeRequest, Controller, Setting, Site
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/changes", tags=["changes"], dependencies=[Depends(require_module("change-engine"))])
@@ -80,8 +81,22 @@ async def _full(db: AsyncSession, cr: ChangeRequest) -> dict[str, Any]:
 
 
 @router.get("/operations")
-async def operations(principal: Reader) -> dict:
+async def operations(db: DB, principal: Reader) -> dict:
+    """The operations, and which each controller supports at its detected version (so the UI only offers those)."""
+    support: dict[str, dict[str, Any]] = {}
+    for c in await db.scalars(select(Controller)):
+        caps = (c.capabilities or {}).get("capabilities") or evaluate(c.application_version)["capabilities"]
+        support[c.id] = {
+            op.id: {
+                "supported": (caps.get(op.capability) or {}).get("status") == "supported",
+                "min_version": (caps.get(op.capability) or {}).get("min_version"),
+            }
+            for op in OPERATIONS.values()
+        }
+    sites = {s.id: s.controller_id for s in await db.scalars(select(Site))}
     return {
+        "support": support,
+        "sites": sites,
         "items": [
             {
                 "id": op.id,
@@ -91,7 +106,7 @@ async def operations(principal: Reader) -> dict:
                 "verify_seconds": int(op.verify_window.total_seconds()),
             }
             for op in OPERATIONS.values()
-        ]
+        ],
     }
 
 

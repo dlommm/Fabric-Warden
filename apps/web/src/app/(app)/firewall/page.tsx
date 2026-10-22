@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ArrowRight, ShieldCheck } from "lucide-react";
-import { ProposeChange, useCanPropose } from "@/components/changes";
+import { OpenChangeLink, ProposeChange, useCanPropose, useOpenChange } from "@/components/changes";
 import { FindingsPlate } from "@/components/ipam";
 import { Button } from "@/components/ui/button";
 import { EmptyState, ModuleOff, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
@@ -82,11 +82,12 @@ function Matrix({ site }: { site: FwSite }) {
   );
 }
 
-const columns = (system = false, propose = false): Column<FwPolicy>[] => [
+const columns = (system = false, propose = false, siteId?: string): Column<FwPolicy>[] => [
   { key: "idx", header: "#", align: "right", className: "w-20", sort: (p) => p.index, cell: (p) => <span className="font-mono text-xs text-ink-2">{p.index ?? "—"}</span> },
   {
     key: "name",
     header: "Policy",
+    className: "min-w-52",
     sort: (p) => p.name.toLowerCase(),
     cell: (p) => (
       <span className="flex flex-col">
@@ -102,7 +103,6 @@ const columns = (system = false, propose = false): Column<FwPolicy>[] => [
         <span className="mt-1 md:hidden"><Analysis p={p} /></span>
         <span className="mt-1 inline-flex items-center gap-2 text-sm md:hidden">
           <span className="text-ink-3">Logs</span> {p.logging ? "Yes" : "No"}
-          {propose && <LoggingChange p={p} />}
         </span>
       </span>
     ),
@@ -123,15 +123,13 @@ const columns = (system = false, propose = false): Column<FwPolicy>[] => [
   {
     key: "log",
     header: "Logs",
-    className: clsx("hidden md:table-cell", propose ? "w-40" : "w-20"),
-    cell: (p) => (
-      <span className="inline-flex items-center gap-2 whitespace-nowrap">
-        {p.logging ? "Yes" : <span className={clsx(p.action !== "ALLOW" && !system ? "font-semibold text-warn-text" : "text-ink-3")}>No</span>}
-        {propose && <LoggingChange p={p} />}
-      </span>
-    ),
+    className: "hidden w-20 md:table-cell",
+    cell: (p) => (p.logging ? "Yes" : <span className={clsx(p.action !== "ALLOW" && !system ? "font-semibold text-warn-text" : "text-ink-3")}>No</span>),
   },
   { key: "analysis", header: "Analysis", className: "hidden w-[22rem] md:table-cell", cell: (p) => <Analysis p={p} /> },
+  ...(propose
+    ? [{ key: "change", header: <span className="sr-only">Propose a change</span>, className: "w-44", cell: (p: FwPolicy) => <PolicyChanges p={p} siteId={siteId} /> }]
+    : []),
 ];
 
 export default function FirewallPage() {
@@ -175,17 +173,17 @@ export default function FirewallPage() {
                 <Matrix site={s} />
               </Panel>
               <Panel title={`Policies in order (${s.policies.length})`} bodyClassName="p-0">
-                <DataTable folds caption="Policies in evaluation order" rows={s.policies} columns={columns(false, canPropose)} initialSort={{ key: "idx", dir: "asc" }} rowClassName={(p) => (p.relation === "shadowed" ? "bg-warn-soft" : undefined)} />
+                <DataTable folds caption="Policies in evaluation order" rows={s.policies} columns={columns(false, canPropose, s.site.id)} initialSort={{ key: "idx", dir: "asc" }} rowClassName={(p) => (p.relation === "shadowed" ? "bg-warn-soft" : undefined)} />
               </Panel>
               {s.system_policies.length > 0 && (
                 <Panel title={`System policies (${s.system_policies.length})`} bodyClassName="p-0">
                   <p className="border-b border-rule px-4 py-2 text-sm text-ink-3">Defined by UniFi. The API gives them no position, so they are left out of ordering analysis.</p>
-                  <DataTable folds caption="System policies" rows={s.system_policies} columns={columns(true, canPropose)} />
+                  <DataTable folds caption="System policies" rows={s.system_policies} columns={columns(true, canPropose, s.site.id)} />
                 </Panel>
               )}
               {s.disabled.length > 0 && (
                 <Panel title={`Disabled (${s.disabled.length})`} bodyClassName="p-0">
-                  <DataTable folds caption="Disabled policies" rows={s.disabled} columns={columns(true, canPropose)} />
+                  <DataTable folds caption="Disabled policies" rows={s.disabled} columns={columns(true, canPropose, s.site.id)} />
                 </Panel>
               )}
             </div>
@@ -197,13 +195,28 @@ export default function FirewallPage() {
   );
 }
 
+/** The changes a user-defined policy offers, stacked; an open change replaces them with its link. */
+function PolicyChanges({ p, siteId }: { p: FwPolicy; siteId?: string }) {
+  const open = useOpenChange(p.id);
+  if (p.origin === "SYSTEM_DEFINED") return <span className="text-sm text-ink-3">Managed by UniFi</span>;
+  if (open) return <OpenChangeLink c={open} />;
+  return (
+    <span className="flex flex-col items-start">
+      <LoggingChange p={p} siteId={siteId} />
+      <EnabledChange p={p} siteId={siteId} />
+    </span>
+  );
+}
+
 /** Propose switching a policy's logging; the change is reviewed and approved on its own page. */
-function LoggingChange({ p }: { p: FwPolicy }) {
+function LoggingChange({ p, siteId }: { p: FwPolicy; siteId?: string }) {
+  if (p.origin === "SYSTEM_DEFINED") return null; // UniFi manages system policies; Fabric Warden never changes them
   const on = !p.logging;
   return (
     <ProposeChange
       operation="firewall_policy.set_logging"
       targetId={p.id}
+      siteId={siteId}
       params={{ enabled: on }}
       title={`Propose: turn ${on ? "on" : "off"} logging for “${p.name}”`}
       summary={
@@ -211,7 +224,29 @@ function LoggingChange({ p }: { p: FwPolicy }) {
           ? "The gateway will write a syslog line each time this policy matches, so its traffic appears under Logs and Connections. Traffic itself is handled exactly as before."
           : "The gateway stops logging this policy's matches. Connections analytics and SOC detections will no longer see them."
       }
-      trigger={<Button size="sm" variant="ghost" aria-label={`Turn ${on ? "on" : "off"}… logging for ${p.name}`}>{on ? "Turn on…" : "Turn off…"}</Button>}
+      trigger={<Button size="sm" variant="ghost" aria-label={`Turn ${on ? "on" : "off"} logging… for ${p.name}`}>{on ? "Turn on logging…" : "Turn off logging…"}</Button>}
+    />
+  );
+}
+
+/** Propose enabling or disabling a user-defined policy; sent as a checked read-modify-write. */
+function EnabledChange({ p, siteId }: { p: FwPolicy; siteId?: string }) {
+  if (p.origin === "SYSTEM_DEFINED") return null;
+  const on = !p.enabled;
+  const blocks = p.action !== "ALLOW";
+  return (
+    <ProposeChange
+      operation="firewall_policy.set_enabled"
+      targetId={p.id}
+      siteId={siteId}
+      params={{ enabled: on }}
+      title={`Propose: ${on ? "enable" : "disable"} “${p.name}”`}
+      summary={
+        on
+          ? `Once enabled, the policy ${blocks ? "blocks" : "allows"} matching ${p.source_zone} → ${p.destination_zone} traffic in its place in the order.`
+          : `Disabled, ${p.source_zone} → ${p.destination_zone} traffic it ${blocks ? "blocks" : "allows"} is decided by later policies or the zone default.${blocks ? " That may allow it." : ""} Fabric Warden sends the policy back exactly as read with only this changed, and checks nothing else moved.`
+      }
+      trigger={<Button size="sm" variant="ghost" aria-label={`${on ? "Enable" : "Disable"}… ${p.name}`}>{on ? "Enable…" : "Disable…"}</Button>}
     />
   );
 }

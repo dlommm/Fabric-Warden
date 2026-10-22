@@ -257,6 +257,7 @@ async def apply(db: AsyncSession, state: AppState, cr: ChangeRequest, actor: Act
             await _finish(db, state, cr, "conflict", f"{why}; nothing was sent.")
             return
         auth = WriteAuthorization(cr.id, _write_gate.ISSUER)
+        t.current = now
         try:
             response = await op.execute(api, t, cr.params, auth)
         except UniFiError as e:
@@ -304,7 +305,7 @@ async def _fail_or_revert(
         return
     _note(cr, "revert", f"{why}. Reverting under the same approval.")
     try:
-        await op.execute(api, t, inverse, WriteAuthorization(cr.id, _write_gate.ISSUER))
+        await op.restore(api, t, cr.before, cr.params, WriteAuthorization(cr.id, _write_gate.ISSUER))
         back = await op.read(api, t)
     except UniFiError as e:
         await _finish(db, state, cr, "failed", f"The automatic revert failed too: {e}. Check the controller.")

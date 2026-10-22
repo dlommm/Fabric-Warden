@@ -1219,14 +1219,14 @@ export interface ChangeRequest {
   id: string;
   number: number;
   ref: string;
-  operation: "firewall_policy.set_logging" | "device.restart" | "port.power_cycle";
+  operation: "firewall_policy.set_logging" | "firewall_policy.set_enabled" | "device.restart" | "port.power_cycle";
   title: string;
   reason: string;
   target: { type: string; id: string; label: string; params: Record<string, unknown> };
   controller: { id: string; name: string; write_mode: string } | null;
   before: Record<string, unknown>;
   expected: Record<string, unknown>;
-  diff: { field: string; before: string; after: string }[];
+  diff: { field: string; before: string; after: string; unchanged?: boolean }[];
   impact: string[];
   risk: "low" | "medium" | "high";
   risk_reasons: string[];

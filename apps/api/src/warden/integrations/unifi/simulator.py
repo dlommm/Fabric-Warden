@@ -373,7 +373,8 @@ class SimulatorState:
     clock: float | None = None
     # Writes the simulator has accepted, newest last, so tests can see exactly what was sent.
     writes: list[dict[str, Any]] = field(default_factory=list)
-    # Faults tests can switch on: "patch_ignored" (PATCH answers 200 but changes nothing),
+    # Faults tests can switch on: "patch_ignored" (PATCH/PUT answer 200 but change nothing),
+    # "put_alters_other_field" (a PUT also changes a field it was not asked to),
     # "restart_never_returns" (a restarted device stays offline), "writes_fail" (every write answers 500).
     faults: set[str] = field(default_factory=set)
 
@@ -563,6 +564,43 @@ def create_simulator_app(state: SimulatorState | None = None) -> FastAPI:
         accept("PATCH", S + "/firewall/policies/{firewallPolicyId}", request, x_api_key, siteId, body)
         if "patch_ignored" not in sim.faults:
             target["loggingEnabled"] = body["loggingEnabled"]
+        return copy.deepcopy(target)
+
+    # The published Update Firewall Policy schema (10.6.106): everything GET returns except id, index and metadata.
+    put_fields = {
+        "action",
+        "connectionStateFilter",
+        "description",
+        "destination",
+        "enabled",
+        "ipProtocolScope",
+        "ipsecFilter",
+        "loggingEnabled",
+        "name",
+        "schedule",
+        "source",
+    }
+    put_required = {"action", "destination", "enabled", "ipProtocolScope", "loggingEnabled", "name", "source"}
+
+    @app.put(prefix + S + "/firewall/policies/{policyId}")
+    async def put_policy(request: Request, siteId: str, policyId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if unknown := set(body) - put_fields:
+            raise HTTPException(400, f"Unrecognized fields: {', '.join(sorted(unknown))}")
+        if missing := put_required - set(body):
+            raise HTTPException(400, f"Missing required fields: {', '.join(sorted(missing))}")
+        target = raw(find(sim.policies, policyId))
+        accept("PUT", S + "/firewall/policies/{firewallPolicyId}", request, x_api_key, siteId, body)
+        if "patch_ignored" in sim.faults:
+            return copy.deepcopy(target)
+        for k in put_fields:
+            if k in body:
+                target[k] = copy.deepcopy(body[k])
+            else:
+                target.pop(k, None)
+        if "put_alters_other_field" in sim.faults:
+            sim.faults.discard("put_alters_other_field")  # one-shot, so the restore that follows is clean
+            target["connectionStateFilter"] = ["NEW", "INVALID"]
         return copy.deepcopy(target)
 
     @app.post(prefix + S + "/devices/{deviceId}/actions")

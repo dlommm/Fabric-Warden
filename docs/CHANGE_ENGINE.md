@@ -1,6 +1,6 @@
 # Change Approval & Recovery engine
 
-**Status: Phase 6a implemented** (module `change-engine`). Three operations, tested only against the simulated controller; no write has been sent to a live controller yet. Bulk operations, automation, the digital twin and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
+**Status: Phases 6a and 6b implemented** (module `change-engine`). Four operations, tested only against the simulated controller; no write has been sent to a live controller yet. Bulk operations, automation, the digital twin and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
 
 ## Invariants
 
@@ -27,13 +27,25 @@ Everything read, sent and observed is kept on the change as evidence; every step
 | Operation | Endpoint (since) | Body | Reversible | Verification | Risk |
 |---|---|---|---|---|---|
 | `firewall_policy.set_logging` | `PATCH /v1/sites/{siteId}/firewall/policies/{id}` (10.1.84) | `{"loggingEnabled": bool}`; the published PATCH schema has no other field | Yes: the opposite value | `loggingEnabled` reads back as expected | Low; notes log volume for allow policies |
+| `firewall_policy.set_enabled` | `PUT /v1/sites/{siteId}/firewall/policies/{id}` (10.1.84) | The object just read, minus `id`, `index` and `metadata` (absent from the published PUT schema), with only `enabled` changed | Yes: the original object is put back whole | `enabled` reads back as expected **and every other top-level field is exactly as before** | Medium; **high** to disable a block/reject policy; **high and protected** when either zone is Gateway |
 | `device.restart` | `POST /v1/sites/{siteId}/devices/{id}/actions` (9.1.120) | `{"action": "RESTART"}` | No | The device was seen not online, or its uptime went backwards, and is online again | Medium; **high and protected** for the gateway or any device other devices uplink through |
 | `port.power_cycle` | `POST /v1/sites/{siteId}/devices/{id}/interfaces/ports/{idx}/actions` (9.1.120) | `{"action": "POWER_CYCLE"}` | No (self-recovering) | PoE state reads back as before | Medium; says plainly that the API does not report which device is on the port |
 
 Bodies were checked against the Network API 10.6.106 OpenAPI document (`opastorello/unifi-api-docs` mirror of developer.ui.com).
 
+## Read-modify-write (full-replacement PUT)
+
+The published PUT endpoints replace the whole object, and the spec marks no field read-only or write-only. For `firewall_policy.set_enabled` the engine:
+
+1. sends exactly the object it re-read and drift-checked just before writing, minus the fields the PUT schema does not list, with one field changed;
+2. re-reads the object and requires every other field to be unchanged;
+3. otherwise puts the original object back (the `restore` hook) and verifies that too.
+
+System-defined policies are never changed: the spec does not say whether UniFi accepts edits to them.
+
 ## Not built yet
 
-- Network, Wi-Fi broadcast, zone and policy edits (published as PUT with full objects: they need read-modify-write with exact field preservation and their own inverse tests).
+- Wi-Fi broadcast edits: the spec shares one schema for the passphrase in GET and PUT but does not say whether a controller returns it in clear; if it is masked, a read-modify-write would overwrite the passphrase with the mask. Not attempted until that is verified on a live controller.
+- Network and zone edits (same read-modify-write path; each needs its own risk model and tests).
 - Bulk operations, Automation Studio, the network digital twin.
 - An independently deployed watchdog for high-risk workflows, and protected-path detection for the ports hosting Fabric Warden itself (the official API does not map clients to switch ports).

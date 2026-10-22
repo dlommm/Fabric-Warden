@@ -74,6 +74,7 @@ export default function DevicePage() {
             <ProposeChange
               operation="device.restart"
               targetId={d.id}
+              siteId={d.site_id}
               title={`Propose a restart of ${d.name}`}
               summary={
                 role === "gateway"
@@ -320,6 +321,7 @@ function PoeCycle({ d }: { d: DeviceDetail }) {
       <ProposeChange
         operation="port.power_cycle"
         targetId={d.id}
+        siteId={d.site_id}
         params={{ port_idx: idx }}
         title={`Propose a PoE power-cycle of ${d.name} port ${idx}`}
         summary="Whatever is powered by this port loses power for a few seconds and reboots. The UniFi API does not say which device is on a port, so check that first."

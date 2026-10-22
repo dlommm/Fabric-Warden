@@ -97,8 +97,17 @@ export default function ChangePage() {
                 {c.diff.map((d) => (
                   <tr key={d.field} className="border-t border-rule">
                     <td className="py-2 pr-4 font-semibold">{d.field}</td>
-                    <td className="py-2 pr-4 text-crit line-through decoration-crit/60">{d.before}</td>
-                    <td className="py-2 font-bold">{d.after}</td>
+                    {d.unchanged ? (
+                      <>
+                        <td className="py-2 pr-4 text-ink-3">{d.before}</td>
+                        <td className="py-2 text-ink-2">{d.after}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2 pr-4 text-crit line-through decoration-crit/60">{d.before}</td>
+                        <td className="py-2 font-bold">{d.after}</td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

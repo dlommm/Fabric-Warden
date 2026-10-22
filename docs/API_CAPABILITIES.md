@@ -131,6 +131,7 @@ Only these writes are sent, only by the change engine, and only to a controller 
 | Capability | Endpoint | Since | Body (Network API 10.6.106 schema) |
 |---|---|---|---|
 | `network.firewall.policies.logging` | `PATCH /v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | 10.1.84 | `{"loggingEnabled": boolean}`, the only property in the published PATCH schema |
+| `network.firewall.policies.update` | `PUT /v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | 10.1.84 | The policy as read, minus `id`, `index`, `metadata`, with `enabled` changed |
 | `network.devices.restart` | `POST /v1/sites/{siteId}/devices/{deviceId}/actions` | 9.1.120 | `{"action": "RESTART"}` |
 | `network.ports.power_cycle` | `POST /v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions` | 9.1.120 | `{"action": "POWER_CYCLE"}` |
 

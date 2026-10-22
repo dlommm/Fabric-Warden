@@ -2,6 +2,7 @@
 
 ## 0.1.0 — unreleased
 - Phase 0 research: UniFi Network/Protect official API matrices.
+- Phase 6b: enable/disable firewall policies by checked read-modify-write (full PUT minus server fields; every other field verified unchanged; original object restored on mismatch); system-defined policies are never changed; entry points hidden where the controller version lacks the operation; firewall list gets a Change column.
 - Phase 6a: Change Approval & Recovery — the single write path: proposals with live state, diff, risk and protected paths; approval with optional second person; per-controller write mode (read-only by default, owner only); apply with conflict detection; verification by re-reading; automatic revert; evidence and audit. Operations: firewall policy logging, device restart, PoE power-cycle. Simulator accepts these writes and can inject faults. Migration `0009`.
 - Phase 5d: SNMP Port Counters — read-only SNMP v3/v2c IF-MIB collector (pysnmp) with an OID-level simulator for the demo devices; credential profiles in the vault, targets from inventory, per-port throughput, utilisation, errors and discards; `port.*` metrics, built-in "Port errors" alert rule, findings; Port counters page and device-page counters. New permission `snmp:manage`. Migration `0008`.
 - Phase 5b (backend): Log Management (UDP syslog receiver, RFC 3164/5424/CEF parsing, search, stats, retention), SOC (signals + cases), Investigation workbench. New permission `soc:manage`. Migration `0007`. Compose publishes syslog on localhost:5514/udp.
