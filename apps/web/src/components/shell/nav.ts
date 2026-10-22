@@ -2,10 +2,12 @@ import {
   Activity,
   BellRing,
   Blocks,
+  Bot,
   BookOpen,
   Cable,
   ChartLine,
   ClipboardCheck,
+  Cpu,
   Gauge,
   GitPullRequest,
   Globe,
@@ -79,6 +81,13 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Servers", href: "/servers", icon: HardDrive, module: "servers", permission: "inventory:read" },
       { label: "Assets", href: "/assets", icon: Package, module: "asset-lifecycle", permission: "inventory:read" },
       { label: "Docs", href: "/docs", icon: BookOpen, module: "docs", permission: "inventory:read" },
+    ],
+  },
+  {
+    section: "AI",
+    items: [
+      { label: "Agent Center", href: "/ai/agents", icon: Bot, module: "ai-agents", permission: "ai:use" },
+      { label: "AI providers", href: "/ai/providers", icon: Cpu, module: "ai-providers", permission: "ai:use" },
     ],
   },
   {

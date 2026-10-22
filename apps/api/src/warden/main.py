@@ -14,6 +14,7 @@ from sqlalchemy import delete
 
 from warden import __version__, metrics, monitoring
 from warden.api import (
+    ai,
     alerts,
     analytics,
     assets,
@@ -180,6 +181,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         servers.router,
         snmp.router,
         changes.router,
+        ai.providers_router,
+        ai.agents_router,
         firewall.router,
         config_history.router,
         compliance.router,

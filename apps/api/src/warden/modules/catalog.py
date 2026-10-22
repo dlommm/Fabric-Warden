@@ -576,6 +576,55 @@ INVESTIGATIONS = ModuleManifest(
     resources=ResourceEstimate(memory_mb=8),
 )
 
+AI_PROVIDERS = ModuleManifest(
+    id="ai-providers",
+    version=VERSION,
+    name="AI Providers",
+    category=C.AI,
+    description=(
+        "Connections to local model servers (Ollama, LM Studio and other OpenAI-compatible endpoints) and to Anthropic Claude "
+        "through the official Messages API: connection test, model listing, token and cost usage, monthly budgets."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=7,
+    requires=["core"],
+    permissions=["ai:manage", "ai:use"],
+    nav=[NavEntry(label="AI Providers", href="/ai/providers", icon="cpu", section="AI")],
+    external_integrations=["Anthropic Messages API (2023-06-01)", "OpenAI-compatible chat completions", "Ollama API"],
+    resources=ResourceEstimate(memory_mb=16),
+    data_ownership=["ai_providers", "ai_usage"],
+    uninstall_behavior="Disabling stops every model call; providers, keys (in the vault) and usage history are kept.",
+    warnings=[
+        "Optional: nothing else in Fabric Warden needs a model. A local provider keeps all data on your network; an API "
+        "provider receives the agent's prompt and the tool results it reads (inventory, metrics, logs, firewall policies)."
+    ],
+)
+
+AI_AGENTS = ModuleManifest(
+    id="ai-agents",
+    version=VERSION,
+    name="AI Agent Center",
+    category=C.AI,
+    description=(
+        "Specialised read-only network agents (explain an alert, why a client is slow, firewall review) that answer from "
+        "Fabric Warden's own data through a fixed, permission-scoped tool set, with autonomy levels, budgets, kill switches "
+        "and every run kept as evidence."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=7,
+    requires=["core", "inventory", "ai-providers"],
+    optional=["monitoring", "firewall", "logs", "change-engine"],
+    permissions=["ai:use", "ai:manage"],
+    nav=[NavEntry(label="Agent Center", href="/ai/agents", icon="sparkles", section="AI")],
+    resources=ResourceEstimate(memory_mb=32),
+    data_ownership=["ai_agent_configs", "ai_agent_runs"],
+    uninstall_behavior="Disabling stops agents from running; past runs and their evidence are kept.",
+    warnings=[
+        "The highest autonomy in this release is “propose”: an agent can put a change into the Change Approval queue and "
+        "nothing more. People approve and apply. Answers are AI-generated and labelled as such."
+    ],
+)
+
 PLANNED: list[ModuleManifest] = [
     _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
     _planned(
@@ -611,16 +660,6 @@ PLANNED: list[ModuleManifest] = [
     ),
     _planned("automation", "Automation Studio", C.AUTOMATION, 6, "Workflows, triggers, approvals and dry runs.", ["change-engine"]),
     _planned("digital-twin", "Network Digital Twin", C.AUTOMATION, 6, "Versioned infrastructure graph and impact previews.", ["topology"]),
-    _planned("ai-providers", "AI Providers", C.AI, 7, "Local (Ollama, LM Studio) and API model providers; official CLI setup guides."),
-    _planned(
-        "ai-agents",
-        "AI Agent Center",
-        C.AI,
-        7,
-        "Specialised network agents with autonomy levels, budgets and approval queues.",
-        ["ai-providers"],
-        memory_mb=256,
-    ),
     _planned(
         "unifi-protect",
         "UniFi Protect",
@@ -661,6 +700,8 @@ CATALOG: dict[str, ModuleManifest] = {
         LOGS,
         SOC,
         INVESTIGATIONS,
+        AI_PROVIDERS,
+        AI_AGENTS,
         *PLANNED,
     ]
 }

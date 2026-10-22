@@ -1,3 +1,4 @@
+from warden.models.ai import AiAgentConfig, AiAgentRun, AiProvider, AiUsage
 from warden.models.analytics import (
     Alert,
     AlertRule,
@@ -96,4 +97,8 @@ __all__ = [
     "SnmpProfile",
     "SnmpTarget",
     "ChangeRequest",
+    "AiAgentConfig",
+    "AiAgentRun",
+    "AiProvider",
+    "AiUsage",
 ]
