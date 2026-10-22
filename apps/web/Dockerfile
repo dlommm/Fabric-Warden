@@ -20,7 +20,7 @@ RUN pnpm build
 
 FROM ${NODE_IMAGE}
 LABEL org.opencontainers.image.title="Fabric Warden web" \
-      org.opencontainers.image.version="1.0.0-rc.1" \
+      org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.licenses="UNLICENSED"
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0

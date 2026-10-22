@@ -1,6 +1,6 @@
 [project]
 name = "warden"
-version = "1.0.0rc1"
+version = "1.0.0"
 description = "Fabric Warden API: self-hosted modular network operations platform"
 license = "AGPL-3.0-or-later"
 authors = [

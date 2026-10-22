@@ -41,7 +41,7 @@ services:
   api:
     <<: *hardening
     build: ../apps/api
-    image: fabric-warden/api:1.0.0-rc.1
+    image: fabric-warden/api:1.0.0
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -71,7 +71,7 @@ services:
       context: ../apps/web
       args:
         WARDEN_API_URL: http://api:8000
-    image: fabric-warden/web:1.0.0-rc.1
+    image: fabric-warden/web:1.0.0
     depends_on:
       api: { condition: service_healthy }
     read_only: true

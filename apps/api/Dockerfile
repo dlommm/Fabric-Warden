@@ -16,7 +16,7 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM ${PYTHON_IMAGE}
 LABEL org.opencontainers.image.title="Fabric Warden API" \
-      org.opencontainers.image.version="1.0.0-rc.1" \
+      org.opencontainers.image.version="1.0.0" \
       org.opencontainers.image.licenses="UNLICENSED"
 RUN useradd --system --uid 10001 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin warden \
  && mkdir -p /data && chown warden:warden /data && chmod 0700 /data
