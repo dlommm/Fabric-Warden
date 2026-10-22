@@ -10,12 +10,12 @@ import { Dialog } from "radix-ui";
 import { type ReactNode, useState } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
-import { Notice } from "@/components/ui/layout-bits";
-import { StateLabel, type Tone } from "@/components/ui/signs";
+import { Notice, Panel, Skeleton } from "@/components/ui/layout-bits";
+import { Chip, StateLabel, type Tone, VlanPatch, ZonePatch } from "@/components/ui/signs";
 import { ApiError, get, post } from "@/lib/api";
-import { dateTime } from "@/lib/format";
+import { ago, dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { ChangeEvidence, ChangeRequest, ChangeStatus } from "@/lib/types";
+import type { BatchStatus, ChangeBatch, ChangeEvidence, ChangeRequest, ChangeStatus, ImpactPreview } from "@/lib/types";
 
 const STATUS: Record<ChangeStatus, [Tone, string]> = {
   proposed: ["info", "Waiting for approval"],
@@ -207,7 +207,172 @@ const KIND_WORD: Record<string, string> = {
   rejected: "Rejected",
   cancelled: "Cancelled",
   expired: "Expired",
+  batch: "Bulk",
+  propose: "Proposed",
+  start: "Started",
+  item: "Item",
+  stopped: "Stopped",
 };
+
+const BATCH_STATUS: Record<BatchStatus, [Tone, string]> = {
+  proposed: ["info", "Waiting for approval"],
+  approved: ["info", "Approved, not started"],
+  running: ["warn", "Running"],
+  succeeded: ["ok", "All items applied and verified"],
+  stopped: ["crit", "Stopped"],
+  rejected: ["muted", "Rejected"],
+  cancelled: ["muted", "Cancelled"],
+  expired: ["muted", "Expired"],
+};
+
+export function BatchState({ status, className }: { status: BatchStatus; className?: string }) {
+  const [tone, word] = BATCH_STATUS[status];
+  return <StateLabel tone={tone} className={className}>{word}</StateLabel>;
+}
+
+/** Operations offered over many targets, in the words used for picking one. */
+export const MANY_TARGET_OPERATIONS: { id: ChangeRequest["operation"]; label: string; flag?: { key: "enabled" | "value"; on: string; off: string } }[] = [
+  { id: "port.power_cycle", label: "Power-cycle PoE ports" },
+  { id: "device.restart", label: "Restart devices" },
+  { id: "firewall_policy.set_logging", label: "Firewall policy logging", flag: { key: "enabled", on: "Turn logging on", off: "Turn logging off" } },
+  { id: "firewall_policy.set_enabled", label: "Enable or disable firewall policies", flag: { key: "enabled", on: "Enable", off: "Disable" } },
+  { id: "network.set_internet_access", label: "Network internet access", flag: { key: "value", on: "Allow internet access", off: "Block internet access" } },
+  { id: "network.set_isolation", label: "Network isolation", flag: { key: "value", on: "Turn isolation on", off: "Turn isolation off" } },
+];
+
+/** How far a batch has got, in words: "2 of 5 applied · 1 failed". */
+export function batchProgress(b: ChangeBatch): string {
+  const total = Object.values(b.counts).reduce((a, n) => a + (n ?? 0), 0);
+  const parts = [`${b.counts.succeeded ?? 0} of ${total} applied`];
+  const bad = (b.counts.failed ?? 0) + (b.counts.conflict ?? 0) + (b.counts.reverted ?? 0);
+  if (bad) parts.push(`${bad} did not succeed`);
+  if (b.counts.verifying || b.counts.applying) parts.push("one verifying");
+  if (b.counts.cancelled && b.status === "stopped") parts.push(`${b.counts.cancelled} not applied`);
+  return parts.join(" · ");
+}
+
+const RELATION_WORD: Record<ImpactPreview["devices"][number]["relation"], string> = {
+  target: "The target",
+  downstream: "Behind it",
+  possibly: "Possibly",
+};
+
+/**
+ * What a change (or a bulk operation) would touch, from the observed inventory graph:
+ * devices on the uplink tree, clients, networks, zones and policies. Read-only; says what it cannot know.
+ */
+export function ImpactPanel({ url, queryKey }: { url: string; queryKey: unknown[] }) {
+  const { moduleEnabled } = useSession();
+  const on = moduleEnabled("digital-twin");
+  const q = useQuery({ queryKey, queryFn: () => get<ImpactPreview>(url), enabled: on, staleTime: 30_000 });
+  if (!on) return null;
+  const imp = q.data;
+  return (
+    <Panel
+      id="impact"
+      title="What it touches"
+      actions={imp?.traffic_change === false ? <StateLabel tone="muted">No traffic change</StateLabel> : undefined}
+    >
+      {q.error ? (
+        <Notice tone="crit">{(q.error as Error).message}</Notice>
+      ) : !imp ? (
+        <Skeleton className="h-24" />
+      ) : (
+        <div className="flex flex-col gap-4">
+          <ul className="flex flex-col gap-1">
+            {imp.summary.map((s) => <li key={s} className="max-w-[70ch] font-semibold">{s}</li>)}
+          </ul>
+          {imp.notes.length > 0 && (
+            <Notice tone="info">
+              {imp.notes.map((n) => <p key={n} className="max-w-[70ch]">{n}</p>)}
+            </Notice>
+          )}
+          <div className="grid gap-4 md:grid-cols-2">
+            {imp.devices.length > 0 && (
+              <ImpactList title={`Devices (${imp.devices.length})`}>
+                {imp.devices.map((d) => (
+                  <li key={d.id} className="flex items-baseline justify-between gap-3 py-1">
+                    <Link href={`/inventory/devices/${d.id}`} className="min-w-0 truncate font-semibold hover:underline" style={{ paddingLeft: `${Math.min(d.depth, 4) * 12}px` }}>
+                      {d.name}
+                    </Link>
+                    {d.relation === "possibly" ? (
+                      <Chip dashed>Possibly</Chip>
+                    ) : (
+                      <span className="text-sm whitespace-nowrap text-ink-3">{RELATION_WORD[d.relation]}{d.relation === "downstream" && d.via ? ` · via ${d.via}` : ""}</span>
+                    )}
+                  </li>
+                ))}
+              </ImpactList>
+            )}
+            {(imp.clients.count > 0 || imp.clients.possible > 0) && (
+              <ImpactList
+                title={`Clients (${imp.clients.count}${imp.clients.possible ? `, ${imp.clients.possible} possibly` : ""})`}
+                footer={imp.clients.count + imp.clients.possible > imp.clients.sample.length ? `First ${imp.clients.sample.length} shown` : undefined}
+              >
+                {imp.clients.sample.map((c) => (
+                  <li key={c.id} className="flex items-baseline justify-between gap-3 py-1">
+                    <Link href={`/inventory/clients/${c.id}`} className="min-w-0 truncate hover:underline">
+                      {c.name} {c.ip && <span className="font-mono text-xs text-ink-3">{c.ip}</span>}
+                    </Link>
+                    {c.certain ? <span className="text-sm whitespace-nowrap text-ink-3">{c.via}</span> : <Chip dashed>Possibly</Chip>}
+                  </li>
+                ))}
+              </ImpactList>
+            )}
+            {imp.networks.length > 0 && (
+              <ImpactList title={`Networks (${imp.networks.length})`}>
+                {imp.networks.map((n) => (
+                  <li key={n.id} className="flex items-center justify-between gap-3 py-1">
+                    <span className="flex min-w-0 items-center gap-2">
+                      {n.vlan_id != null && <VlanPatch id={n.vlan_id} />}
+                      <span className="truncate font-semibold">{n.name}</span>
+                    </span>
+                    <span className="text-sm whitespace-nowrap text-ink-3">
+                      {n.relation}
+                      {n.clients != null ? ` · ${n.clients} client${n.clients === 1 ? "" : "s"}` : ""}
+                    </span>
+                  </li>
+                ))}
+              </ImpactList>
+            )}
+            {(imp.zones.length > 0 || imp.policies.length > 0) && (
+              <ImpactList title={`Zones and policies (${imp.zones.length + imp.policies.length})`}>
+                {imp.zones.map((z) => (
+                  <li key={z.id} className="flex items-center justify-between gap-3 py-1">
+                    <ZonePatch name={z.name} />
+                    <span className="text-sm text-ink-3">{z.relation}</span>
+                  </li>
+                ))}
+                {imp.policies.map((p) => (
+                  <li key={p.id} className="flex items-baseline justify-between gap-3 py-1">
+                    <span className="min-w-0 truncate">
+                      <span className="font-semibold">{p.name}</span> <span className="text-sm text-ink-3">{p.action.toLowerCase()}{p.enabled ? "" : ", disabled"}</span>
+                    </span>
+                    <span className="text-sm whitespace-nowrap text-ink-3">{p.relation}</span>
+                  </li>
+                ))}
+              </ImpactList>
+            )}
+          </div>
+          <p className="text-sm text-ink-3">
+            {imp.basis.text}
+            {imp.basis.observed_at ? ` Last sync ${ago(imp.basis.observed_at)}.` : ""}
+          </p>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function ImpactList({ title, children, footer }: { title: string; children: ReactNode; footer?: string }) {
+  return (
+    <div className="min-w-0">
+      <h3 className="mb-1 border-b border-rule pb-1 text-xs font-bold tracking-wide text-ink-2 uppercase">{title}</h3>
+      <ul className="max-h-72 overflow-auto">{children}</ul>
+      {footer && <p className="mt-1 text-sm text-ink-3">{footer}</p>}
+    </div>
+  );
+}
 
 /** The change's evidence: every read, write and check, oldest first, on the case-timeline rule. */
 export function EvidenceTimeline({ items }: { items: ChangeEvidence[] }) {

@@ -28,6 +28,7 @@ import {
   Siren,
   Users,
   Waypoints,
+  Workflow,
 } from "lucide-react";
 
 export interface NavItem {
@@ -46,6 +47,8 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Alerts", href: "/alerts", icon: Siren, module: "monitoring", permission: "inventory:read" },
       { label: "Dashboards", href: "/analytics", icon: ChartLine, module: "analytics-studio", permission: "inventory:read" },
       { label: "Changes", href: "/changes", icon: GitPullRequest, module: "change-engine", permission: "inventory:read" },
+      { label: "Bulk operations", href: "/changes/batches", icon: Layers, module: "bulk-ops", permission: "inventory:read" },
+      { label: "Automation", href: "/automation", icon: Workflow, module: "automation", permission: "inventory:read" },
     ],
   },
   {

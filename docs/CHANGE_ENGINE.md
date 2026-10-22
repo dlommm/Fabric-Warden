@@ -1,6 +1,6 @@
 # Change Approval & Recovery engine
 
-**Status: Phases 6a–6c implemented** (module `change-engine`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Bulk operations, automation, the digital twin and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
+**Status: Phases 6a–6d implemented** (modules `change-engine`, `bulk-ops`, `automation`, `digital-twin`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Digital-twin snapshots and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
 
 ## Invariants
 
@@ -48,9 +48,42 @@ The published PUT endpoints replace the whole object, and the spec marks no fiel
 
 System-defined policies are never changed: the spec does not say whether UniFi accepts edits to them.
 
+## Bulk operations
+
+Module `bulk-ops`, code `warden/changes/batches.py`, API `/api/batches`. A batch adds **no write path**: it never mints a `WriteAuthorization` and never calls the client.
+
+- **Operations:** PoE power-cycle, device restart, firewall policy logging, firewall policy enable/disable, network internet access, network isolation. Renames and zone moves stay single changes. At most 50 targets.
+- **Propose:** every target goes through `engine.propose` (live read, plan, risk, protected path) and becomes an ordinary change request with `batch_id` and its position. Targets the engine refuses are listed on the batch as *skipped* with the reason; at least one must remain. Batch risk is the highest item risk; it is protected if any item is.
+- **One open change per target** still holds, with one refinement: PoE cycles of *different ports* on the same switch may be open together.
+- **Approve once:** one decision approves every item through `engine.approve` (second-person rule and protected-path acknowledgement apply). Items cannot be approved, applied or cancelled on their own (`409`); they are decided with their batch. A succeeded item can still be reverted on its own.
+- **Apply:** refused while any item's controller is read-only. Items are applied in order through `engine.apply` (fresh re-read, drift check, one write, verification). The next item starts only after the current one has **succeeded** (verified) and the optional pause has passed; the `bulk-ops.advance` job (30 s) continues batches waiting on verification or a pause.
+- **Stop on first failure:** an item that fails, conflicts, is reverted or cannot be applied stops the batch; remaining items are cancelled and never sent. An approver can also stop a running batch; the item in progress finishes and is verified.
+- **Evidence:** each item keeps its own evidence; the batch keeps a log. Audit: `change.batch.propose`, `change.batch.approve`, `change.batch.reject`, `change.batch.cancel`, `change.batch.apply`, `change.batch.finish`, plus every item's `change.*` records. Events: `change.batch.proposed`, `change.batch.decided`, `change.batch.finished`.
+
+## Automation Studio
+
+Module `automation`, code `warden/automation.py`, API `/api/automation`.
+
+- **Rule** = trigger (one event type from the event log, or every N ≥ 15 minutes) + conditions on the event (`severity`, `entity_type`, `entity_id`, `site_id`, `source`, `payload.<key>`; is, is not, one of, contains, at least, at most, present) + one action.
+- **Actions:** *propose* one of the bulk operations above, for the event's object (a device, policy or network the event names) or a fixed target; or *notify* through the Notifications module's channels. **A rule never approves or applies.** Its proposals are made as `Automation: <rule name>`, so approving them is never self-approval.
+- **Evaluation:** the `automation.evaluate` job (30 s) reads new events from the persisted event log by sequence number. Enabling a rule starts from that moment; old events are never replayed. Change events cannot trigger proposals (a finished change can only notify). A per-rule, per-target quiet period (default 60 minutes) and the engine's one-open-change rule stop repeats.
+- **Dry run** (saved or unsaved rule): replays up to 50 matching events from the last 7 days (or one scheduled run) and says what would happen — would propose (with the title), would be refused (and why), would notify, skipped, or no match. It reads only the inventory; nothing is stored, proposed or sent.
+- **History and audit:** every firing is a run (proposed, notified, refused, skipped, error). Audit: `automation.rule.create/update/enable/disable/delete` and `automation.fire`.
+
+## Impact preview (Network Digital Twin)
+
+Module `digital-twin`, code `warden/twin.py`, API `/api/twin/changes/{id}/impact` and `/api/twin/batches/{id}/impact`. Read-only, stores nothing. It computes from the **last synced inventory** (not a live read):
+
+- restart: the device, every device behind it on the uplink tree, and clients attached through them; for the gateway, every network on the site;
+- PoE cycle: the switch, and the devices and clients behind it marked only *possibly* affected (the official API does not report which device is on a port);
+- firewall policy: the zones it joins, networks in those zones and their clients, other policies on the same zone pair; logging changes are marked as no traffic change;
+- network and zone edits: the network's clients (matched by subnet), its zone and the policies that govern it.
+
+**Not built:** versioned graph snapshots, history of the graph, and what-if simulation of traffic.
+
 ## Not built yet
 
 - Wi-Fi broadcast edits: the spec shares one schema for the passphrase in GET and PUT but does not say whether a controller returns it in clear; if it is masked, a read-modify-write would overwrite the passphrase with the mask. Not attempted until that is verified on a live controller.
 - VLAN, subnet, DHCP and IPv6 edits: nested configuration whose round-trip semantics need a live controller to confirm.
-- Bulk operations, Automation Studio, the network digital twin.
+- Versioned digital-twin snapshots and what-if simulation; multi-step automation workflows.
 - An independently deployed watchdog for high-risk workflows, and protected-path detection for the ports hosting Fabric Warden itself (the official API does not map clients to switch ports).

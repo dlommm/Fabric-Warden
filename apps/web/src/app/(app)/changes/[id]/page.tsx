@@ -5,7 +5,7 @@ import { ChevronLeft, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChangeState, EvidenceTimeline, RiskLabel } from "@/components/changes";
+import { BatchState, ChangeState, EvidenceTimeline, ImpactPanel, RiskLabel } from "@/components/changes";
 import { Button } from "@/components/ui/button";
 import { Field, Textarea } from "@/components/ui/field";
 import { KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
@@ -116,6 +116,7 @@ export default function ChangePage() {
               On <Link href={TARGET_HREF[c.target.type]?.(c) ?? "#"} className="font-semibold text-accent hover:underline">{c.target.label}</Link> via {c.controller?.name ?? "the controller"}. “Now” was read live from the controller when this was proposed, {ago(c.proposed_at)}; it is read again just before applying.
             </p>
           </Panel>
+          <ImpactPanel url={`/api/twin/changes/${c.id}/impact`} queryKey={["twin", "change", c.id, c.status]} />
           <Panel title="Impact and recovery">
             <ul className="flex list-disc flex-col gap-1 pl-5">
               {c.impact.map((i) => <li key={i}>{i}</li>)}
@@ -128,7 +129,18 @@ export default function ChangePage() {
           </Panel>
         </div>
         <div className="flex flex-col gap-[var(--gap)]">
-          <Actions c={c} />
+          {c.batch && ["proposed", "approved", "applying", "verifying"].includes(c.status) ? (
+            <Panel title="Next step">
+              <div className="flex flex-col gap-2">
+                <p className="text-ink-2">
+                  Item {(c.batch_position ?? 0) + 1} of <Link href={`/changes/batches/${c.batch.id}`} className="font-semibold text-accent hover:underline"><span className="font-mono text-xs">{c.batch.ref}</span></Link>. It is approved, applied and cancelled with its bulk operation.
+                </p>
+                <BatchState status={c.batch.status} />
+              </div>
+            </Panel>
+          ) : (
+            <Actions c={c} />
+          )}
           <Panel title="Record">
             <KeyValue
               items={[
@@ -140,6 +152,11 @@ export default function ChangePage() {
                 ...(c.status === "proposed" || c.status === "approved" ? [["Open until", dateTime(c.expires_at)] as [string, string]] : []),
               ]}
             />
+            {c.batch && (
+              <p className="mt-3 text-sm">
+                Part of <Link href={`/changes/batches/${c.batch.id}`} className="font-semibold text-accent hover:underline"><span className="font-mono text-xs">{c.batch.ref}</span> {c.batch.title}</Link>
+              </p>
+            )}
             {c.inverse_of_id && <p className="mt-3 text-sm"><Link href={`/changes/${c.inverse_of_id}`} className="font-semibold text-accent hover:underline">The change this reverts</Link></p>}
           </Panel>
         </div>

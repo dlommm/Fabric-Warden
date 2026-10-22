@@ -16,9 +16,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from warden import audit
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.changes import engine
+from warden.changes.candidates import MANY_TARGET_OPERATIONS
+from warden.changes.candidates import candidates as candidate_targets
 from warden.changes.operations import OPERATIONS, ChangeRefused
 from warden.integrations.unifi.capabilities import evaluate
-from warden.models import ChangeRequest, Controller, Setting, Site
+from warden.models import ChangeBatch, ChangeRequest, Controller, Setting, Site
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/changes", tags=["changes"], dependencies=[Depends(require_module("change-engine"))])
@@ -62,6 +64,8 @@ def _out(cr: ChangeRequest, controller: Controller | None = None) -> dict[str, A
         "expires_at": cr.expires_at,
         "evidence": cr.evidence,
         "is_demo": cr.is_demo,
+        "batch_id": cr.batch_id,
+        "batch_position": cr.batch_position,
     }
 
 
@@ -77,7 +81,20 @@ def _refused(e: ChangeRefused) -> HTTPException:
 
 
 async def _full(db: AsyncSession, cr: ChangeRequest) -> dict[str, Any]:
-    return _out(cr, await db.get(Controller, cr.controller_id))
+    out = _out(cr, await db.get(Controller, cr.controller_id))
+    if cr.batch_id and (b := await db.get(ChangeBatch, cr.batch_id)) is not None:
+        out["batch"] = {"id": b.id, "ref": f"BAT-{b.number:04d}", "status": b.status, "title": b.title}
+    return out
+
+
+async def _single(db: AsyncSession, cid: str) -> ChangeRequest:
+    """A change decided on its own; items of a bulk operation are decided and applied with their batch."""
+    cr = await _get(db, cid)
+    if cr.batch_id and (b := await db.get(ChangeBatch, cr.batch_id)) is not None:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, f"CHG-{cr.number:04d} is part of BAT-{b.number:04d}; approve, apply or cancel the batch instead"
+        )
+    return cr
 
 
 @router.get("/operations")
@@ -108,6 +125,14 @@ async def operations(db: DB, principal: Reader) -> dict:
             for op in OPERATIONS.values()
         ],
     }
+
+
+@router.get("/candidates")
+async def candidates(db: DB, principal: Reader, operation: str) -> dict:
+    """Inventory targets a many-target operation could apply to (bulk operations, automation). Checked live on proposal."""
+    if operation not in MANY_TARGET_OPERATIONS:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "This operation is not offered over many targets")
+    return {"operation": operation, "items": await candidate_targets(db, operation)}
 
 
 @router.get("")
@@ -157,7 +182,7 @@ class DecideIn(BaseModel):
 
 @router.post("/{cid}/approve")
 async def approve(cid: str, body: DecideIn, db: DB, state: State, principal: Approver) -> dict:
-    cr = await _get(db, cid)
+    cr = await _single(db, cid)
     try:
         await engine.approve(db, state, cr, principal.actor, body.note.strip(), body.acknowledge_protected)
     except PermissionError as e:
@@ -169,7 +194,7 @@ async def approve(cid: str, body: DecideIn, db: DB, state: State, principal: App
 
 @router.post("/{cid}/reject")
 async def reject(cid: str, body: DecideIn, db: DB, state: State, principal: Approver) -> dict:
-    cr = await _get(db, cid)
+    cr = await _single(db, cid)
     try:
         await engine.close(db, state, cr, principal.actor, "rejected", body.note.strip())
     except ChangeRefused as e:
@@ -179,7 +204,7 @@ async def reject(cid: str, body: DecideIn, db: DB, state: State, principal: Appr
 
 @router.post("/{cid}/cancel")
 async def cancel(cid: str, body: DecideIn, db: DB, state: State, principal: Proposer) -> dict:
-    cr = await _get(db, cid)
+    cr = await _single(db, cid)
     if cr.proposed_by != engine.who(principal.actor) and P.CHANGES_APPROVE not in principal.permissions:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the proposer or an approver can cancel a change")
     try:
@@ -191,7 +216,7 @@ async def cancel(cid: str, body: DecideIn, db: DB, state: State, principal: Prop
 
 @router.post("/{cid}/apply")
 async def apply(cid: str, db: DB, state: State, principal: Approver) -> dict:
-    cr = await _get(db, cid)
+    cr = await _single(db, cid)
     try:
         await engine.apply(db, state, cr, principal.actor)
     except ChangeRefused as e:

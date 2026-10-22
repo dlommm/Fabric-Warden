@@ -56,3 +56,38 @@ class ChangeRequest(IdMixin, TimestampMixin, Base):
     # What was sent, what came back, every verification read: the change's evidence.
     evidence: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Set when the change is one item of a bulk operation; it is then decided and applied with its batch.
+    batch_id: Mapped[str | None] = mapped_column(ForeignKey("change_batches.id", ondelete="SET NULL"), nullable=True, index=True)
+    batch_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+
+class ChangeBatch(IdMixin, TimestampMixin, Base):
+    """One operation over many targets, decided once and applied item by item.
+
+    Each item is an ordinary change request, so it is read, drift-checked,
+    written, verified and evidenced exactly like a single change. The batch
+    stops at the first item that does not succeed.
+    """
+
+    __tablename__ = "change_batches"
+
+    number: Mapped[int] = mapped_column(Integer, unique=True)  # shown as BAT-0001
+    operation: Mapped[str] = mapped_column(String(48))
+    title: Mapped[str] = mapped_column(String(256))
+    reason: Mapped[str] = mapped_column(Text, default="")
+    risk: Mapped[str] = mapped_column(String(8))  # the highest item risk
+    protected: Mapped[bool] = mapped_column(Boolean, default=False)  # any item on a protected path
+    pause_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    # proposed | approved | running | succeeded | stopped | rejected | cancelled | expired
+    status: Mapped[str] = mapped_column(String(16), default="proposed", index=True)
+    proposed_by: Mapped[str] = mapped_column(String(64))
+    approved_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    decided_note: Mapped[str] = mapped_column(Text, default="")
+    started_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    next_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)  # when the next item may start
+    finished_at: Mapped[datetime | None] = mapped_column(UTCDateTime(), nullable=True)
+    skipped: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)  # targets refused at proposal, with why
+    log: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)

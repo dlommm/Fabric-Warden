@@ -8,7 +8,8 @@ from warden.models.analytics import (
     NotificationChannel,
     NotificationDelivery,
 )
-from warden.models.changes import ChangeRequest
+from warden.models.automation import AutomationRule, AutomationRun
+from warden.models.changes import ChangeBatch, ChangeRequest
 from warden.models.config import ComplianceResult, ConfigSnapshot
 from warden.models.dcim import Asset, Cable, CableEnd, DocPage, DocVersion, Location, PowerFeed, PowerLink, Rack, RackItem
 from warden.models.ecosystem import HaEntity, IntegrationConnection, ProtectDevice
@@ -49,6 +50,8 @@ __all__ = [
     "Asset",
     "AuditRecord",
     "AuthSession",
+    "AutomationRule",
+    "AutomationRun",
     "Cable",
     "CableEnd",
     "Client",
@@ -96,6 +99,7 @@ __all__ = [
     "SnmpInterface",
     "SnmpProfile",
     "SnmpTarget",
+    "ChangeBatch",
     "ChangeRequest",
     "HaEntity",
     "IntegrationConnection",

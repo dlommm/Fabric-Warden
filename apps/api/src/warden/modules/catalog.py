@@ -471,6 +471,90 @@ CHANGE_ENGINE = ModuleManifest(
     ],
 )
 
+BULK_OPS = ModuleManifest(
+    id="bulk-ops",
+    version=VERSION,
+    name="Bulk Operations",
+    category=C.AUTOMATION,
+    description=(
+        "One change over many targets: PoE-cycle several ports, restart several devices, or switch logging, policies, "
+        "internet access or isolation for several objects. Proposed and approved once; applied one item at a time through "
+        "the change engine, each re-read, verified and evidenced; stops at the first item that does not succeed."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=6,
+    requires=["core", "unifi-network", "inventory", "change-engine"],
+    permissions=["changes:propose", "changes:approve"],
+    nav=[NavEntry(label="Bulk operations", href="/changes/batches", icon="layers", section="Operate")],
+    jobs=[JobDecl(id="bulk-ops.advance", title="Continue running bulk operations", default_interval_seconds=30)],
+    publishes=["change.batch.proposed", "change.batch.decided", "change.batch.finished"],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["change_batches"],
+    uninstall_behavior="Disabling stops running batches from advancing; batches and their changes are kept.",
+    warnings=[
+        "Adds no write path: every item is an ordinary change request. Up to 50 targets per batch. "
+        "Tested only against the simulated controller."
+    ],
+)
+
+AUTOMATION = ModuleManifest(
+    id="automation",
+    version=VERSION,
+    name="Automation Studio",
+    category=C.AUTOMATION,
+    description=(
+        "Rules: an event or a schedule, conditions, and one action: propose a change (which still waits for a person to "
+        "approve and apply it) or send a notification. Dry runs replay recent events; every firing is kept as run history."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=6,
+    requires=["core", "inventory", "change-engine"],
+    permissions=["changes:propose"],
+    nav=[NavEntry(label="Automation", href="/automation", icon="workflow", section="Operate")],
+    jobs=[JobDecl(id="automation.evaluate", title="Evaluate automation rules against new events", default_interval_seconds=30)],
+    subscribes=[
+        ALERT_FIRING,
+        ALERT_RESOLVED,
+        DEVICE_STATE_CHANGED,
+        DEVICE_MISSING,
+        DEVICE_DISCOVERED,
+        DEVICE_FIRMWARE_CHANGED,
+        CLIENT_CONNECTED,
+        CLIENT_DISCONNECTED,
+        CLIENT_MOVED,
+        CONTROLLER_STATUS_CHANGED,
+        CONFIG_CHANGED,
+    ],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["automation_rules", "automation_runs"],
+    uninstall_behavior="Disabling stops rules from firing; rules and run history are kept. Re-enabled rules do not replay missed events.",
+    warnings=[
+        "A rule never approves or applies a change. Notifications need the Notifications module. "
+        "Multi-step workflows and approval routing are not built."
+    ],
+)
+
+DIGITAL_TWIN = ModuleManifest(
+    id="digital-twin",
+    version=VERSION,
+    name="Network Digital Twin",
+    category=C.AUTOMATION,
+    description=(
+        "Impact preview for proposed changes and bulk operations: the devices, clients, networks, zones and policies a change "
+        "would touch, computed from the observed inventory graph (uplink tree, subnets, zone and policy matrix)."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=6,
+    requires=["core", "inventory", "change-engine"],
+    permissions=["inventory:read"],
+    resources=ResourceEstimate(memory_mb=8),
+    uninstall_behavior="Read-only; stores nothing.",
+    warnings=[
+        "Impact preview only. Versioned graph snapshots and what-if simulation are not built yet. The preview uses the last "
+        "synced inventory and cannot name the device on a switch port (the official API does not report it)."
+    ],
+)
+
 FIREWALL = ModuleManifest(
     id="firewall",
     version=VERSION,
@@ -680,11 +764,6 @@ PLANNED: list[ModuleManifest] = [
         memory_mb=512,
         containers=["flow-collector", "clickhouse"],
     ),
-    _planned(
-        "bulk-ops", "Bulk Operations", C.AUTOMATION, 6, "Capability-verified bulk PoE, port and device operations.", ["change-engine"]
-    ),
-    _planned("automation", "Automation Studio", C.AUTOMATION, 6, "Workflows, triggers, approvals and dry runs.", ["change-engine"]),
-    _planned("digital-twin", "Network Digital Twin", C.AUTOMATION, 6, "Versioned infrastructure graph and impact previews.", ["topology"]),
     _planned("ai-providers", "AI Providers", C.AI, 7, "Local (Ollama, LM Studio) and API model providers; official CLI setup guides."),
     _planned(
         "ai-agents",
@@ -718,6 +797,9 @@ CATALOG: dict[str, ModuleManifest] = {
         SERVERS,
         SNMP,
         CHANGE_ENGINE,
+        BULK_OPS,
+        AUTOMATION,
+        DIGITAL_TWIN,
         FIREWALL,
         CONFIG_HISTORY,
         COMPLIANCE,
