@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import Link from "next/link";
+import { type ChangeChoice, ProposeChange, useCanPropose } from "@/components/changes";
+import { Button } from "@/components/ui/button";
 import { EmptyState, Notice, PageHeader, Panel } from "@/components/ui/layout-bits";
 import { DemoTag, StateLabel, VlanPatch, ZonePatch } from "@/components/ui/signs";
 import { type Column, DataTable } from "@/components/ui/table";
@@ -20,6 +22,22 @@ interface Firewall {
 export default function NetworksPage() {
   const nets = useQuery({ queryKey: ["networks"], queryFn: () => get<{ items: NetworkRow[] }>("/api/inventory/networks") });
   const fw = useQuery({ queryKey: ["firewall"], queryFn: () => get<Firewall>("/api/inventory/firewall") });
+  const canPropose = useCanPropose();
+  // Zones a network may move into: not External, Gateway or VPN (the engine refuses those too).
+  const movable = (fw.data?.zones ?? []).filter((z) => !["external", "gateway", "vpn"].includes(z.name.toLowerCase()));
+  const choicesFor = (n: NetworkRow): ChangeChoice[] => {
+    const out: ChangeChoice[] = [{ operation: "network.rename", label: "Rename", value: { label: "New name", initial: n.name } }];
+    if (n.management === "GATEWAY") {
+      out.push(
+        { operation: "network.set_internet_access", label: "Block internet access", params: { value: false } },
+        { operation: "network.set_internet_access", label: "Allow internet access", params: { value: true } },
+        { operation: "network.set_isolation", label: "Isolate from other networks", params: { value: true } },
+        { operation: "network.set_isolation", label: "Stop isolating", params: { value: false } },
+        { operation: "network.move_zone", label: "Move to another zone", value: { label: "Zone", options: movable.filter((z) => z.id !== n.zone?.id).map((z) => ({ value: z.id, label: z.name })) } },
+      );
+    }
+    return out;
+  };
 
   const columns: Column<NetworkRow>[] = [
     { key: "vlan", header: "VLAN", align: "right", sort: (n) => n.vlan_id, cell: (n) => (n.vlan_id != null ? <VlanPatch id={n.vlan_id} /> : <span className="text-ink-3">—</span>), className: "w-16" },
@@ -67,6 +85,26 @@ export default function NetworksPage() {
         );
       },
     },
+    ...(canPropose
+      ? [
+          {
+            key: "change",
+            header: <span className="sr-only">Propose a change</span>,
+            className: "w-28",
+            cell: (n: NetworkRow) => (
+              <ProposeChange
+                operation="network.rename"
+                targetId={n.id}
+                siteId={n.site_id}
+                choices={choicesFor(n)}
+                title={`Propose a change to “${n.name}”`}
+                summary="Pick the change. It is sent as the network exactly as read with one field changed, and checked afterwards that nothing else moved."
+                trigger={<Button size="sm" variant="ghost" aria-label={`Change… ${n.name}`}>Change…</Button>}
+              />
+            ),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -94,7 +132,7 @@ export default function NetworksPage() {
           title="Firewall zones and policies"
           id="firewall"
           bodyClassName="p-0"
-          actions={<span className="text-sm text-ink-3">Read-only inventory · analysis arrives with Firewall & Policy Manager</span>}
+          actions={<span className="text-sm text-ink-3">Inventory · analysis on the Firewall page</span>}
         >
           {fw.data && fw.data.zones.length > 0 ? (
             <>
@@ -103,6 +141,17 @@ export default function NetworksPage() {
                   <span key={z.id} className="inline-flex items-center gap-1.5">
                     <ZonePatch name={z.name} />
                     <span className="text-sm text-ink-3">{z.network_count} net{z.network_count === 1 ? "" : "s"}</span>
+                    {canPropose && z.origin === "USER_DEFINED" && (
+                      <ProposeChange
+                        operation="zone.rename"
+                        targetId={z.id}
+                        siteId={nets.data?.items[0]?.site_id}
+                        choices={[{ operation: "zone.rename", label: "Rename", value: { label: "New name", initial: z.name } }]}
+                        title={`Propose renaming zone “${z.name}”`}
+                        summary="Only the label changes; member networks and policies stay as they are."
+                        trigger={<Button size="sm" variant="ghost" aria-label={`Rename… zone ${z.name}`}>Rename…</Button>}
+                      />
+                    )}
                   </span>
                 ))}
               </div>

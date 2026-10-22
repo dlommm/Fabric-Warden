@@ -1,6 +1,6 @@
 # Change Approval & Recovery engine
 
-**Status: Phases 6a and 6b implemented** (module `change-engine`). Four operations, tested only against the simulated controller; no write has been sent to a live controller yet. Bulk operations, automation, the digital twin and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
+**Status: Phases 6a–6c implemented** (module `change-engine`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Bulk operations, automation, the digital twin and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
 
 ## Invariants
 
@@ -28,6 +28,11 @@ Everything read, sent and observed is kept on the change as evidence; every step
 |---|---|---|---|---|---|
 | `firewall_policy.set_logging` | `PATCH /v1/sites/{siteId}/firewall/policies/{id}` (10.1.84) | `{"loggingEnabled": bool}`; the published PATCH schema has no other field | Yes: the opposite value | `loggingEnabled` reads back as expected | Low; notes log volume for allow policies |
 | `firewall_policy.set_enabled` | `PUT /v1/sites/{siteId}/firewall/policies/{id}` (10.1.84) | The object just read, minus `id`, `index` and `metadata` (absent from the published PUT schema), with only `enabled` changed | Yes: the original object is put back whole | `enabled` reads back as expected **and every other top-level field is exactly as before** | Medium; **high** to disable a block/reject policy; **high and protected** when either zone is Gateway |
+| `network.rename` | `PUT /v1/sites/{siteId}/networks/{id}` (10.0.162) | Network as read minus `id`, `default`, `metadata`, with `name` changed | Yes (original restored) | Field reads back; every other field unchanged | Low |
+| `network.set_internet_access` | same | … with `internetAccessEnabled` changed (gateway-managed networks) | Yes | same | Medium; **high and protected** for the default network or the network the controller's address is in |
+| `network.set_isolation` | same | … with `isolationEnabled` changed | Yes | same | Medium to enable, high to disable; protected as above |
+| `network.move_zone` | same | … with `zoneId` changed; never into External, Gateway or VPN | Yes | same | **High**; protected as above |
+| `zone.rename` | `PUT /v1/sites/{siteId}/firewall/zones/{id}` (10.0.162) | `{name, networkIds}` as read with `name` changed; custom zones only | Yes | same | Low |
 | `device.restart` | `POST /v1/sites/{siteId}/devices/{id}/actions` (9.1.120) | `{"action": "RESTART"}` | No | The device was seen not online, or its uptime went backwards, and is online again | Medium; **high and protected** for the gateway or any device other devices uplink through |
 | `port.power_cycle` | `POST /v1/sites/{siteId}/devices/{id}/interfaces/ports/{idx}/actions` (9.1.120) | `{"action": "POWER_CYCLE"}` | No (self-recovering) | PoE state reads back as before | Medium; says plainly that the API does not report which device is on the port |
 
@@ -46,6 +51,6 @@ System-defined policies are never changed: the spec does not say whether UniFi a
 ## Not built yet
 
 - Wi-Fi broadcast edits: the spec shares one schema for the passphrase in GET and PUT but does not say whether a controller returns it in clear; if it is masked, a read-modify-write would overwrite the passphrase with the mask. Not attempted until that is verified on a live controller.
-- Network and zone edits (same read-modify-write path; each needs its own risk model and tests).
+- VLAN, subnet, DHCP and IPv6 edits: nested configuration whose round-trip semantics need a live controller to confirm.
 - Bulk operations, Automation Studio, the network digital twin.
 - An independently deployed watchdog for high-risk workflows, and protected-path detection for the ports hosting Fabric Warden itself (the official API does not map clients to switch ports).

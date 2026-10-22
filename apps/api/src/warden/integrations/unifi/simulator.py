@@ -229,6 +229,10 @@ def _build_networks() -> list[dict[str, Any]]:
                 "default": default,
                 "zoneId": _zone_id(zone),
                 "metadata": {"origin": "SYSTEM_DEFINED" if default else "USER_DEFINED"},
+                "internetAccessEnabled": True,
+                "isolationEnabled": False,
+                "cellularBackupEnabled": True,
+                "mdnsForwardingEnabled": zone != "hotspot",
                 "ipv4Configuration": {
                     "hostIpAddress": host,
                     "prefixLength": prefix,
@@ -564,6 +568,71 @@ def create_simulator_app(state: SimulatorState | None = None) -> FastAPI:
         accept("PATCH", S + "/firewall/policies/{firewallPolicyId}", request, x_api_key, siteId, body)
         if "patch_ignored" not in sim.faults:
             target["loggingEnabled"] = body["loggingEnabled"]
+        return copy.deepcopy(target)
+
+    # Update Network, gateway-managed variant (10.6.106): GET minus id, default and metadata.
+    net_fields = {
+        "management",
+        "name",
+        "enabled",
+        "vlanId",
+        "dhcpGuarding",
+        "cellularBackupEnabled",
+        "internetAccessEnabled",
+        "ipv4Configuration",
+        "ipv6Configuration",
+        "isolationEnabled",
+        "mdnsForwardingEnabled",
+        "zoneId",
+    }
+    net_required = {"cellularBackupEnabled", "enabled", "internetAccessEnabled", "ipv4Configuration", "isolationEnabled", "name", "vlanId"}
+
+    @app.put(prefix + S + "/networks/{networkId}")
+    async def put_network(request: Request, siteId: str, networkId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if unknown := set(body) - net_fields:
+            raise HTTPException(400, f"Unrecognized fields: {', '.join(sorted(unknown))}")
+        if missing := net_required - set(body):
+            raise HTTPException(400, f"Missing required fields: {', '.join(sorted(missing))}")
+        target = next((n for n in sim.networks if n["id"] == networkId), None)
+        if target is None:
+            raise HTTPException(404, "Not Found")
+        if body.get("zoneId") and body["zoneId"] not in {z["id"] for z in sim.zones}:
+            raise HTTPException(400, "Unknown zoneId")
+        accept("PUT", S + "/networks/{networkId}", request, x_api_key, siteId, body)
+        old_zone = target.get("zoneId")
+        for k in net_fields:
+            if k in body:
+                target[k] = copy.deepcopy(body[k])
+            else:
+                target.pop(k, None)
+        if "put_alters_other_field" in sim.faults:
+            sim.faults.discard("put_alters_other_field")
+            target["mdnsForwardingEnabled"] = not target.get("mdnsForwardingEnabled")
+        if target.get("zoneId") != old_zone:  # the zone lists follow the network's zone
+            for z in sim.zones:
+                ids = [i for i in z["networkIds"] if i != networkId]
+                z["networkIds"] = ids + ([networkId] if z["id"] == target["zoneId"] else [])
+        return copy.deepcopy(target)
+
+    @app.get(prefix + S + "/firewall/zones/{zoneId}")
+    def firewall_zone(request: Request, siteId: str, zoneId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        gate(request, "GET", S + "/firewall/zones/{firewallZoneId}", x_api_key)
+        site(siteId)
+        return find(sim.zones, zoneId)
+
+    @app.put(prefix + S + "/firewall/zones/{zoneId}")
+    async def put_zone(request: Request, siteId: str, zoneId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if set(body) != {"name", "networkIds"}:
+            raise HTTPException(400, "Body must be exactly name and networkIds")
+        target = next((z for z in sim.zones if z["id"] == zoneId), None)
+        if target is None:
+            raise HTTPException(404, "Not Found")
+        if target["metadata"]["origin"] != "USER_DEFINED":
+            raise HTTPException(400, "System zones cannot be updated")
+        accept("PUT", S + "/firewall/zones/{firewallZoneId}", request, x_api_key, siteId, body)
+        target["name"], target["networkIds"] = body["name"], list(body["networkIds"])
         return copy.deepcopy(target)
 
     # The published Update Firewall Policy schema (10.6.106): everything GET returns except id, index and metadata.

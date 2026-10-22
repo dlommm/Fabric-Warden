@@ -9,7 +9,7 @@ import { useRouter } from "next/navigation";
 import { Dialog } from "radix-ui";
 import { type ReactNode, useState } from "react";
 import { Button, buttonClass } from "@/components/ui/button";
-import { Field, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Notice } from "@/components/ui/layout-bits";
 import { StateLabel, type Tone } from "@/components/ui/signs";
 import { ApiError, get, post } from "@/lib/api";
@@ -75,9 +75,18 @@ export function useCanPropose() {
   return moduleEnabled("change-engine") && can("changes:propose");
 }
 
+export interface ChangeChoice {
+  operation: ChangeRequest["operation"];
+  label: string;
+  params?: Record<string, unknown>;
+  /** A value the person supplies, sent as params.value. */
+  value?: { label: string; initial?: string; options?: { value: string; label: string }[] };
+}
+
 /**
  * Propose a change. The dialog states what will be proposed and asks why; nothing is
  * written here. On success it opens the change, where it is reviewed, approved and applied.
+ * With `choices`, the dialog first asks which change to propose.
  */
 export function ProposeChange({
   operation,
@@ -87,7 +96,9 @@ export function ProposeChange({
   title,
   summary,
   trigger,
+  choices,
 }: {
+  choices?: ChangeChoice[];
   operation: ChangeRequest["operation"];
   targetId: string;
   /** The target's site; when its controller lacks the operation, say so instead of offering it. */
@@ -101,10 +112,19 @@ export function ProposeChange({
   const [open, setOpen] = useState(false);
   // One open change per target: show that one instead of offering a proposal the engine would refuse.
   const existing = useOpenChange(targetId);
-  const support = useOperationSupport()(operation, siteId);
+  const support = useOperationSupport()(choices?.[0]?.operation ?? operation, siteId);
   const [reason, setReason] = useState("");
+  const [pick, setPick] = useState(0);
+  const choice = choices?.[pick];
+  const [value, setValue] = useState(choice?.value?.initial ?? "");
   const m = useMutation({
-    mutationFn: () => post<ChangeRequest>("/api/changes", { operation, target_id: targetId, params, reason: reason.trim() }),
+    mutationFn: () =>
+      post<ChangeRequest>("/api/changes", {
+        operation: choice?.operation ?? operation,
+        target_id: targetId,
+        params: choice ? { ...choice.params, ...(choice.value ? { value } : {}) } : params,
+        reason: reason.trim(),
+      }),
     onSuccess: (cr) => {
       setOpen(false);
       router.push(`/changes/${cr.id}`);
@@ -134,13 +154,38 @@ export function ProposeChange({
               m.mutate();
             }}
           >
+            {choices && (
+              <fieldset className="flex flex-col gap-1">
+                <legend className="mb-1 text-sm font-semibold">Change</legend>
+                {choices.map((c, i) => (
+                  <label key={c.label} className="flex items-center gap-2">
+                    <input type="radio" name="change-choice" className="size-4 accent-[var(--accent)]" checked={pick === i} onChange={() => { setPick(i); setValue(c.value?.initial ?? ""); }} />
+                    {c.label}
+                  </label>
+                ))}
+              </fieldset>
+            )}
+            {choice?.value && (
+              <Field label={choice.value.label}>
+                {(p) =>
+                  choice.value?.options ? (
+                    <Select {...p} value={value} onChange={(e) => setValue(e.target.value)}>
+                      <option value="" disabled>Choose…</option>
+                      {choice.value.options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </Select>
+                  ) : (
+                    <Input {...p} value={value} maxLength={64} onChange={(e) => setValue(e.target.value)} />
+                  )
+                }
+              </Field>
+            )}
             <Field label="Why" hint="Recorded with the change and in the audit trail">
               {(p) => <Textarea {...p} className="min-h-20" maxLength={2000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What this fixes or enables" />}
             </Field>
             {m.error && <Notice tone="crit" title="Couldn't propose this change">{m.error instanceof ApiError ? m.error.message : "The request failed."}</Notice>}
             <div className="flex justify-end gap-2">
               <Dialog.Close className={buttonClass("secondary")}>Cancel</Dialog.Close>
-              <Button type="submit" variant="primary" loading={m.isPending}>Propose change</Button>
+              <Button type="submit" variant="primary" loading={m.isPending} disabled={!!choice?.value && !value.trim()}>Propose change</Button>
             </div>
           </form>
         </Dialog.Content>

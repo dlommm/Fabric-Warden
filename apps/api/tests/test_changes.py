@@ -313,3 +313,77 @@ async def test_operation_support_follows_the_controller_version(changes, owner, 
     sup = (await owner.get("/api/changes/operations")).json()["support"][demo["id"]]
     assert sup["firewall_policy.set_enabled"] == {"supported": False, "min_version": "10.1.84"}
     assert sup["device.restart"]["supported"] is True
+
+
+# -- 6c: network and zone edits -----------------------------------------------------------------
+
+
+async def _network(owner, name: str) -> dict:
+    return next(n for n in (await owner.get("/api/inventory/networks")).json()["items"] if n["name"] == name)
+
+
+async def _apply(owner, cr: dict) -> dict:
+    await owner.post(f"/api/changes/{cr['id']}/approve", json={"acknowledge_protected": True})
+    return (await owner.post(f"/api/changes/{cr['id']}/apply")).json()
+
+
+async def test_network_rename_and_internet_access(changes, owner, demo):
+    sim = changes
+    await _allow_changes(owner, demo["id"])
+    iot = await _network(owner, "IoT")
+    original = dict(next(n for n in sim.networks if n["name"] == "IoT"))
+
+    cr = await _propose(owner, "network.rename", iot["id"], value="IoT devices")
+    assert cr["risk"] == "low" and cr["diff"][0] == {"field": "Name", "before": "“IoT”", "after": "“IoT devices”"}
+    assert (await _apply(owner, cr))["status"] == "succeeded"
+    put = sim.writes[-1]
+    assert put["method"] == "PUT" and not {"id", "default", "metadata"} & set(put["body"]) and put["body"]["name"] == "IoT devices"
+
+    cr = await _propose(owner, "network.set_internet_access", iot["id"], value=False)
+    assert cr["title"] == "Block internet access for “IoT devices”" and cr["risk"] == "medium"
+    assert (await _apply(owner, cr))["status"] == "succeeded"
+    now = next(n for n in sim.networks if n["id"] == original["id"])
+    assert now["internetAccessEnabled"] is False and now["ipv4Configuration"] == original["ipv4Configuration"]
+
+    sim.faults.add("put_alters_other_field")
+    cr = await _propose(owner, "network.set_isolation", iot["id"], value=True)
+    out = await _apply(owner, cr)
+    assert out["status"] == "reverted" and any("also changed mdnsForwardingEnabled" in e["text"] for e in out["evidence"])
+    assert next(n for n in sim.networks if n["id"] == original["id"])["isolationEnabled"] is False
+
+
+async def test_move_network_zone_and_protected_default(changes, owner, demo):
+    sim = changes
+    await _allow_changes(owner, demo["id"])
+    zones = {z["name"]: z for z in (await owner.get("/api/inventory/firewall")).json()["zones"]}
+    cams = await _network(owner, "Cameras")
+    ext_zone_external = next(z["id"] for z in sim.zones if z["name"] == "External")
+    servers_zone_external = next(z["id"] for z in sim.zones if z["name"] == "Servers")
+    bad = await owner.post(
+        "/api/changes", json={"operation": "network.move_zone", "target_id": cams["id"], "params": {"value": ext_zone_external}}
+    )
+    assert bad.status_code == 409 and "External" in bad.json()["detail"]
+    cr = await _propose(owner, "network.move_zone", cams["id"], value=servers_zone_external)
+    assert cr["risk"] == "high" and cr["diff"][0]["before"] == "IoT" and cr["diff"][0]["after"] == "Servers"
+    assert (await _apply(owner, cr))["status"] == "succeeded"
+    cam_id = next(n["id"] for n in sim.networks if n["name"] == "Cameras")
+    assert cam_id in next(z for z in sim.zones if z["name"] == "Servers")["networkIds"]
+    assert cam_id not in next(z for z in sim.zones if z["name"] == "IoT")["networkIds"]
+    assert zones  # inventory zones listed
+
+    default = await _network(owner, "Default")
+    cr = await _propose(owner, "network.set_internet_access", default["id"], value=False)
+    assert cr["protected"] is True and cr["risk"] == "high"
+
+
+async def test_zone_rename_only_for_custom_zones(changes, owner, demo):
+    sim = changes
+    await _allow_changes(owner, demo["id"])
+    zones = {z["name"]: z for z in (await owner.get("/api/inventory/firewall")).json()["zones"]}
+    r = await owner.post(
+        "/api/changes", json={"operation": "zone.rename", "target_id": zones["Internal"]["id"], "params": {"value": "Home"}}
+    )
+    assert r.status_code == 409 and "Built-in zones" in r.json()["detail"]
+    cr = await _propose(owner, "zone.rename", zones["IoT"]["id"], value="Things")
+    assert (await _apply(owner, cr))["status"] == "succeeded"
+    assert sim.writes[-1]["body"]["name"] == "Things" and set(sim.writes[-1]["body"]) == {"name", "networkIds"}

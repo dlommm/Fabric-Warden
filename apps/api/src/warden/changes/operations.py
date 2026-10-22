@@ -10,6 +10,7 @@ names the capability that must be supported at the controller's version.
 
 from __future__ import annotations
 
+import ipaddress
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import Any, ClassVar
@@ -18,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from warden.integrations.unifi.client import UniFiNetworkClient, WriteAuthorization
-from warden.models import Client, Controller, Device, FirewallPolicy, FirewallZone, Port, Site
+from warden.models import Client, Controller, Device, FirewallPolicy, FirewallZone, Network, Port, Site
 
 
 class ChangeRefused(Exception):
@@ -497,4 +498,320 @@ class PowerCyclePort(Operation):
         return Check(False, observed=observed, note="Waiting for PoE to come back")
 
 
-OPERATIONS: dict[str, Operation] = {op.id: op for op in (SetPolicyLogging(), SetPolicyEnabled(), RestartDevice(), PowerCyclePort())}
+# -- 6c: generic checked read-modify-write for one field -----------------------------------
+
+
+class FieldEdit(Operation):
+    """Change one top-level field of an object updated by a full-replacement PUT.
+
+    Sends the object exactly as just re-read (minus `server_fields`, which the published PUT
+    schema does not list) with one field changed; verification requires that field to read
+    back as expected and every other field to be unchanged, else the original is put back.
+    """
+
+    reversible = True
+    server_fields: ClassVar[tuple[str, ...]] = ("id", "metadata")
+    field: ClassVar[str]
+    label: ClassVar[str]
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        return params["value"]
+
+    def show(self, v: Any) -> str:
+        return "On" if v is True else "Off" if v is False else str(v)
+
+    async def fetch(self, api: UniFiNetworkClient, t: Target) -> dict[str, Any]:
+        raise NotImplementedError
+
+    async def put(self, api: UniFiNetworkClient, t: Target, body: dict[str, Any], auth: WriteAuthorization) -> Any:
+        raise NotImplementedError
+
+    def body(self, obj: dict[str, Any]) -> dict[str, Any]:
+        return {k: v for k, v in obj.items() if k not in self.server_fields}
+
+    async def read(self, api: UniFiNetworkClient, t: Target) -> dict[str, Any]:
+        return await self.fetch(api, t)
+
+    def drifted(self, before: dict[str, Any], now: dict[str, Any]) -> list[str]:
+        return sorted(k for k in (set(before) | set(now)) - {"metadata"} if before.get(k) != now.get(k))
+
+    def plan(self, before: dict[str, Any], params: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        new = self.new_value(params)
+        if before.get(self.field) == new:
+            raise ChangeRefused(f"{self.label} is already {self.show(new)}")
+        return {self.field: new}, [
+            {"field": self.label, "before": self.show(before.get(self.field)), "after": self.show(new)},
+            {
+                "field": "Everything else",
+                "before": "As read from the controller",
+                "after": "Unchanged (checked after the write)",
+                "unchanged": True,
+            },
+        ]
+
+    async def execute(self, api: UniFiNetworkClient, t: Target, params: dict[str, Any], auth: WriteAuthorization) -> Any:
+        current = t.current if t.current is not None else await self.fetch(api, t)
+        return await self.put(api, t, {**self.body(current), self.field: self.new_value(params)}, auth)
+
+    async def restore(
+        self, api: UniFiNetworkClient, t: Target, before: dict[str, Any], params: dict[str, Any], auth: WriteAuthorization
+    ) -> Any:
+        return await self.put(api, t, self.body(before), auth)
+
+    def check(self, before: dict[str, Any], expected: dict[str, Any], now: dict[str, Any], progress: dict[str, Any]) -> Check:
+        keys = (set(before) | set(now)) - {self.field, "metadata", *self.server_fields}
+        moved = sorted(k for k in keys if before.get(k) != now.get(k))
+        observed = {self.field: now.get(self.field), "other_fields_changed": moved}
+        if now.get(self.field) != expected[self.field]:
+            return Check(True, False, observed, "The controller accepted the request but still reports the old value")
+        if moved:
+            return Check(True, False, observed, f"The controller also changed {', '.join(moved)}")
+        return Check(True, True, observed, f"{self.label} as expected; every other field unchanged")
+
+    def inverse(self, params: dict[str, Any], before: dict[str, Any]) -> dict[str, Any] | None:
+        return {**params, "value": before.get(self.field)}
+
+
+def _text(params: dict[str, Any], what: str) -> str:
+    v = params.get("value")
+    if not isinstance(v, str) or not v.strip() or len(v.strip()) > 64:
+        raise ChangeRefused(f"Give the {what} a name of 1 to 64 characters")
+    return v.strip()
+
+
+def _flag(params: dict[str, Any]) -> bool:
+    if not isinstance(params.get("value"), bool):
+        raise ChangeRefused("Say whether it should be on or off")
+    return params["value"]
+
+
+class NetworkEdit(FieldEdit):
+    target_type = "network"
+    capability = "network.networks.update"
+    server_fields = ("id", "default", "metadata")
+    gateway_only: ClassVar[bool] = False
+
+    async def resolve(self, db: AsyncSession, target_id: str, params: dict[str, Any]) -> Target:
+        n = await db.get(Network, target_id)
+        if n is None or not n.present:
+            raise ChangeRefused("That network is not in the current inventory")
+        if self.gateway_only and n.management != "GATEWAY":
+            raise ChangeRefused("Only gateway-managed networks have this setting")
+        controller, site = await _controller_site(db, n.site_id)
+        self.new_value(params)  # validate early
+        return Target(controller, site, self.target_type, n.id, n.external_id, n.name, n.is_demo)
+
+    async def fetch(self, api: UniFiNetworkClient, t: Target) -> dict[str, Any]:
+        return await api.network(t.site.external_id, t.external_id)
+
+    async def put(self, api: UniFiNetworkClient, t: Target, body: dict[str, Any], auth: WriteAuthorization) -> Any:
+        return await api.put_network(t.site.external_id, t.external_id, body, authorization=auth)
+
+    async def carries_controller(self, db: AsyncSession, t: Target, before: dict[str, Any]) -> bool:
+        """The controller's own address is in this network's subnet (only knowable for an IP address URL)."""
+        host = (t.controller.base_url.split("//", 1)[-1].split("/", 1)[0]).rsplit(":", 1)[0].strip("[]")
+        cfg = before.get("ipv4Configuration") or {}
+        try:
+            net = ipaddress.ip_network(f"{cfg.get('hostIpAddress')}/{cfg.get('prefixLength')}", strict=False)
+            return ipaddress.ip_address(host) in net
+        except ValueError:
+            return False
+
+    async def common(self, db: AsyncSession, t: Target, before: dict[str, Any]) -> tuple[list[str], bool]:
+        reasons: list[str] = []
+        protected = False
+        if before.get("default"):
+            reasons.append("This is the site's default network.")
+            protected = True
+        if await self.carries_controller(db, t, before):
+            reasons.append("The controller is reached through this network; a mistake can cut Fabric Warden off from it.")
+            protected = True
+        return reasons, protected
+
+
+class RenameNetwork(NetworkEdit):
+    id = "network.rename"
+    field = "name"
+    label = "Name"
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        return _text(params, "network")
+
+    def show(self, v: Any) -> str:
+        return f"“{v}”"
+
+    def title(self, t: Target, params: dict[str, Any]) -> str:
+        return f"Rename network “{t.label}” to “{self.new_value(params)}”"
+
+    async def assess(self, db: AsyncSession, t: Target, before: dict[str, Any], params: dict[str, Any]) -> Assessment:
+        return Assessment(
+            "low",
+            ["Only the label changes; addressing, VLAN and policies are untouched."],
+            ["Fabric Warden pages, UniFi and anything that matches on the network's name see the new name."],
+            recovery="Reversible: rename it back with a new change; a failed check restores the original automatically.",
+        )
+
+
+class SetInternetAccess(NetworkEdit):
+    id = "network.set_internet_access"
+    field = "internetAccessEnabled"
+    label = "Internet access"
+    gateway_only = True
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        return _flag(params)
+
+    def title(self, t: Target, params: dict[str, Any]) -> str:
+        return f"{'Allow' if self.new_value(params) else 'Block'} internet access for “{t.label}”"
+
+    async def assess(self, db: AsyncSession, t: Target, before: dict[str, Any], params: dict[str, Any]) -> Assessment:
+        reasons, protected = await self.common(db, t, before)
+        on = self.new_value(params)
+        risk = "high" if protected else "medium"
+        if on:
+            reasons.insert(0, "Devices on this network can reach the internet again, subject to firewall policies.")
+        else:
+            reasons.insert(
+                0, "Every device on this network loses internet access; traffic to other local networks follows the firewall as before."
+            )
+        return Assessment(
+            risk,
+            reasons,
+            ["Devices that phone home for updates, time or cloud control stop working while blocked."] if not on else [],
+            protected,
+            "Reversible: switch it back with a new change; a failed check restores the original automatically.",
+        )
+
+
+class SetIsolation(NetworkEdit):
+    id = "network.set_isolation"
+    field = "isolationEnabled"
+    label = "Network isolation"
+    gateway_only = True
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        return _flag(params)
+
+    def title(self, t: Target, params: dict[str, Any]) -> str:
+        return f"Turn {'on' if self.new_value(params) else 'off'} isolation for “{t.label}”"
+
+    async def assess(self, db: AsyncSession, t: Target, before: dict[str, Any], params: dict[str, Any]) -> Assessment:
+        reasons, protected = await self.common(db, t, before)
+        on = self.new_value(params)
+        reasons.insert(
+            0,
+            "Devices on this network can no longer reach other local networks."
+            if on
+            else "Devices on this network can reach other local networks again, subject to firewall policies.",
+        )
+        return Assessment(
+            "high" if protected or not on else "medium",
+            reasons,
+            [],
+            protected,
+            "Reversible: switch it back with a new change; a failed check restores the original automatically.",
+        )
+
+
+class MoveNetworkZone(NetworkEdit):
+    id = "network.move_zone"
+    field = "zoneId"
+    label = "Firewall zone"
+    gateway_only = True
+    _zones: dict[str, str]
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        v = params.get("value")
+        if not isinstance(v, str) or not v:
+            raise ChangeRefused("Pick the zone to move the network to")
+        return v
+
+    def show(self, v: Any) -> str:
+        return getattr(self, "_zones", {}).get(v, str(v))
+
+    async def resolve(self, db: AsyncSession, target_id: str, params: dict[str, Any]) -> Target:
+        t = await super().resolve(db, target_id, params)
+        zones = list(await db.scalars(select(FirewallZone).where(FirewallZone.site_id == t.site.id, FirewallZone.present.is_(True))))
+        self._zones = {z.external_id: z.name for z in zones}
+        # The UI sends Fabric Warden's zone id; the controller needs its own.
+        by_platform = {z.id: z.external_id for z in zones}
+        if params["value"] in by_platform:
+            params["value"] = by_platform[params["value"]]
+        dest = next((z for z in zones if z.external_id == params["value"]), None)
+        if dest is None:
+            raise ChangeRefused("That zone is not on this network's site")
+        if dest.name.lower() in ("external", "gateway", "vpn"):
+            raise ChangeRefused(f"Networks cannot be moved into the {dest.name} zone")
+        return t
+
+    def title(self, t: Target, params: dict[str, Any]) -> str:
+        return f"Move network “{t.label}” to zone {self.show(params['value'])}"
+
+    async def assess(self, db: AsyncSession, t: Target, before: dict[str, Any], params: dict[str, Any]) -> Assessment:
+        reasons, protected = await self.common(db, t, before)
+        src, dst = self.show(before.get("zoneId")), self.show(params["value"])
+        reasons.insert(0, f"Traffic to and from this network stops following the {src} zone's policies and follows {dst}'s instead.")
+        return Assessment(
+            "high",
+            reasons,
+            ["Check the zone matrix on the Firewall page for what each pair allows before approving."],
+            protected,
+            "Reversible: move it back with a new change; a failed check restores the original automatically.",
+        )
+
+
+class RenameZone(FieldEdit):
+    id = "zone.rename"
+    target_type = "zone"
+    capability = "network.firewall.zones.update"
+    field = "name"
+    label = "Name"
+
+    def new_value(self, params: dict[str, Any]) -> Any:
+        return _text(params, "zone")
+
+    def show(self, v: Any) -> str:
+        return f"“{v}”"
+
+    async def resolve(self, db: AsyncSession, target_id: str, params: dict[str, Any]) -> Target:
+        z = await db.get(FirewallZone, target_id)
+        if z is None or not z.present:
+            raise ChangeRefused("That zone is not in the current inventory")
+        if z.origin != "USER_DEFINED":
+            raise ChangeRefused("Built-in zones are managed by UniFi; only custom zones can be renamed")
+        self.new_value(params)
+        controller, site = await _controller_site(db, z.site_id)
+        return Target(controller, site, self.target_type, z.id, z.external_id, z.name, z.is_demo)
+
+    def title(self, t: Target, params: dict[str, Any]) -> str:
+        return f"Rename zone “{t.label}” to “{self.new_value(params)}”"
+
+    async def fetch(self, api: UniFiNetworkClient, t: Target) -> dict[str, Any]:
+        return await api.firewall_zone(t.site.external_id, t.external_id)
+
+    async def put(self, api: UniFiNetworkClient, t: Target, body: dict[str, Any], auth: WriteAuthorization) -> Any:
+        return await api.put_firewall_zone(t.site.external_id, t.external_id, body, authorization=auth)
+
+    async def assess(self, db: AsyncSession, t: Target, before: dict[str, Any], params: dict[str, Any]) -> Assessment:
+        return Assessment(
+            "low",
+            ["Only the label changes; member networks and policies are untouched."],
+            [],
+            recovery="Reversible: rename it back with a new change.",
+        )
+
+
+OPERATIONS: dict[str, Operation] = {
+    op.id: op
+    for op in (
+        SetPolicyLogging(),
+        SetPolicyEnabled(),
+        RestartDevice(),
+        PowerCyclePort(),
+        RenameNetwork(),
+        SetInternetAccess(),
+        SetIsolation(),
+        MoveNetworkZone(),
+        RenameZone(),
+    )
+}

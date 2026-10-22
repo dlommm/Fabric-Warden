@@ -129,6 +129,7 @@ export interface NetworkRow {
   dhcp_pool_size: number | null;
   active_clients: number;
   zone: { id: string; name: string } | null;
+  site_id?: string;
   provenance: Provenance;
 }
 
@@ -1219,7 +1220,16 @@ export interface ChangeRequest {
   id: string;
   number: number;
   ref: string;
-  operation: "firewall_policy.set_logging" | "firewall_policy.set_enabled" | "device.restart" | "port.power_cycle";
+  operation:
+    | "firewall_policy.set_logging"
+    | "firewall_policy.set_enabled"
+    | "device.restart"
+    | "port.power_cycle"
+    | "network.rename"
+    | "network.set_internet_access"
+    | "network.set_isolation"
+    | "network.move_zone"
+    | "zone.rename";
   title: string;
   reason: string;
   target: { type: string; id: string; label: string; params: Record<string, unknown> };

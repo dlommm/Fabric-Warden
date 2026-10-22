@@ -380,6 +380,7 @@ async def list_networks(db: DB, principal: Reader) -> dict:
                 "dhcp_pool_size": pool,
                 "active_clients": counts.get(n.id, 0),
                 "zone": {"id": zone.id, "name": zone.name} if zone else None,
+                "site_id": n.site_id,
                 "provenance": provenance(n),
             }
         )

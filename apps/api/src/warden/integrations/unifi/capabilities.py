@@ -69,6 +69,18 @@ CAPABILITIES: tuple[CapabilityDef, ...] = (
         write=True,
     ),
     CapabilityDef(
+        "network.networks.update",
+        "Edit a network (name, internet access, isolation, zone)",
+        (("GET", S + "/networks/{networkId}"), ("PUT", S + "/networks/{networkId}")),
+        write=True,
+    ),
+    CapabilityDef(
+        "network.firewall.zones.update",
+        "Rename a custom firewall zone",
+        (("GET", S + "/firewall/zones/{firewallZoneId}"), ("PUT", S + "/firewall/zones/{firewallZoneId}")),
+        write=True,
+    ),
+    CapabilityDef(
         "network.firewall.policies.update",
         "Enable or disable a firewall policy",
         (("GET", S + "/firewall/policies/{firewallPolicyId}"), ("PUT", S + "/firewall/policies/{firewallPolicyId}")),
