@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { AiAnswer, AiTag, AUTONOMY_WORD, money, RunState, Transcript } from "@/components/ai";
+import { AiAnswer, AiTag, AUTONOMY_WORD, money, RunProgress, RunState, RunTrigger, TRIGGER_WORD, Transcript } from "@/components/ai";
 import { RiskLabel } from "@/components/changes";
 import { KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { DemoTag, StateLabel } from "@/components/ui/signs";
@@ -16,6 +16,8 @@ const SUBJECT_HREF: Record<string, (v: string) => string> = {
   client_id: (v) => `/inventory/clients/${v}`,
   alert_id: () => "/alerts",
   site_id: () => "/firewall",
+  case_id: () => "/soc",
+  change_id: (v) => `/changes/${v}`,
 };
 
 function BackLink() {
@@ -31,7 +33,7 @@ export default function RunPage() {
   const q = useQuery({
     queryKey: ["ai", "runs", id],
     queryFn: () => get<AiRun>(`/api/ai/runs/${id}`),
-    refetchInterval: (query) => (query.state.data?.status === "running" ? 3_000 : false),
+    refetchInterval: (query) => (query.state.data?.status === "running" ? 1_500 : false),
   });
   if (q.error) {
     return (
@@ -63,6 +65,7 @@ export default function RunPage() {
           <span className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
             <span className="font-mono text-xs font-bold">{r.ref}</span>
             <RunState status={r.status} />
+            <RunTrigger trigger={r.trigger} />
             <AiTag />
             {r.is_demo && <DemoTag />}
           </span>
@@ -70,6 +73,7 @@ export default function RunPage() {
       />
       <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-[var(--gap)]">
+          <RunProgress run={r} />
           {r.status !== "succeeded" && r.error && (
             <Notice tone={r.status === "failed" ? "crit" : "warn"} title={r.status === "failed" ? "The run failed" : "The run was stopped"}>
               {r.error}
@@ -88,7 +92,9 @@ export default function RunPage() {
                 ))}
               </ul>
               <p className="mt-3 max-w-[70ch] text-sm text-ink-3">
-                The agent only proposed these. Each waits in the Change Approval queue; nothing is sent to the controller until a person approves and applies it.
+                {r.proposals.some((p) => p.apply_on_approval)
+                  ? "The agent only proposed these, at “act after approval”. Each waits in the Change Approval queue; the person who approves one also applies it, in their name, after the usual re-read. The agent can do neither."
+                  : "The agent only proposed these. Each waits in the Change Approval queue; nothing is sent to the controller until a person approves and applies it."}
               </p>
             </Panel>
           )}
@@ -127,6 +133,7 @@ export default function RunPage() {
             <KeyValue
               items={[
                 ["Asked by", r.requested_by],
+                ["Started from", TRIGGER_WORD[r.trigger]],
                 ["Autonomy", AUTONOMY_WORD[r.autonomy]],
                 ["Provider", r.provider_name || "—"],
                 ["Model", <span key="m" className="font-mono text-xs">{r.model}</span>],

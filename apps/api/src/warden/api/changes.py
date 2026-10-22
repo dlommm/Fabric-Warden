@@ -66,6 +66,7 @@ def _out(cr: ChangeRequest, controller: Controller | None = None) -> dict[str, A
         "is_demo": cr.is_demo,
         "batch_id": cr.batch_id,
         "batch_position": cr.batch_position,
+        "apply_on_approval": cr.apply_on_approval,
     }
 
 
@@ -178,6 +179,8 @@ async def get_change(cid: str, db: DB, principal: Reader) -> dict:
 class DecideIn(BaseModel):
     note: str = Field(default="", max_length=2000)
     acknowledge_protected: bool = False
+    # Only for a change proposed by an agent at "act after approval": false approves it without applying it yet.
+    apply: bool | None = None
 
 
 @router.post("/{cid}/approve")
@@ -189,6 +192,13 @@ async def approve(cid: str, body: DecideIn, db: DB, state: State, principal: App
         raise HTTPException(status.HTTP_403_FORBIDDEN, str(e)) from e
     except ChangeRefused as e:
         raise _refused(e) from e
+    if not (cr.apply_on_approval and body.apply is not False):
+        return await _full(db, cr)
+    # "Act after approval": the person who approved applies it now, under their own name, through the engine.
+    try:
+        await engine.apply(db, state, cr, principal.actor)
+    except ChangeRefused as e:
+        return {**await _full(db, cr), "apply_error": str(e)}
     return await _full(db, cr)
 
 

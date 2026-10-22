@@ -764,22 +764,28 @@ AI_AGENTS = ModuleManifest(
     name="AI Agent Center",
     category=C.AI,
     description=(
-        "Specialised read-only network agents (explain an alert, why a client is slow, firewall review) that answer from "
-        "Fabric Warden's own data through a fixed, permission-scoped tool set, with autonomy levels, budgets, kill switches "
-        "and every run kept as evidence."
+        "Specialised network agents (explain an alert, why a client is slow, firewall review, Wi-Fi and RF, capacity and IP "
+        "plan, compliance and security, SOC case summary, change explainer) and an “Ask the network” box. They answer from "
+        "Fabric Warden's own data through a fixed, permission-scoped read-only tool set, with autonomy levels, budgets, kill "
+        "switches, background and scheduled runs, reviewed agent notes, and every run kept as evidence."
     ),
     maturity=Maturity.AVAILABLE,
     roadmap_phase=7,
     requires=["core", "inventory", "ai-providers"],
-    optional=["monitoring", "firewall", "logs", "change-engine"],
+    optional=["monitoring", "firewall", "logs", "change-engine", "ipam", "compliance", "soc", "digital-twin"],
     permissions=["ai:use", "ai:manage"],
-    nav=[NavEntry(label="Agent Center", href="/ai/agents", icon="sparkles", section="AI")],
+    nav=[
+        NavEntry(label="Agent Center", href="/ai/agents", icon="sparkles", section="AI"),
+        NavEntry(label="Ask the network", href="/ai/ask", icon="message-square", section="AI"),
+    ],
+    jobs=[JobDecl(id="ai-agents.schedules", title="Run scheduled AI agents", default_interval_seconds=60)],
     resources=ResourceEstimate(memory_mb=32),
-    data_ownership=["ai_agent_configs", "ai_agent_runs"],
-    uninstall_behavior="Disabling stops agents from running; past runs and their evidence are kept.",
+    data_ownership=["ai_agent_configs", "ai_agent_runs", "ai_agent_schedules", "ai_agent_notes"],
+    uninstall_behavior="Disabling stops agents and schedules from running; past runs, notes and their evidence are kept.",
     warnings=[
-        "The highest autonomy in this release is “propose”: an agent can put a change into the Change Approval queue and "
-        "nothing more. People approve and apply. Answers are AI-generated and labelled as such."
+        "The highest autonomy in this release is “act after approval”: an agent can put a change into the Change Approval "
+        "queue, and for an agent at that level the approving person's approval also applies it. Agents never approve or "
+        "apply anything themselves. Answers are AI-generated and labelled as such."
     ],
 )
 

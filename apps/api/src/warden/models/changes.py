@@ -59,6 +59,9 @@ class ChangeRequest(IdMixin, TimestampMixin, Base):
     # Set when the change is one item of a bulk operation; it is then decided and applied with its batch.
     batch_id: Mapped[str | None] = mapped_column(ForeignKey("change_batches.id", ondelete="SET NULL"), nullable=True, index=True)
     batch_position: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Proposed by an agent at "act after approval": the approving person's approval also applies it, in the same
+    # request and under that person's name, through this engine. The agent itself never approves or applies.
+    apply_on_approval: Mapped[bool] = mapped_column(Boolean, default=False)
 
 
 class ChangeBatch(IdMixin, TimestampMixin, Base):

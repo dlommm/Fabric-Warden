@@ -3,14 +3,19 @@
 // AI vocabulary: the AI-generated plate, run states, the autonomy selector, the
 // answer panel and the run transcript. AI output is never presented as a fact
 // of the network: it is framed, labelled and followed by the evidence it used.
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Bot } from "lucide-react";
+import { Bot, Square } from "lucide-react";
 import Link from "next/link";
 import { Markdown } from "@/components/markdown";
 import { PctBar } from "@/components/servers";
-import { StateLabel, type Tone } from "@/components/ui/signs";
+import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/field";
+import { Chip, StateLabel, type Tone } from "@/components/ui/signs";
+import { get, post } from "@/lib/api";
 import { dateTime } from "@/lib/format";
-import type { AiAutonomy, AiProviderKind, AiRun, AiRunStatus, AiTranscriptEntry } from "@/lib/types";
+import { useSession } from "@/lib/session";
+import type { AiAutonomy, AiProviderKind, AiRun, AiRunStatus, AiRunTrigger, AiSubjectKind, AiTranscriptEntry, AlertItem, ClientRow } from "@/lib/types";
 
 export const PROVIDER_KIND: Record<AiProviderKind, string> = {
   anthropic: "Anthropic Claude",
@@ -24,7 +29,7 @@ const RUN_STATE: Record<AiRunStatus, [Tone, string]> = {
   succeeded: ["ok", "Answered"],
   failed: ["crit", "Failed"],
   budget_exceeded: ["warn", "Stopped: budget reached"],
-  stopped: ["warn", "Stopped by kill switch"],
+  stopped: ["warn", "Stopped"],
 };
 
 export function RunState({ status, className }: { status: AiRunStatus; className?: string }) {
@@ -45,13 +50,21 @@ export function AiTag({ className }: { className?: string }) {
   );
 }
 
-export const AUTONOMY_WORD: Record<AiAutonomy, string> = { off: "Off", explain: "Explain", propose: "Propose" };
+export const AUTONOMY_WORD: Record<AiAutonomy, string> = { off: "Off", explain: "Explain", propose: "Propose", act_with_approval: "Act after approval" };
 
 const AUTONOMY_HELP: Record<AiAutonomy, string> = {
   off: "The agent cannot run.",
   explain: "Reads Fabric Warden's data and answers. Has no tool that changes anything.",
   propose: "Can also put a change into the Change Approval queue. People approve and apply it.",
+  act_with_approval: "Proposes like Propose; when a person approves one of its changes, that approval also applies it, in their name. The agent never approves or applies.",
 };
+
+export const TRIGGER_WORD: Record<AiRunTrigger, string> = { manual: "Run by a person", schedule: "Scheduled", ask: "Ask the network" };
+
+/** How a run started, as a chip: the run's own words, never a state colour. */
+export function RunTrigger({ trigger }: { trigger: AiRunTrigger }) {
+  return trigger === "manual" ? null : <Chip>{TRIGGER_WORD[trigger]}</Chip>;
+}
 
 /** Built levels as a radio strip; levels above the agent's ceiling are disabled with the reason. */
 export function AutonomyPicker({
@@ -67,11 +80,11 @@ export function AutonomyPicker({
   disabled?: boolean;
   id: string;
 }) {
-  const levels: AiAutonomy[] = ["off", "explain", "propose"];
+  const levels: AiAutonomy[] = ["off", "explain", "propose", "act_with_approval"];
   const allowed = levels.slice(0, levels.indexOf(max) + 1);
   return (
     <div className="flex flex-col gap-1.5">
-      <div role="radiogroup" aria-labelledby={`${id}-l`} aria-describedby={`${id}-d`} className="inline-flex self-start rounded-[var(--radius)] border border-rule-strong bg-surface p-0.5">
+      <div role="radiogroup" aria-labelledby={`${id}-l`} aria-describedby={`${id}-d`} className="inline-flex flex-wrap self-start rounded-[var(--radius)] border border-rule-strong bg-surface p-0.5">
         {levels.map((l) => {
           const on = l === value;
           const ok = allowed.includes(l) && !disabled;
@@ -229,6 +242,73 @@ export function Transcript({ items }: { items: AiTranscriptEntry[] }) {
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * While a run is in progress: what it is doing now, read from its growing transcript, and a stop button for the person
+ * who started it or an AI manager. The page polls the run; the stop takes effect before the next model call.
+ */
+export function RunProgress({ run }: { run: AiRun }) {
+  const { can, me } = useSession();
+  const qc = useQueryClient();
+  const stop = useMutation({
+    mutationFn: () => post<AiRun>(`/api/ai/runs/${run.id}/cancel`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["ai"] }),
+  });
+  if (run.status !== "running") return null;
+  const t = run.transcript ?? [];
+  const last = t[t.length - 1];
+  const turns = t.filter((e) => e.kind === "model").length;
+  const calls = t.filter((e) => e.kind === "tool").length;
+  const doing =
+    run.cancel_requested || stop.isSuccess
+      ? "Stopping before the next model call…"
+      : !last || last.kind === "user" || last.kind === "system"
+        ? "Waiting for the model's first turn…"
+        : last.kind === "tool"
+          ? `Read ${last.name}; waiting for the model…`
+          : `Model turn ${turns}: calling ${last.tool_calls?.map((c) => c.name).join(", ") || "tools"}…`;
+  const mayStop = run.requested_by === me.username || can("ai:manage");
+  return (
+    <div role="status" aria-live="polite" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[var(--radius)] border border-rule bg-surface px-4 py-3">
+      <span aria-hidden className="size-2 animate-pulse rounded-[1px] bg-accent motion-reduce:animate-none" />
+      <span className="font-semibold">{doing}</span>
+      <span className="tabular text-sm text-ink-3">
+        {turns} model turn{turns === 1 ? "" : "s"} · {calls} tool call{calls === 1 ? "" : "s"} · {(run.input_tokens + run.output_tokens).toLocaleString()} tokens
+      </span>
+      {mayStop && (
+        <Button size="sm" variant="danger" className="ml-auto" icon={<Square />} loading={stop.isPending} disabled={run.cancel_requested || stop.isSuccess} onClick={() => stop.mutate()}>
+          Stop this run
+        </Button>
+      )}
+      {stop.error && <p className="w-full text-sm font-semibold text-crit">{(stop.error as Error).message}</p>}
+    </div>
+  );
+}
+
+/** Subject picker for an agent's subject field; each kind lists what Fabric Warden already knows. */
+export function SubjectSelect({ kind, value, onChange, id, required }: { kind: AiSubjectKind; value: string; onChange: (v: string) => void; id: string; required: boolean }) {
+  const alerts = useQuery({ queryKey: ["monitoring", "alerts"], queryFn: () => get<{ items: AlertItem[] }>("/api/monitoring/alerts"), enabled: kind === "alert" });
+  const clients = useQuery({ queryKey: ["inventory", "clients"], queryFn: () => get<{ items: ClientRow[] }>("/api/inventory/clients"), enabled: kind === "client" });
+  const named = useQuery({
+    queryKey: ["ai", "subjects", kind],
+    queryFn: () => get<{ items: { id: string; name: string; is_demo: boolean }[] }>(`/api/ai/subjects/${kind === "case" ? "cases" : kind === "change" ? "changes" : "sites"}`),
+    enabled: kind === "site" || kind === "case" || kind === "change",
+  });
+  const options: { id: string; label: string }[] =
+    kind === "alert"
+      ? (alerts.data?.items ?? []).map((x) => ({ id: x.id, label: `${x.rule ?? "Alert"} · ${x.label} (${x.state})` }))
+      : kind === "client"
+        ? (clients.data?.items ?? []).map((x) => ({ id: x.id, label: `${x.alias || x.name}${x.ip_address ? ` · ${x.ip_address}` : ""}` }))
+        : (named.data?.items ?? []).map((x) => ({ id: x.id, label: x.name }));
+  const loading = alerts.isLoading || clients.isLoading || named.isLoading;
+  const none = kind === "alert" ? "No active alerts" : kind === "case" ? "No security cases" : kind === "change" ? "No changes" : "Nothing to choose";
+  return (
+    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={loading}>
+      <option value="">{loading ? "Loading…" : required ? (options.length ? "Choose…" : none) : "All sites"}</option>
+      {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+    </Select>
   );
 }
 

@@ -172,10 +172,17 @@ function Actions({ c }: { c: ChangeRequest }) {
   const [note, setNote] = useState("");
   const [ack, setAck] = useState(false);
   const done = () => qc.invalidateQueries({ queryKey: ["changes"] });
+  const [applyError, setApplyError] = useState("");
+  const readOnly = c.controller?.write_mode !== "changes";
   const act = useMutation({
-    mutationFn: (what: "approve" | "reject" | "cancel" | "apply") => post<ChangeRequest>(`/api/changes/${c.id}/${what}`, what === "apply" ? undefined : { note: note.trim(), acknowledge_protected: ack }),
-    onSuccess: () => {
+    mutationFn: (what: "approve" | "approve-only" | "reject" | "cancel" | "apply") =>
+      post<ChangeRequest>(
+        `/api/changes/${c.id}/${what === "approve-only" ? "approve" : what}`,
+        what === "apply" ? undefined : { note: note.trim(), acknowledge_protected: ack, ...(c.apply_on_approval ? { apply: what === "approve" && !readOnly } : {}) },
+      ),
+    onSuccess: (r) => {
       setNote("");
+      setApplyError(r.apply_error ?? "");
       done();
     },
   });
@@ -189,7 +196,6 @@ function Actions({ c }: { c: ChangeRequest }) {
   const approver = can("changes:approve");
   const proposer = can("changes:propose");
   const mine = me.username === c.proposed_by;
-  const readOnly = c.controller?.write_mode !== "changes";
   const settings = useQuery({ queryKey: ["changes", "settings"], queryFn: () => get<ChangeSettings>("/api/changes/settings/current") });
   const needsSecond = !!settings.data?.require_second_person && mine;
   const expired = (c.status === "proposed" || c.status === "approved") && new Date(c.expires_at) < new Date();
@@ -215,6 +221,14 @@ function Actions({ c }: { c: ChangeRequest }) {
             I have read the protected-path warning and accept the impact
           </label>
         )}
+        {c.apply_on_approval && (
+          <Notice tone="warn" title={readOnly ? "Proposed to be applied on approval" : "Approving also applies it"}>
+            An AI agent at “act after approval” proposed this change.{" "}
+            {readOnly
+              ? "This controller is read-only, so approving only records the decision for now."
+              : "Approve and apply sends it to the controller straight away, in your name, after the usual re-read and drift check. Approve only keeps it waiting for Apply now."}
+          </Notice>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button
             variant="primary"
@@ -223,8 +237,13 @@ function Actions({ c }: { c: ChangeRequest }) {
             aria-describedby={c.protected && !ack ? `ack-hint-${c.id}` : undefined}
             onClick={() => act.mutate("approve")}
           >
-            Approve
+            {c.apply_on_approval && !readOnly ? "Approve and apply" : "Approve"}
           </Button>
+          {c.apply_on_approval && !readOnly && (
+            <Button loading={act.isPending && act.variables === "approve-only"} disabled={c.protected && !ack} onClick={() => act.mutate("approve-only")}>
+              Approve only
+            </Button>
+          )}
           <Button variant="danger" loading={act.isPending && act.variables === "reject"} onClick={() => act.mutate("reject")}>Reject</Button>
         </div>
         {c.protected && !ack && <p id={`ack-hint-${c.id}`} className="text-sm text-ink-3">Tick the acknowledgement above to approve.</p>}
@@ -237,6 +256,7 @@ function Actions({ c }: { c: ChangeRequest }) {
   } else if (c.status === "approved") {
     body = approver ? (
       <>
+        {applyError && <Notice tone="warn" title="Approved, not applied">{applyError}</Notice>}
         {readOnly ? (
           <Notice tone="info" title="This controller is read-only">An owner can allow changes on it on the <Link href="/changes" className="font-semibold text-accent hover:underline">Changes</Link> page.</Notice>
         ) : (

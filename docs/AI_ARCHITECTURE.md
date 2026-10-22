@@ -1,6 +1,6 @@
 # AI architecture
 
-**Status: Phase 7 implemented** (modules `ai-providers` and `ai-agents`, both optional). Tested only against in-process fake model servers; no real model endpoint has been called from tests or tooling. Advanced AI (Phase 8) and the MCP gateway (Phase 9) are not built.
+**Status: Phases 7 and 8 implemented** (modules `ai-providers` and `ai-agents`, both optional). Tested only against in-process fake model servers and the offline demo model; no real model endpoint has been called from tests or tooling, and the answer quality of real models is unevaluated. Phase 8 added five specialised agents and "Ask the network" ([AGENT_CATALOG.md](AGENT_CATALOG.md)), the "act after approval" level ([AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)), background runs with a stop button, scheduled runs and reviewed agent notes.
 
 AI is optional. Nothing outside these two modules calls a model, and every other feature works with both disabled and with no network access.
 
@@ -10,10 +10,11 @@ AI is optional. Nothing outside these two modules calls a model, and every other
 |---|---|
 | `warden/ai/providers.py` | Adapters for the Anthropic Messages API, OpenAI-compatible chat completions and Ollama. One interface: list models, one chat turn, tool results to append. Built-in Claude prices. |
 | `warden/ai/simulator.py` | Deterministic fake servers speaking the three wire protocols. Back the "Offline demo model" provider and the tests. Not a language model. |
-| `warden/ai/tools.py` | The fixed tool set agents may call: read-only queries over Fabric Warden's own database, plus `propose_change`. |
-| `warden/ai/agents.py` | The built-in agents, autonomy, budgets, kill switches and the run loop. |
-| `warden/api/ai.py` | `/api/ai/providers/*` (module `ai-providers`) and `/api/ai/*` agents and runs (module `ai-agents`). |
-| `models/ai.py` | `ai_providers`, `ai_usage`, `ai_agent_configs`, `ai_agent_runs` (migration `0011`). |
+| `warden/ai/tools.py` | The fixed tool set agents may call: read-only queries over Fabric Warden's own database, `propose_change`, and `suggest_note` (a pending note in Fabric Warden's own database). |
+| `warden/ai/agents.py` | The built-in agents, autonomy, budgets, kill switches, the run loop (in the request or in the background), and the schedules job. |
+| `warden/api/ai.py` | `/api/ai/providers/*` (module `ai-providers`) and `/api/ai/*` agents, runs, cancel, schedules and notes (module `ai-agents`). |
+| `models/ai.py` | `ai_providers`, `ai_usage`, `ai_agent_configs`, `ai_agent_runs` (migration `0011`); `ai_agent_schedules`, `ai_agent_notes`, run `trigger`/`schedule_id`/`cancel_requested` (migration `0013`). |
+| `api/changes.py` (approve) | For a change flagged `apply_on_approval`, the approving request also calls `engine.apply` as the approver. Not in `warden/ai`. |
 
 ## Outbound HTTP
 
@@ -27,10 +28,10 @@ Claude is called with raw HTTP (`POST /v1/messages`, `anthropic-version: 2023-06
 
 ## A run
 
-1. Refuse to start if the global kill switch is engaged, the agent is switched off or at autonomy "off", a module it needs is disabled, the subject is missing, no provider/model is available. A refusal is audited (`ai.run.refused`).
-2. Create the run, audit `ai.run.start`, record the system prompt and the request as the first transcript entries.
+1. Refuse to start if the global kill switch is engaged, the agent is switched off or at autonomy "off" (or at a level that is not built), a module it needs is disabled, the subject or a required question is missing, no provider/model is available. A refusal is audited (`ai.run.refused`).
+2. Create the run (with its trigger: `manual`, `ask` or `schedule`), audit `ai.run.start`, record the system prompt (including accepted agent notes) and the request as the first transcript entries. With `background: true` the request commits here and returns the run as `running`; the loop continues in its own session and commits before every model call, so the run page (polling every 1.5 s) sees each turn and tool call as it happens.
 3. Stop with `budget_exceeded` if the provider's monthly token or cost budget is already spent.
-4. Loop for at most `max_turns`: before every model call re-check the kill switches (database and an in-process flag) and the run token budget and the provider budget; call the model; record usage (`ai_usage`) and the model turn; if there are no tool calls, the text is the answer. Otherwise run each tool call (at most `max_tool_calls` per run) and append the results.
+4. Loop for at most `max_turns`: before every model call re-check the kill switches (database and an in-process flag), the run's own stop request (`ai.run.cancel`, database and in-process), the run token budget and the provider budget; call the model; record usage (`ai_usage`) and the model turn; if there are no tool calls, the text is the answer. Otherwise run each tool call (at most `max_tool_calls` per run) and append the results.
 5. Finish (`succeeded`, `failed`, `budget_exceeded`, `stopped`) and audit `ai.run.finish` with tool-call count, proposals, tokens and cost. Any unexpected error still finishes the run with its evidence.
 
 The whole transcript (system prompt, request, every model turn with its token counts, every tool call with arguments and the exact result text the model received) is stored on the run and shown on the run page.
@@ -45,9 +46,17 @@ Tools are Python functions over the database, never over a controller or host. E
 | `get_device`, `get_metric_history`, `find_client`, `get_client` | `inventory:read` | — |
 | `firewall_overview` | `inventory:read` | firewall |
 | `search_logs` | `inventory:read` | logs |
+| `list_devices`, `wifi_overview` | `inventory:read` | — |
+| `ipam_overview` | `inventory:read` | ipam |
+| `compliance_overview` (stored results; never re-evaluates) | `inventory:read` | compliance |
+| `list_soc_cases`, `get_soc_case` (untrusted marker) | `inventory:read` | soc |
+| `get_change` (+ twin impact when `digital-twin` is on) | `inventory:read` | change-engine |
+| `suggest_note` | `ai:use` | ai-agents |
 | `propose_change` | `changes:propose` | change-engine |
 
-`propose_change` is offered to the model only when the agent runs at autonomy "propose", only for the operations the agent lists, and only calls `warden.changes.engine.propose`. The proposal is made with an `agent` actor whose name is the person who started the run, so self-approval and second-person rules treat it as that person's proposal; its reason starts with `[AI agent <key>, RUN-NNNN]`. The `warden/ai` package contains no reference to `engine.approve`, `engine.apply`, the write gate or the UniFi client (a test enforces this).
+`propose_change` is offered to the model only when the agent runs at "propose" or "act after approval", only for the operations the agent lists, and only calls `warden.changes.engine.propose` (with `apply_on_approval=True` at the latter). The proposal is made with an `agent` actor whose name is the person who started the run, so self-approval and second-person rules treat it as that person's proposal; its reason starts with `[AI agent <key>, RUN-NNNN]`. The `warden/ai` package contains no reference to `engine.approve`, `engine.apply`, the write gate, the UniFi client or the UniFi integration, and calls no engine function except `propose` (a test enforces this).
+
+`suggest_note` is the only tool that stores anything: a `pending` note in `ai_agent_notes`, audited as `ai.note.suggest`. Pending and rejected notes are never put into a prompt; only a person with `ai:manage` can accept one. This stops text read from the network from planting itself in an agent's memory.
 
 ## Untrusted content
 
@@ -55,8 +64,9 @@ Names, notes and log lines can be written by anyone on the network. The system p
 
 ## Not built
 
-- Streaming answers, background runs and cancelling a run mid-call (the kill switch takes effect before the next model call).
-- Autonomy above "propose" (see [AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)).
-- Agent memory, scheduled agents, agent-to-agent delegation, retrieval over docs.
+- Token-by-token streaming (progress is per model turn and tool call) and aborting an in-flight model call (stops take effect before the next call).
+- Autonomy "autonomous within guardrails" (see [AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)).
+- Event-triggered agents (Automation Studio starting an agent), agent-to-agent delegation, retrieval over docs, notes an agent writes without review.
+- Background runs survive only within one process: a restart interrupts them, and the schedules job marks such runs failed after 30 minutes.
 - Official CLI setup guides for provider tools.
 - Per-site scoping of tool results (site-scoped roles are not enforced anywhere yet).

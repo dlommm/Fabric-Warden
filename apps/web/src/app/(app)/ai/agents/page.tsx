@@ -5,7 +5,8 @@ import { Bot, OctagonAlert } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AUTONOMY_WORD, AutonomyPicker, money, RunLink, RunState, tokens } from "@/components/ai";
+import { AUTONOMY_WORD, AutonomyPicker, money, RunLink, RunState, RunTrigger, SubjectSelect, tokens } from "@/components/ai";
+import { NotesPanel, SchedulesPanel } from "@/components/ai-schedules";
 import { Button } from "@/components/ui/button";
 import { Confirm } from "@/components/ui/confirm";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
@@ -15,7 +16,7 @@ import { type Column, DataTable } from "@/components/ui/table";
 import { ApiError, get, post, put } from "@/lib/api";
 import { ago, dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AiAgent, AiAgentsResponse, AiProvider, AiRun, AlertItem, ClientRow } from "@/lib/types";
+import type { AiAgent, AiAgentsResponse, AiProvider, AiRun } from "@/lib/types";
 
 export default function AgentCenterPage() {
   const { can, moduleEnabled, modules } = useSession();
@@ -34,7 +35,7 @@ export default function AgentCenterPage() {
   if (modules.length > 0 && !on) {
     return (
       <ModuleOff title="Agent Center" name="AI Agent Center" canManage={can("modules:manage")}>
-        Optional read-only agents that explain alerts, slow clients and firewall findings from Fabric Warden&apos;s own data. They need an AI provider.
+        Optional agents that explain alerts, slow clients, Wi-Fi, capacity, compliance, security cases, changes and firewall findings from Fabric Warden&apos;s own data. They need an AI provider.
       </ModuleOff>
     );
   }
@@ -43,7 +44,17 @@ export default function AgentCenterPage() {
 
   const runColumns: Column<AiRun>[] = [
     { key: "ref", header: "Run", className: "whitespace-nowrap", sort: (r) => r.number, cell: (r) => <RunLink id={r.id} label={r.ref} /> },
-    { key: "agent", header: "Agent", sort: (r) => r.agent_name, cell: (r) => <span className="font-semibold">{r.agent_name}</span> },
+    {
+      key: "agent",
+      header: "Agent",
+      sort: (r) => r.agent_name,
+      cell: (r) => (
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="font-semibold">{r.agent_name}</span>
+          <RunTrigger trigger={r.trigger} />
+        </span>
+      ),
+    },
     { key: "status", header: "Result", sort: (r) => r.status, className: "whitespace-nowrap", cell: (r) => <RunState status={r.status} /> },
     {
       key: "prop",
@@ -67,7 +78,7 @@ export default function AgentCenterPage() {
     <>
       <PageHeader
         title="Agent Center"
-        description="Read-only agents that answer from Fabric Warden's own inventory, metrics, logs and firewall data, using only the tools listed for each and only what you may see yourself. At most they propose a change; people approve and apply it."
+        description="Agents that answer from Fabric Warden's own inventory, metrics, logs, IP plan, compliance and firewall data, using only the read-only tools listed for each and only what you may see yourself. At most they propose a change; people approve it, and only a person's approval can apply it."
         actions={
           ks && !ks.engaged && can("ai:use") && (
             <Button variant="danger" icon={<OctagonAlert />} onClick={() => setConfirmStop(true)}>Stop all agents</Button>
@@ -101,9 +112,11 @@ export default function AgentCenterPage() {
             <p className="p-4 text-ink-3">Loading agents…</p>
           )}
           <p className="border-t border-rule px-4 py-3 text-sm text-ink-3">
-            Autonomy built so far: Off, Explain and Propose. “Act after approval” and “Autonomous within guardrails” are planned and cannot be chosen.
+            Autonomy built so far: Off, Explain, Propose and Act after approval (only the firewall review can reach it, and only a person&apos;s approval applies its change). “Autonomous within guardrails” is planned and cannot be chosen.
           </p>
         </Panel>
+        {agents.data && <SchedulesPanel agents={agents.data.items} />}
+        {agents.data && <NotesPanel agents={agents.data.items} />}
         <Panel title={runs.data ? `Runs (${runs.data.total})` : "Runs"} bodyClassName="p-0">
           <DataTable
             caption="Agent runs"
@@ -134,7 +147,7 @@ function AgentRow({ a, providers, stopped }: { a: AiAgent; providers: AiProvider
   const c = a.config;
   const off = !c.enabled || c.autonomy === "off";
   const blocked = a.missing_modules.length > 0;
-  const reads = a.tools.filter((t) => !t.proposes);
+  const reads = a.tools.filter((t) => !t.proposes && !t.stores);
   return (
     <li className="border-b border-rule last:border-b-0">
       <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8">
@@ -159,7 +172,7 @@ function AgentRow({ a, providers, stopped }: { a: AiAgent; providers: AiProvider
             ))}
             {a.allowed_operations.length > 0 && (
               <>
-                . At Propose it may also propose <code className="font-mono text-xs text-ink-2">{a.allowed_operations.join(", ")}</code>
+                . At Propose or above it may also propose <code className="font-mono text-xs text-ink-2">{a.allowed_operations.join(", ")}</code>
               </>
             )}
             .
@@ -195,38 +208,19 @@ function AgentRow({ a, providers, stopped }: { a: AiAgent; providers: AiProvider
   );
 }
 
-function SubjectSelect({ kind, value, onChange, id, required }: { kind: AiAgent["subject"][number]["kind"]; value: string; onChange: (v: string) => void; id: string; required: boolean }) {
-  const alerts = useQuery({ queryKey: ["monitoring", "alerts"], queryFn: () => get<{ items: AlertItem[] }>("/api/monitoring/alerts"), enabled: kind === "alert" });
-  const clients = useQuery({ queryKey: ["inventory", "clients"], queryFn: () => get<{ items: ClientRow[] }>("/api/inventory/clients"), enabled: kind === "client" });
-  const sites = useQuery({ queryKey: ["ai", "sites"], queryFn: () => get<{ items: { id: string; name: string; is_demo: boolean }[] }>("/api/ai/subjects/sites"), enabled: kind === "site" });
-  const options: { id: string; label: string }[] =
-    kind === "alert"
-      ? (alerts.data?.items ?? []).map((x) => ({ id: x.id, label: `${x.rule ?? "Alert"} · ${x.label} (${x.state})` }))
-      : kind === "client"
-        ? (clients.data?.items ?? []).map((x) => ({ id: x.id, label: `${x.alias || x.name}${x.ip_address ? ` · ${x.ip_address}` : ""}` }))
-        : (sites.data?.items ?? []).map((x) => ({ id: x.id, label: x.name }));
-  const loading = alerts.isLoading || clients.isLoading || sites.isLoading;
-  return (
-    <Select id={id} value={value} onChange={(e) => onChange(e.target.value)} disabled={loading}>
-      <option value="">{loading ? "Loading…" : required ? (options.length ? "Choose…" : kind === "alert" ? "No active alerts" : "Nothing to choose") : "All sites"}</option>
-      {options.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
-    </Select>
-  );
-}
-
 function RunForm({ a, onClose }: { a: AiAgent; onClose: () => void }) {
   const router = useRouter();
   const qc = useQueryClient();
   const [subject, setSubject] = useState<Record<string, string>>({});
   const [question, setQuestion] = useState("");
   const run = useMutation({
-    mutationFn: () => post<AiRun>(`/api/ai/agents/${a.key}/runs`, { subject, question: question.trim() }),
+    mutationFn: () => post<AiRun>(`/api/ai/agents/${a.key}/runs`, { subject, question: question.trim(), background: true }),
     onSuccess: (r) => {
       qc.invalidateQueries({ queryKey: ["ai"] });
       router.push(`/ai/runs/${r.id}`);
     },
   });
-  const missing = a.subject.some((s) => s.required && !subject[s.key]);
+  const missing = a.subject.some((s) => s.required && !subject[s.key]) || (a.question_required && !question.trim());
   return (
     <form
       className="mx-4 mb-4 grid gap-4 rounded-[var(--radius)] border border-rule bg-surface-2 p-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]"
@@ -240,7 +234,7 @@ function RunForm({ a, onClose }: { a: AiAgent; onClose: () => void }) {
           {(p) => <SubjectSelect kind={s.kind} id={p.id} required={s.required} value={subject[s.key] ?? ""} onChange={(v) => setSubject({ ...subject, [s.key]: v })} />}
         </Field>
       ))}
-      <Field label="Question" hint="Optional; the agent's own question is used when empty">
+      <Field label="Question" hint={a.question_required ? "Required: ask in your own words" : "Optional; the agent's own question is used when empty"}>
         {(p) => <Textarea {...p} className="min-h-16" maxLength={2000} value={question} placeholder={a.default_question} onChange={(e) => setQuestion(e.target.value)} />}
       </Field>
       {run.error && <Notice tone="crit" className="md:col-span-2">{run.error instanceof ApiError ? run.error.message : "The run could not start."}</Notice>}
@@ -248,7 +242,13 @@ function RunForm({ a, onClose }: { a: AiAgent; onClose: () => void }) {
         <Button type="submit" variant="primary" loading={run.isPending} disabled={missing}>Run agent</Button>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <span className="text-sm text-ink-3">
-          {run.isPending ? "The agent is reading data and waiting for the model; this can take a minute." : `Runs at “${AUTONOMY_WORD[a.config.autonomy]}”: ${a.config.autonomy === "propose" ? "it may propose a change for approval." : "it cannot change anything."}`}
+          {`Runs at “${AUTONOMY_WORD[a.config.autonomy]}”: ${
+            a.config.autonomy === "act_with_approval"
+              ? "it may propose a change; approving it also applies it."
+              : a.config.autonomy === "propose"
+                ? "it may propose a change for approval."
+                : "it cannot change anything."
+          } The run page follows it live.`}
         </span>
       </div>
     </form>
