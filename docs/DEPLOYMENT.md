@@ -74,4 +74,4 @@ Back up, pull the new release, `up -d --build`; migrations run at API start. Det
 
 Outbound policy: Fabric Warden connects to equipment on your network, so private and loopback addresses are allowed. Link-local and cloud-metadata destinations (169.254.169.254, `metadata.google.internal`, …), unspecified, multicast and reserved addresses are refused for controllers, servers, Protect/Home Assistant, AI providers, notification webhooks/ntfy/SMTP, WAN probe targets and SNMP targets when they are saved. HTTP(S) connections are checked again at connect time after DNS resolution, so a name that resolves to a blocked address (or a redirect to one) is refused too; SMTP hosts are re-checked by literal address only, and WAN probe and SNMP hosts only when saved.
 
-Unraid and Proxmox guides: see [UNRAID.md](UNRAID.md), [PROXMOX.md](PROXMOX.md) (not written yet).
+Unraid and Proxmox deployment guides are not written yet.

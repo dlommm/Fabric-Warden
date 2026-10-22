@@ -1,6 +1,6 @@
 # Infrastructure: racks, cabling, power, assets, topology and docs
 
-**Status: implemented in Phase 4a** (modules `dcim`, `cabling`, `power`, `asset-lifecycle`, `topology`, `docs`, all `available`). Tested against the simulator only; no live controller has been connected yet (see [ROADMAP.md](ROADMAP.md)). Servers & Virtualization (Proxmox, Unraid, Docker, Linux hosts) is Phase 4b and still `planned`.
+**Status: implemented in Phase 4a** (modules `dcim`, `cabling`, `power`, `asset-lifecycle`, `topology`, `docs`, all `available`). Tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)). Servers & Virtualization (Proxmox, Unraid, Docker, Linux hosts) is Phase 4b and still `planned`.
 
 The master specification describes these modules only in outline, so the detailed behaviour below is this project's design, not a transcription of the spec.
 

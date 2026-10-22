@@ -1,6 +1,6 @@
 # IPAM and Client Intelligence
 
-**Status: implemented in Phase 2** (modules `ipam` and `client-intel`, both `available`). Everything below is tested against the simulator only; no live controller has been connected yet (see [ROADMAP.md](ROADMAP.md)).
+**Status: implemented in Phase 2** (modules `ipam` and `client-intel`, both `available`). Everything below is tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)).
 
 ## Principle: documentation, compared against observation
 

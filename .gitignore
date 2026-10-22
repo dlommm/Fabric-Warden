@@ -76,3 +76,19 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# -- local-only Markdown: agent guides, design-tool context, planning and stubs ----
+/CLAUDE.md
+/AGENTS.md
+/PRODUCT.md
+/DESIGN.md
+/.impeccable/
+/docs/ROADMAP.md
+/docs/PRODUCT_SPEC.md
+/docs/FEATURE_CATALOG.md
+/docs/FIREWALL.md
+/docs/MODULE_SDK.md
+/docs/OBSERVABILITY.md
+/docs/PROXMOX.md
+/docs/RACK_MANAGEMENT.md
+/docs/UNRAID.md

@@ -1,6 +1,6 @@
 # Analytics, alerts, notifications and WAN
 
-**Status: implemented in Phase 3** (modules `analytics-studio`, `monitoring`, `notifications` and `wan`, all `available`). Everything below is tested against the simulator only; no live controller has been connected yet (see [ROADMAP.md](ROADMAP.md)). `switching`, `wifi` and `fiber` remain **planned**.
+**Status: implemented in Phase 3** (modules `analytics-studio`, `monitoring`, `notifications` and `wan`, all `available`). Everything below is tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)). `switching`, `wifi` and `fiber` remain **planned**.
 
 ## Where the numbers come from
 

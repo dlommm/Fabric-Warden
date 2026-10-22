@@ -2,7 +2,7 @@
 
 Self-hosted, modular network operations for UniFi: inventory, analytics, configuration history, security investigation, rack/DCIM documentation and optional AI agents in one web interface. The UniFi controller stays the authoritative control plane; Fabric Warden reads it through the **official** Integration API and is **read-only by default**.
 
-> **Status: release candidate 1.0.0-rc.1.** Phases 1–7 and 9 are implemented and Phase 10 hardening is done; everything has been validated against the built-in simulators only, not yet a live UniFi console. Five catalog modules remain *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/CHANGELOG.md](docs/CHANGELOG.md).
+> **Status: release candidate 1.0.0-rc.1.** Phases 1–7 and 9 are implemented and Phase 10 hardening is done; everything has been tested against the built-in simulators; read-only sync has also been checked against one live UniFi console, and no change has yet been written to a live one. Five catalog modules remain *planned*; the Module Center shows exactly which. See [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## What works today
 
@@ -57,8 +57,7 @@ Docker Compose with PostgreSQL and Redis: see [docs/DEPLOYMENT.md](docs/DEPLOYME
 apps/api      FastAPI backend (package `warden`): core, modules, UniFi integration, simulator, migrations, tests
 apps/web      Next.js frontend
 deploy/       Docker Compose
-docs/         Architecture, security model, API capabilities, roadmap
-PRODUCT.md    Product context; DESIGN.md: design system
+docs/         Architecture, security model, API capabilities, operations
 ```
 
 ## Tests

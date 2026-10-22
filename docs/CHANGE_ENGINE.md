@@ -1,6 +1,6 @@
 # Change Approval & Recovery engine
 
-**Status: Phases 6a–6d implemented** (modules `change-engine`, `bulk-ops`, `automation`, `digital-twin`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Digital-twin snapshots and the independent watchdog are not built (see [ROADMAP.md](ROADMAP.md)).
+**Status: Phases 6a–6d implemented** (modules `change-engine`, `bulk-ops`, `automation`, `digital-twin`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Digital-twin snapshots and the independent watchdog are not built (see [CHANGELOG.md](CHANGELOG.md)).
 
 ## Invariants
 

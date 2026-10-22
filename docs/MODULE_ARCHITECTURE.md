@@ -12,7 +12,7 @@ Every module is declared by a `ModuleManifest` (`apps/api/src/warden/modules/con
 
 ## Shipping today
 
-Generated from the bundled catalog (`apps/api/src/warden/modules/catalog.py`) for 1.0.0-rc.1: 32 modules are available and 5 are planned (visible in the Module Center, cannot be enabled). `core` is always on. "Available" means built and tested against the simulators; see [ROADMAP.md](ROADMAP.md) for what each one has not yet been validated against (live controllers, real hosts, real model servers).
+Generated from the bundled catalog (`apps/api/src/warden/modules/catalog.py`) for 1.0.0-rc.1: 32 modules are available and 5 are planned (visible in the Module Center, cannot be enabled). `core` is always on. "Available" means built and tested against the simulators; see [CHANGELOG.md](CHANGELOG.md) for what each one has not yet been validated against (live controllers, real hosts, real model servers).
 
 | Module | Name | Maturity | Roadmap phase |
 |---|---|---|---|
@@ -56,4 +56,4 @@ Generated from the bundled catalog (`apps/api/src/warden/modules/catalog.py`) fo
 
 Controller writes happen only through `change-engine` (bulk operations, automation and AI agents create ordinary change requests through it); every other module is read-only towards the controller.
 
-Third-party modules: not supported yet. Planned direction: versioned SDK, signed packages, explicit privilege declarations, and execution outside the privileged core process. See [MODULE_SDK.md](MODULE_SDK.md).
+Third-party modules: not supported yet. Planned direction: versioned SDK, signed packages, explicit privilege declarations, and execution outside the privileged core process.
