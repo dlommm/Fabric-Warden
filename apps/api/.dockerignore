@@ -4,3 +4,10 @@ __pycache__
 .ruff_cache
 data
 tests
+.env
+.env.*
+*.pem
+*.key
+*.fwbk
+*.db
+.coverage

@@ -1,18 +1,78 @@
-node_modules/
-.next/
-.venv/
-__pycache__/
-*.pyc
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
-data/
-*.db
+# Everything here stays on the machine that made it: secrets, runtime data,
+# build output and per-developer tool state. Nothing below belongs on GitHub.
+
+# -- secrets and environment ---------------------------------------------------
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+vault.key
+
+# -- application data, backups and logs ---------------------------------------
+data/
+backups/
+*.fwbk
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+*-wal
+*-shm
+*.log
+
+# -- Python ---------------------------------------------------------------------
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# -- web --------------------------------------------------------------------------
+node_modules/
+.next/
+.next-e2e/
+.e2e-data/
+out/
+*.tsbuildinfo
+next-env.d.ts
 coverage/
 playwright-report/
 test-results/
+
+# -- Claude Code: local settings and session state (settings.json is shared) -----
 .claude/settings.local.json
-.impeccable/config.local.json
+.claude/scheduled_tasks.*
+.claude/routines/.state/
+.claude/worktrees/
+.claude/checkpoints/
+.claude/mailbox/
+.claude/agent-registry.json
+.claude/agent-memory-local
+.claude/first-run
+.claude/assistant-daemon-state.json
+
+# -- Impeccable: local runtime state and review screenshots (the design system,
+#    config.json, design.json and surfaces/ are shared) ---------------------------
+**/.impeccable/config.local.json
+**/.impeccable/hook.cache.json
+**/.impeccable/hook.pending.json
+**/.impeccable/questions/
+.impeccable/review/
+
+# -- OS and editors ---------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
