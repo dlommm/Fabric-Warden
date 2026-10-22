@@ -139,6 +139,7 @@ async def propose(
     reason: str,
     inverse_of: ChangeRequest | None = None,
     batch: tuple[str, int, str] | None = None,  # (batch id, position, BAT-0001)
+    apply_on_approval: bool = False,  # an agent at "act after approval": the approving person's approval also applies it
 ) -> ChangeRequest:
     op = OPERATIONS.get(operation)
     if op is None:
@@ -187,12 +188,15 @@ async def propose(
         is_demo=t.is_demo,
         batch_id=batch[0] if batch else None,
         batch_position=batch[1] if batch else None,
+        apply_on_approval=apply_on_approval and batch is None,
     )
     _note(cr, "read", "Read the current state from the controller", before=before)
     if inverse_of:
         _note(cr, "revert", f"Reverts CHG-{inverse_of.number:04d}")
     if batch:
         _note(cr, "batch", f"Item {batch[1] + 1} of {batch[2]}")
+    if cr.apply_on_approval:
+        _note(cr, "apply_on_approval", "Proposed by an agent at “act after approval”: approving it also applies it, as the approver")
     db.add(cr)
     await db.flush()
     await audit.record(

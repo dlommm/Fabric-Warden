@@ -1259,6 +1259,10 @@ export interface ChangeRequest {
   is_demo: boolean;
   batch_id?: string | null;
   batch_position?: number | null;
+  /** Proposed by an AI agent at "act after approval": approving it also applies it, as the approver. */
+  apply_on_approval?: boolean;
+  /** Set on an approve response when the approval stood but applying it was refused. */
+  apply_error?: string;
   /** Present on a single change's detail when it is one item of a bulk operation. */
   batch?: { id: string; ref: string; status: BatchStatus; title: string };
 }
@@ -1527,7 +1531,7 @@ export interface AiUsageReport {
   items: { at: string; model: string; input_tokens: number; output_tokens: number; cost_usd: number; run: string | null; run_id: string | null }[];
 }
 
-export type AiAutonomy = "off" | "explain" | "propose";
+export type AiAutonomy = "off" | "explain" | "propose" | "act_with_approval";
 
 export interface AiAgentConfig {
   enabled: boolean;
@@ -1543,16 +1547,22 @@ export interface AiAgentConfig {
 
 export type AiRunStatus = "running" | "succeeded" | "failed" | "budget_exceeded" | "stopped";
 
+export type AiSubjectKind = "alert" | "client" | "site" | "device" | "case" | "change";
+
+export type AiRunTrigger = "manual" | "schedule" | "ask";
+
 export interface AiAgent {
   key: string;
   name: string;
   summary: string;
-  subject: { key: string; label: string; kind: "alert" | "client" | "site" | "device"; required: boolean }[];
-  tools: { name: string; description: string; permission: string; proposes: boolean }[];
+  subject: { key: string; label: string; kind: AiSubjectKind; required: boolean }[];
+  tools: { name: string; description: string; permission: string; proposes: boolean; stores: boolean }[];
   max_autonomy: AiAutonomy;
   allowed_operations: string[];
   default_question: string;
   requires_modules: string[];
+  question_required: boolean;
+  phase: number;
   missing_modules: string[];
   config: AiAgentConfig;
   last_run: { id: string; ref: string; status: AiRunStatus; started_at: string } | null;
@@ -1604,7 +1614,10 @@ export interface AiRun {
   question: string;
   output: string;
   ai_generated: true;
-  proposals: { id: string; ref: string; title: string; risk: "low" | "medium" | "high" }[];
+  proposals: { id: string; ref: string; title: string; risk: "low" | "medium" | "high"; apply_on_approval?: boolean }[];
+  trigger: AiRunTrigger;
+  schedule_id: string | null;
+  cancel_requested: boolean;
   tool_call_count: number;
   input_tokens: number;
   output_tokens: number;
@@ -1616,4 +1629,37 @@ export interface AiRun {
   system_prompt?: string;
   transcript?: AiTranscriptEntry[];
   tool_calls?: { turn: number; name: string; arguments: Record<string, unknown>; ok: boolean; summary: string | null }[];
+}
+
+export interface AiSchedule {
+  id: string;
+  agent_key: string;
+  agent_name: string;
+  name: string;
+  subject: Record<string, string>;
+  question: string;
+  interval_minutes: number;
+  max_runs_per_day: number;
+  enabled: boolean;
+  run_as: string;
+  last_run_at: string | null;
+  last_run_id: string | null;
+  last_outcome: AiRunStatus | "refused" | "";
+  last_detail: string;
+  next_run_at: string | null;
+  created_at: string;
+}
+
+export interface AiNote {
+  id: string;
+  agent_key: string;
+  text: string;
+  status: "active" | "pending" | "rejected";
+  source: "person" | "agent";
+  source_run_id: string | null;
+  created_by: string;
+  created_at: string;
+  decided_by: string | null;
+  decided_at: string | null;
+  ai_generated: boolean;
 }

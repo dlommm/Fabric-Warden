@@ -13,6 +13,7 @@ They are served through ``httpx.ASGITransport``; nothing listens on a socket.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from dataclasses import dataclass, field
@@ -36,6 +37,7 @@ class AiSimState:
     models: list[str] = field(default_factory=lambda: [DEMO_MODEL])
     tokens: tuple[int, int] = (420, 90)  # (input, output) reported per response
     refuse: bool = False  # Anthropic fake answers stop_reason "refusal"
+    delay: float = 0.0  # seconds each chat response waits (tests use it to stop a run mid-way)
 
 
 @dataclass
@@ -120,6 +122,8 @@ def create_openai_app(state: AiSimState) -> FastAPI:
             return JSONResponse({"error": {"message": "Incorrect API key provided"}}, status_code=401)
         body = await request.json()
         _record(state, request, body)
+        if state.delay:
+            await asyncio.sleep(state.delay)
         conv = _Conversation()
         for m in body.get("messages", []):
             if m.get("role") == "user" and not conv.user_text:
@@ -179,6 +183,8 @@ def create_anthropic_app(state: AiSimState) -> FastAPI:
             return bad
         body = await request.json()
         _record(state, request, body)
+        if state.delay:
+            await asyncio.sleep(state.delay)
         usage = {"input_tokens": state.tokens[0], "output_tokens": state.tokens[1]}
         n = len(state.requests)
         if state.refuse:
@@ -239,6 +245,8 @@ def create_ollama_app(state: AiSimState) -> FastAPI:
     async def chat(request: Request) -> JSONResponse:
         body = await request.json()
         _record(state, request, body)
+        if state.delay:
+            await asyncio.sleep(state.delay)
         conv = _Conversation()
         for m in body.get("messages", []):
             if m.get("role") == "user" and not conv.user_text:

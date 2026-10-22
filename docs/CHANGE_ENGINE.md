@@ -60,6 +60,10 @@ Module `bulk-ops`, code `warden/changes/batches.py`, API `/api/batches`. A batch
 - **Stop on first failure:** an item that fails, conflicts, is reverted or cannot be applied stops the batch; remaining items are cancelled and never sent. An approver can also stop a running batch; the item in progress finishes and is verified.
 - **Evidence:** each item keeps its own evidence; the batch keeps a log. Audit: `change.batch.propose`, `change.batch.approve`, `change.batch.reject`, `change.batch.cancel`, `change.batch.apply`, `change.batch.finish`, plus every item's `change.*` records. Events: `change.batch.proposed`, `change.batch.decided`, `change.batch.finished`.
 
+## Approve and apply (AI "act after approval")
+
+A change proposed by an AI agent at autonomy "act after approval" carries `apply_on_approval` (never set on batch items). `POST /api/changes/{id}/approve` then calls `engine.apply` right after `engine.approve`, as the approving person, in the same request; `{"apply": false}` approves only. Nothing else differs: the second-person rule, protected-path acknowledgement, approval window, write mode, re-read and drift check, verification and automatic revert all apply. If applying is refused (for example a read-only controller), the approval stands and the response carries `apply_error`. See [AGENT_AUTONOMY.md](AGENT_AUTONOMY.md).
+
 ## Automation Studio
 
 Module `automation`, code `warden/automation.py`, API `/api/automation`.

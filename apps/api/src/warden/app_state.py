@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -59,6 +60,8 @@ class AppState:
     ai_sim: AiSimState = field(default_factory=AiSimState)
     _ai_sim_app: FastAPI | None = None
     ai_stop: bool = False  # in-process mirror of the AI kill switch, checked between agent turns
+    ai_cancel: set[str] = field(default_factory=set)  # runs someone stopped; checked between agent turns
+    ai_tasks: dict[str, asyncio.Task[None]] = field(default_factory=dict)  # background agent runs in progress
 
     def simulator_transport(self) -> httpx.AsyncBaseTransport:
         if self._sim_app is None:

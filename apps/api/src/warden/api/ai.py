@@ -4,14 +4,16 @@ Providers: connections to local (Ollama, OpenAI-compatible servers such as LM
 Studio) and API (Anthropic Claude) model providers. API keys live in the vault;
 responses carry only a fingerprint. Usage and monthly budgets are per provider.
 
-Agents: the built-in read-only agents (warden.ai.agents), their autonomy and
-limits, the global and per-agent kill switches, and runs with their evidence.
-Nothing here writes to a controller; an agent at "propose" autonomy can only
-create a change proposal through the change engine.
+Agents: the built-in agents (warden.ai.agents), their autonomy and limits,
+the global and per-agent kill switches, runs with their evidence (in the
+request or in the background, with a stop button), schedules, and agent notes
+(memory). Nothing here writes to a controller; an agent at "propose" or "act
+after approval" can only create a change proposal through the change engine.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -26,7 +28,18 @@ from warden.ai.providers import ADAPTERS, BUILTIN_PRICES, HINTS, KINDS, Provider
 from warden.ai.simulator import DEMO_BASE_URL, DEMO_MODEL
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
-from warden.models import AiAgentConfig, AiAgentRun, AiProvider, AiUsage, Credential, Setting
+from warden.models import (
+    AiAgentConfig,
+    AiAgentNote,
+    AiAgentRun,
+    AiAgentSchedule,
+    AiProvider,
+    AiUsage,
+    ChangeRequest,
+    Credential,
+    Setting,
+    SocCase,
+)
 from warden.security.rbac import P
 
 providers_router = APIRouter(prefix="/api/ai/providers", tags=["ai-providers"], dependencies=[Depends(require_module("ai-providers"))])
@@ -324,13 +337,21 @@ def _spec_out(spec: A.AgentSpec) -> dict[str, Any]:
         "summary": spec.summary,
         "subject": [{"key": f.key, "label": f.label, "kind": f.kind, "required": f.required} for f in spec.subject],
         "tools": [
-            {"name": t, "description": T.TOOLS[t].description, "permission": T.TOOLS[t].permission.value, "proposes": T.TOOLS[t].proposes}
-            for t in spec.tools
+            {
+                "name": t,
+                "description": T.TOOLS[t].description,
+                "permission": T.TOOLS[t].permission.value,
+                "proposes": T.TOOLS[t].proposes,
+                "stores": T.TOOLS[t].stores,
+            }
+            for t in [*spec.tools, "suggest_note"]
         ],
         "max_autonomy": spec.max_autonomy,
         "allowed_operations": list(spec.allowed_operations),
         "default_question": spec.default_question,
         "requires_modules": list(spec.requires_modules),
+        "question_required": spec.question_required,
+        "phase": spec.phase,
     }
 
 
@@ -358,7 +379,7 @@ async def list_agents(db: DB, state: State, principal: User) -> dict:
             {"id": "off", "label": "Off", "built": True},
             {"id": "explain", "label": "Explain (read-only)", "built": True},
             {"id": "propose", "label": "Propose changes for approval", "built": True},
-            {"id": "act_with_approval", "label": "Act after approval", "built": False},
+            {"id": "act_with_approval", "label": "Act after approval", "built": True},
             {"id": "autonomous", "label": "Autonomous within guardrails", "built": False},
         ],
     }
@@ -366,7 +387,7 @@ async def list_agents(db: DB, state: State, principal: User) -> dict:
 
 class AgentConfigIn(BaseModel):
     enabled: bool | None = None
-    autonomy: Literal["off", "explain", "propose"] | None = None
+    autonomy: Literal["off", "explain", "propose", "act_with_approval"] | None = None
     provider_id: str | None = Field(default=None, max_length=36)
     clear_provider: bool = False
     model: str | None = Field(default=None, max_length=128)
@@ -448,6 +469,9 @@ def _run_out(r: AiAgentRun, full: bool = False) -> dict[str, Any]:
         "output": r.output,
         "ai_generated": True,
         "proposals": r.proposals,
+        "trigger": r.trigger,
+        "schedule_id": r.schedule_id,
+        "cancel_requested": r.cancel_requested,
         "tool_call_count": len(r.tool_calls),
         "input_tokens": r.input_tokens,
         "output_tokens": r.output_tokens,
@@ -465,19 +489,44 @@ def _run_out(r: AiAgentRun, full: bool = False) -> dict[str, Any]:
 class RunIn(BaseModel):
     subject: dict[str, str] = Field(default_factory=dict)
     question: str = Field(default="", max_length=2000)
+    # Return at once with the run "running"; the page polls GET /runs/{id} for the transcript as it grows.
+    background: bool = False
 
 
 @agents_router.post("/agents/{key}/runs", status_code=status.HTTP_201_CREATED)
 async def start_run(key: str, body: RunIn, db: DB, state: State, principal: User) -> dict:
+    trigger = "ask" if key == "ask-network" else "manual"
     try:
-        run = await A.run_agent(db, state, principal, key, body.subject, body.question)
+        prepared = await A.prepare(db, state, principal, key, body.subject, body.question, trigger)
     except A.AgentRefused as e:
         await audit.record(
             db, principal.actor, "ai.run.refused", target_type="ai_agent", target_id=key, outcome="denied", detail={"reason": str(e)}
         )
         await db.commit()
         raise HTTPException(status.HTTP_409_CONFLICT, str(e)) from e
-    return _run_out(run, full=True)
+    if body.background:
+        await db.commit()
+        A.start_in_background(state, principal, prepared)
+        return _run_out(prepared.run, full=True)
+    return _run_out(await A.execute(db, state, principal, prepared), full=True)
+
+
+@agents_router.post("/runs/{rid}/cancel")
+async def cancel_run(rid: str, db: DB, state: State, principal: User) -> dict:
+    """Stop a running run before its next model call. The person who started it or an AI manager may."""
+    r = await db.get(AiAgentRun, rid)
+    if r is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Run not found")
+    if r.requested_by != principal.user.username and not principal.can(P.AI_MANAGE):
+        await audit.record(db, principal.actor, "ai.run.cancel", target_type="ai_run", target_id=r.id, outcome="denied")
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the person who started the run or an AI manager can stop it")
+    if r.status != "running":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"RUN-{r.number:04d} is no longer running")
+    state.ai_cancel.add(r.id)
+    r.cancel_requested = True
+    await audit.record(db, principal.actor, "ai.run.cancel", target_type="ai_run", target_id=r.id, detail={"number": r.number})
+    return _run_out(r)
 
 
 @agents_router.get("/runs")
@@ -500,3 +549,228 @@ async def get_run(rid: str, db: DB, principal: User) -> dict:
 @agents_router.get("/subjects/sites")
 async def subject_sites(db: DB, principal: User) -> dict:
     return {"items": await T.site_choices(db)}
+
+
+@agents_router.get("/subjects/cases")
+async def subject_cases(db: DB, principal: User) -> dict:
+    rows = await db.scalars(select(SocCase).order_by(SocCase.updated_at.desc()).limit(100))
+    return {"items": [{"id": c.id, "name": f"{c.title} ({c.status})", "is_demo": c.is_demo} for c in rows]}
+
+
+@agents_router.get("/subjects/changes")
+async def subject_changes(db: DB, principal: User) -> dict:
+    rows = await db.scalars(select(ChangeRequest).order_by(ChangeRequest.number.desc()).limit(100))
+    return {"items": [{"id": c.id, "name": f"CHG-{c.number:04d} · {c.title} ({c.status})", "is_demo": c.is_demo} for c in rows]}
+
+
+# -- schedules ---------------------------------------------------------------------------
+
+
+def _schedule_out(s: AiAgentSchedule) -> dict[str, Any]:
+    spec = A.AGENTS.get(s.agent_key)
+    return {
+        "id": s.id,
+        "agent_key": s.agent_key,
+        "agent_name": spec.name if spec else s.agent_key,
+        "name": s.name,
+        "subject": s.subject,
+        "question": s.question,
+        "interval_minutes": s.interval_minutes,
+        "max_runs_per_day": s.max_runs_per_day,
+        "enabled": s.enabled,
+        "run_as": s.run_as,
+        "last_run_at": s.last_run_at,
+        "last_run_id": s.last_run_id,
+        "last_outcome": s.last_outcome,
+        "last_detail": s.last_detail,
+        "next_run_at": (s.last_run_at + timedelta(minutes=s.interval_minutes)) if s.last_run_at and s.enabled else None,
+        "created_at": s.created_at,
+    }
+
+
+async def _get_schedule(db: AsyncSession, sid: str) -> AiAgentSchedule:
+    s = await db.get(AiAgentSchedule, sid)
+    if s is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Schedule not found")
+    return s
+
+
+class ScheduleIn(BaseModel):
+    agent_key: str = Field(max_length=48)
+    name: str = Field(min_length=1, max_length=128)
+    subject: dict[str, str] = Field(default_factory=dict)
+    question: str = Field(default="", max_length=2000)
+    interval_minutes: int = Field(default=1440, ge=60, le=43_200)
+    max_runs_per_day: int = Field(default=4, ge=1, le=24)
+    enabled: bool = True
+
+
+class SchedulePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    question: str | None = Field(default=None, max_length=2000)
+    interval_minutes: int | None = Field(default=None, ge=60, le=43_200)
+    max_runs_per_day: int | None = Field(default=None, ge=1, le=24)
+    enabled: bool | None = None
+
+
+@agents_router.get("/schedules")
+async def list_schedules(db: DB, principal: User) -> dict:
+    rows = await db.scalars(select(AiAgentSchedule).order_by(AiAgentSchedule.created_at))
+    return {"items": [_schedule_out(s) for s in rows]}
+
+
+@agents_router.post("/schedules", status_code=status.HTTP_201_CREATED)
+async def create_schedule(body: ScheduleIn, db: DB, principal: Manager) -> dict:
+    """A schedule always runs as the signed-in person who creates it, with that person's roles at run time."""
+    spec = A.AGENTS.get(body.agent_key)
+    if spec is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Agent not found")
+    if principal.via != "session":
+        # A narrowed API token must not be able to start runs later with its owner's full rights.
+        await audit.record(db, principal.actor, "ai.schedule.create", outcome="denied", detail={"reason": "not a session"})
+        await db.commit()
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Create schedules from a signed-in session, not an API token")
+    missing = [f.label for f in spec.subject if f.required and not body.subject.get(f.key)]
+    if missing:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Choose a subject: {', '.join(missing)}")
+    if spec.question_required and not body.question.strip():
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "This agent needs a question")
+    s = AiAgentSchedule(
+        agent_key=spec.key,
+        name=body.name.strip(),
+        subject={f.key: body.subject[f.key] for f in spec.subject if body.subject.get(f.key)},
+        question=body.question.strip(),
+        interval_minutes=body.interval_minutes,
+        max_runs_per_day=body.max_runs_per_day,
+        enabled=body.enabled,
+        run_as_user_id=principal.user.id,
+        run_as=principal.user.username,
+    )
+    db.add(s)
+    await db.flush()
+    await audit.record(
+        db,
+        principal.actor,
+        "ai.schedule.create",
+        target_type="ai_schedule",
+        target_id=s.id,
+        detail={"agent": s.agent_key, "name": s.name, "interval_minutes": s.interval_minutes, "max_runs_per_day": s.max_runs_per_day},
+    )
+    return _schedule_out(s)
+
+
+@agents_router.patch("/schedules/{sid}")
+async def update_schedule(sid: str, body: SchedulePatch, db: DB, principal: Manager) -> dict:
+    s = await _get_schedule(db, sid)
+    changed = body.model_dump(exclude_unset=True)
+    for k, v in changed.items():
+        if v is not None:
+            setattr(s, k, v.strip() if isinstance(v, str) else v)
+    await db.flush()
+    await audit.record(
+        db, principal.actor, "ai.schedule.update", target_type="ai_schedule", target_id=s.id, detail={"changed": sorted(changed)}
+    )
+    return _schedule_out(s)
+
+
+@agents_router.delete("/schedules/{sid}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_schedule(sid: str, db: DB, principal: Manager) -> None:
+    s = await _get_schedule(db, sid)
+    await audit.record(db, principal.actor, "ai.schedule.delete", target_type="ai_schedule", target_id=s.id, detail={"name": s.name})
+    await db.delete(s)
+
+
+@agents_router.post("/schedules/{sid}/run")
+async def run_schedule_now(sid: str, db: DB, state: State, principal: Manager) -> dict:
+    """Run a schedule once now, exactly as the scheduler would (as its creator, with the daily cap)."""
+    s = await _get_schedule(db, sid)
+    run = await A.run_schedule(db, state, s)
+    return {"schedule": _schedule_out(s), "run": _run_out(run) if run else None}
+
+
+# -- notes (agent memory) ----------------------------------------------------------------
+
+
+def _note_out(n: AiAgentNote) -> dict[str, Any]:
+    return {
+        "id": n.id,
+        "agent_key": n.agent_key,
+        "text": n.text,
+        "status": n.status,
+        "source": n.source,
+        "source_run_id": n.source_run_id,
+        "created_by": n.created_by,
+        "created_at": n.created_at,
+        "decided_by": n.decided_by,
+        "decided_at": n.decided_at,
+        "ai_generated": n.source == "agent",
+    }
+
+
+async def _get_note(db: AsyncSession, nid: str) -> AiAgentNote:
+    n = await db.get(AiAgentNote, nid)
+    if n is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Note not found")
+    return n
+
+
+class NoteIn(BaseModel):
+    agent_key: str = Field(max_length=48)
+    text: str = Field(min_length=1, max_length=T.MAX_NOTE_CHARS)
+
+
+@agents_router.get("/notes")
+async def list_notes(db: DB, principal: User, agent: str | None = None, include_rejected: bool = False) -> dict:
+    q = select(AiAgentNote).order_by(AiAgentNote.created_at.desc())
+    if agent:
+        q = q.where(AiAgentNote.agent_key.in_((agent, "*")))
+    if not include_rejected:
+        q = q.where(AiAgentNote.status != "rejected")
+    return {"items": [_note_out(n) for n in await db.scalars(q)]}
+
+
+@agents_router.post("/notes", status_code=status.HTTP_201_CREATED)
+async def create_note(body: NoteIn, db: DB, principal: Manager) -> dict:
+    if body.agent_key != "*" and body.agent_key not in A.AGENTS:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Agent not found")
+    n = AiAgentNote(
+        agent_key=body.agent_key, text=" ".join(body.text.split()), status="active", source="person", created_by=principal.user.username
+    )
+    db.add(n)
+    await db.flush()
+    await audit.record(
+        db, principal.actor, "ai.note.create", target_type="ai_note", target_id=n.id, detail={"agent": n.agent_key, "text": n.text[:200]}
+    )
+    return _note_out(n)
+
+
+class NoteDecision(BaseModel):
+    accept: bool
+
+
+@agents_router.post("/notes/{nid}/decide")
+async def decide_note(nid: str, body: NoteDecision, db: DB, principal: Manager) -> dict:
+    """Accept an agent's suggested note into its memory, or reject it. Only a pending note can be decided."""
+    n = await _get_note(db, nid)
+    if n.status != "pending":
+        raise HTTPException(status.HTTP_409_CONFLICT, f"This note is already {n.status}")
+    n.status = "active" if body.accept else "rejected"
+    n.decided_by, n.decided_at = principal.user.username, utcnow()
+    await audit.record(
+        db,
+        principal.actor,
+        "ai.note.accept" if body.accept else "ai.note.reject",
+        target_type="ai_note",
+        target_id=n.id,
+        detail={"agent": n.agent_key},
+    )
+    return _note_out(n)
+
+
+@agents_router.delete("/notes/{nid}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_note(nid: str, db: DB, principal: Manager) -> None:
+    n = await _get_note(db, nid)
+    await audit.record(
+        db, principal.actor, "ai.note.delete", target_type="ai_note", target_id=n.id, detail={"agent": n.agent_key, "text": n.text[:200]}
+    )
+    await db.delete(n)

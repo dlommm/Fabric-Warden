@@ -44,7 +44,7 @@ State = Annotated[AppState, Depends(get_state)]
 class Principal:
     user: User
     permissions: frozenset[P]
-    via: str  # session | token
+    via: str  # session | token | schedule (an AI agent schedule running as its creator; token_id is the schedule id)
     session_id: str | None = None
     token_id: str | None = None
     ip: str | None = None
@@ -53,6 +53,8 @@ class Principal:
     def actor(self) -> Actor:
         if self.via == "token":
             return Actor("token", self.token_id, f"{self.user.username} (token)", self.ip)
+        if self.via == "schedule":
+            return Actor("system", self.token_id, f"{self.user.username} (AI schedule)"[:64])
         return Actor("user", self.user.id, self.user.username, self.ip)
 
     def can(self, perm: P) -> bool:

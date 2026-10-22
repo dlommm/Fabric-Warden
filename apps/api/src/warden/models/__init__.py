@@ -1,4 +1,4 @@
-from warden.models.ai import AiAgentConfig, AiAgentRun, AiProvider, AiUsage
+from warden.models.ai import AiAgentConfig, AiAgentNote, AiAgentRun, AiAgentSchedule, AiProvider, AiUsage
 from warden.models.analytics import (
     Alert,
     AlertRule,
@@ -106,7 +106,9 @@ __all__ = [
     "IntegrationConnection",
     "ProtectDevice",
     "AiAgentConfig",
+    "AiAgentNote",
     "AiAgentRun",
+    "AiAgentSchedule",
     "AiProvider",
     "AiUsage",
 ]

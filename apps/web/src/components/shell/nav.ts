@@ -9,6 +9,7 @@ import {
   ChartLine,
   ClipboardCheck,
   Cpu,
+  MessageSquareText,
   Gauge,
   GitPullRequest,
   Globe,
@@ -93,6 +94,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
   {
     section: "AI",
     items: [
+      { label: "Ask the network", href: "/ai/ask", icon: MessageSquareText, module: "ai-agents", permission: "ai:use" },
       { label: "Agent Center", href: "/ai/agents", icon: Bot, module: "ai-agents", permission: "ai:use" },
       { label: "AI providers", href: "/ai/providers", icon: Cpu, module: "ai-providers", permission: "ai:use" },
     ],

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 
 import httpx
 import pytest
@@ -255,3 +256,8 @@ def test_ai_package_has_no_path_to_approve_or_apply():
     text = "\n".join(p.read_text() for p in root.glob("*.py"))
     assert "engine.approve" not in text and "engine.apply" not in text and "_write_gate" not in text
     assert "unifi_client" not in text and "WriteAuthorization" not in text
+    # Phase 8 ("act after approval") keeps this: the only engine function the AI package calls is propose; it imports
+    # nothing from the UniFi integration or the change routers (the approval that applies lives in api/changes.py).
+    assert set(re.findall(r"\bengine\.(\w+)", text)) == {"propose"}
+    assert "warden.integrations" not in text and "warden.api.changes" not in text and "warden.api import changes" not in text
+    assert "approve(" not in text and ".apply(" not in text

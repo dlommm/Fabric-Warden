@@ -14,6 +14,7 @@ from sqlalchemy import delete
 
 from warden import __version__, metrics, monitoring
 from warden import automation as automation_engine
+from warden.ai import agents as ai_agents
 from warden.api import (
     ai,
     alerts,
@@ -113,6 +114,7 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(
         JobSpec("automation.evaluate", "automation", "Evaluate automation rules against new events", automation_engine.evaluate_job, 30)
     )
+    state.scheduler.register(JobSpec("ai-agents.schedules", "ai-agents", "Run scheduled AI agents", ai_agents.schedules_job, 60))
     return state
 
 
@@ -144,6 +146,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log.info("Fabric Warden %s started", __version__)
         yield
         await state.scheduler.stop()
+        for task in list(state.ai_tasks.values()):  # background agent runs; the schedules job marks them interrupted later
+            task.cancel()
         await state.syslog.stop()
         await state.db.dispose()
 
