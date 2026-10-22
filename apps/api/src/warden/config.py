@@ -44,6 +44,20 @@ class Settings(BaseSettings):
     log_retention_days: int = 14
     log_max_rows: int = 2_000_000
 
+    # Outbound connections to user-supplied addresses (see security/outbound.py).
+    # Private and loopback ranges are allowed (equipment lives there); link-local and
+    # metadata addresses are refused unless allowed here.
+    outbound_allow_link_local: bool = False
+    outbound_allowed_cidrs: list[str] = Field(default_factory=list)
+    outbound_blocked_cidrs: list[str] = Field(default_factory=list)
+
+    # Request body limits (bytes). Restoring a backup has its own, larger limit.
+    max_request_bytes: int = 2 * 1024 * 1024
+    max_restore_bytes: int = 512 * 1024 * 1024
+
+    # Sign-in rate limits, per client address, on top of the per-account limit.
+    login_ip_max_failures: int = 20
+
 
 @lru_cache
 def get_settings() -> Settings:

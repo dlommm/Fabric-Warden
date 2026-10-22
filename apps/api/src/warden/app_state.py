@@ -28,6 +28,7 @@ from warden.integrations.unifi.simulator import SimulatorState, create_simulator
 from warden.jobs import Scheduler
 from warden.models import AiProvider, Controller, HostConnection, IntegrationConnection
 from warden.modules.service import ModuleService
+from warden.security.outbound import guarded_transport
 from warden.security.vault import Vault
 
 SIMULATOR_BASE_URL = "http://unifi-simulator.local"
@@ -96,7 +97,10 @@ class AppState:
             if self._ai_sim_app is None:
                 self._ai_sim_app = create_openai_app(self.ai_sim)
             return httpx.ASGITransport(app=self._ai_sim_app)
-        return self.ai_transport
+        if self.ai_transport is not None:
+            return self.ai_transport
+        # Real providers go out through the SSRF guard (link-local / metadata refused).
+        return guarded_transport(provider.verify_tls)
 
     def unifi_client(self, controller: Controller, api_key: str) -> UniFiNetworkClient:
         if controller.kind == "unifi-simulator":

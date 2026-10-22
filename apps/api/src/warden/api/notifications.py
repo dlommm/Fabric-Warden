@@ -15,6 +15,7 @@ from sqlalchemy import select
 from warden import audit, notify
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.models import Credential, NotificationChannel, NotificationDelivery
+from warden.security.outbound import check_host, check_url
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/notifications", tags=["notifications"], dependencies=[Depends(require_module("notifications"))])
@@ -31,6 +32,10 @@ def _http_url(v: str, field: str) -> str:
     parts = urlsplit(v)
     if parts.scheme not in ("http", "https") or not parts.hostname:
         raise ValueError(f"{field}: use an http:// or https:// URL")
+    try:
+        check_url(v)
+    except ValueError as exc:
+        raise ValueError(f"{field}: {exc}") from None
     return v
 
 
@@ -95,6 +100,10 @@ def _validate(kind: str, cfg: Any) -> None:
                 ipaddress.ip_address(cfg.host)
             except ValueError:
                 raise ValueError("host: enter a hostname or IP address") from None
+        try:
+            check_host(cfg.host)
+        except ValueError as exc:
+            raise ValueError(f"host: {exc}") from None
 
 
 def _split(kind: str, cfg: Any) -> tuple[dict[str, Any], dict[str, Any]]:

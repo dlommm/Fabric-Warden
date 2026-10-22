@@ -15,6 +15,7 @@ from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
 from warden.integrations import probe
 from warden.models import Device, MetricSeries, Setting, Site, Wan
+from warden.security.outbound import check_host
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/wan", tags=["wan"], dependencies=[Depends(require_module("wan"))])
@@ -33,6 +34,7 @@ class Target(BaseModel):
     @classmethod
     def host_ok(cls, v: str) -> str:
         v = v.strip()
+        check_host(v)
         try:
             ipaddress.ip_address(v)
             return v

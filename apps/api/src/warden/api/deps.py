@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from warden import audit
 from warden.app_state import AppState
 from warden.audit import Actor
 from warden.db import utcnow
@@ -114,9 +115,32 @@ async def current_principal(request: Request, db: DB) -> Principal:
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
 
 
+def _csrf_header(request: Request) -> None:
+    """Unauthenticated cookie endpoints (sign-in, setup, sign-out) need the CSRF header too.
+
+    Without it a cross-site form could sign a victim into an attacker's account
+    (login CSRF) or sign them out. Bearer-token clients are exempt.
+    """
+    if request.method in UNSAFE and not request.headers.get("authorization", "").lower().startswith("bearer "):
+        if request.headers.get(CSRF_HEADER) != "1":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "missing CSRF header")
+
+
+CsrfHeader = Depends(_csrf_header)
+
+
 def require(perm: P) -> Callable[..., Principal]:
-    async def dep(principal: CurrentPrincipal) -> Principal:
+    async def dep(principal: CurrentPrincipal, request: Request, db: DB) -> Principal:
         if not principal.can(perm):
+            # Authorization denials are part of the audit trail (committed before raising).
+            await audit.record(
+                db,
+                principal.actor,
+                "authz.denied",
+                outcome="denied",
+                detail={"permission": perm.value, "method": request.method, "path": request.url.path},
+            )
+            await db.commit()
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission {perm.value}")
         return principal
 

@@ -57,6 +57,7 @@ def fingerprint(plaintext: str) -> str:
 
 class Vault:
     def __init__(self, key: bytes, previous_keys: list[bytes] | None = None) -> None:
+        self.master_key = key  # needed by backup/restore; never returned by the API
         self._fernet = MultiFernet([Fernet(key), *(Fernet(k) for k in previous_keys or [])])
 
     def encrypt(self, plaintext: str) -> str:

@@ -17,6 +17,8 @@ from typing import Any
 
 import httpx
 
+from warden.security.outbound import guarded_transport
+
 DOCKER_API = "v1.47"
 
 
@@ -45,6 +47,9 @@ class ReadOnlyHTTP:
             # Docker socket: httpx talks HTTP over the Unix socket; the host part is ignored.
             transport = httpx.AsyncHTTPTransport(uds=base_url.removeprefix("unix://"))
             base_url = "http://docker"
+        elif transport is None:
+            # Real hosts and integrations: refuse link-local / metadata destinations at connect time.
+            transport = guarded_transport(verify)
         self._http = httpx.AsyncClient(
             base_url=base_url.rstrip("/"), headers=headers or {}, verify=verify, transport=transport, timeout=timeout
         )

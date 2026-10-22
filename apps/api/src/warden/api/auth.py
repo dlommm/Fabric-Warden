@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import time
-from collections import defaultdict, deque
 from datetime import datetime, timedelta
 from typing import Annotated, Literal
 
@@ -13,7 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from warden import audit
-from warden.api.deps import DB, CurrentPrincipal, Principal, State, authenticate, client_ip, require
+from warden.api.deps import DB, CsrfHeader, CurrentPrincipal, Principal, State, authenticate, client_ip, require
 from warden.audit import Actor
 from warden.db import utcnow
 from warden.models import ApiToken, AuthSession, Credential, Setting, User
@@ -25,6 +23,7 @@ from warden.security.crypto import (
     validate_password_strength,
     verify_password,
 )
+from warden.security.limits import Throttle
 from warden.security.rbac import ROLES, P
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -33,28 +32,9 @@ MAX_FAILURES = 5
 FAILURE_WINDOW = 15 * 60
 
 
-class _Throttle:
-    def __init__(self) -> None:
-        self._fails: dict[str, deque[float]] = defaultdict(deque)
-
-    def _prune(self, key: str) -> deque[float]:
-        q = self._fails[key]
-        cutoff = time.monotonic() - FAILURE_WINDOW
-        while q and q[0] < cutoff:
-            q.popleft()
-        return q
-
-    def blocked(self, key: str) -> bool:
-        return len(self._prune(key)) >= MAX_FAILURES
-
-    def fail(self, key: str) -> None:
-        self._prune(key).append(time.monotonic())
-
-    def reset(self, key: str) -> None:
-        self._fails.pop(key, None)
-
-
-throttle = _Throttle()
+# Per account (address + username), per address (spraying many usernames) and per
+# user for password confirmations. In-process, bounded in memory, reset per app.
+throttle = Throttle(MAX_FAILURES, FAILURE_WINDOW)
 
 
 class LoginIn(BaseModel):
@@ -114,11 +94,12 @@ async def start_session(db: DB, state: State, request: Request, response: Respon
     )
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[CsrfHeader])
 async def login(body: LoginIn, request: Request, response: Response, db: DB, state: State) -> dict:
     key = f"{client_ip(request)}|{body.username.lower()}"
+    ip_key = f"ip|{client_ip(request)}"
     actor = Actor("user", None, body.username, client_ip(request))
-    if throttle.blocked(key):
+    if throttle.blocked(key) or throttle.blocked(ip_key, state.settings.login_ip_max_failures):
         await audit.record(db, actor, "auth.login", outcome="denied", detail={"reason": "throttled"})
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed attempts. Try again in 15 minutes.")
@@ -127,6 +108,7 @@ async def login(body: LoginIn, request: Request, response: Response, db: DB, sta
         burn_password_check(body.password)
     if user is None or not user.is_active or not verify_password(user.password_hash, body.password):
         throttle.fail(key)
+        throttle.fail(ip_key)
         await audit.record(db, actor, "auth.login", outcome="denied", detail={"reason": "bad_credentials"})
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect username or password.")
@@ -139,8 +121,8 @@ async def login(body: LoginIn, request: Request, response: Response, db: DB, sta
     return {"mfa_required": False}
 
 
-@router.post("/mfa/verify")
-async def mfa_verify(body: MfaIn, request: Request, db: DB, state: State) -> dict:
+@router.post("/mfa/verify", dependencies=[CsrfHeader])
+async def mfa_verify(body: MfaIn, request: Request, response: Response, db: DB, state: State) -> dict:
     p = await authenticate(request, db, allow_mfa_pending=True)
     raw = request.cookies.get(state.settings.session_cookie_name)
     sess = await db.scalar(select(AuthSession).where(AuthSession.token_hash == token_digest(raw or "")))
@@ -156,14 +138,15 @@ async def mfa_verify(body: MfaIn, request: Request, db: DB, state: State) -> dic
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "That code didn't match. Check your authenticator's clock and try again.")
     throttle.reset(key)
-    sess.mfa_pending = False
-    sess.expires_at = utcnow() + timedelta(hours=state.settings.session_ttl_hours)
+    # The half-authenticated token is retired; the full session gets a fresh one.
+    sess.revoked_at = utcnow()
+    await start_session(db, state, request, response, p.user, mfa_pending=False)
     p.user.last_login_at = utcnow()
     await audit.record(db, p.actor, "auth.login", detail={"mfa": True})
     return {"ok": True}
 
 
-@router.post("/logout")
+@router.post("/logout", dependencies=[CsrfHeader])
 async def logout(request: Request, response: Response, db: DB, state: State) -> dict:
     raw = request.cookies.get(state.settings.session_cookie_name)
     if raw:
@@ -199,7 +182,11 @@ class PasswordChange(BaseModel):
 async def change_password(body: PasswordChange, request: Request, principal: CurrentPrincipal, db: DB) -> dict:
     if principal.via != "session":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Passwords can only be changed from an interactive session.")
+    pw_key = f"pw|{principal.user.id}"
+    if throttle.blocked(pw_key):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed attempts. Try again in 15 minutes.")
     if not verify_password(principal.user.password_hash, body.current_password):
+        throttle.fail(pw_key)
         await audit.record(db, principal.actor, "auth.password.change", outcome="denied")
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Your current password is incorrect.")
@@ -226,7 +213,7 @@ class Preferences(BaseModel):
     density: Literal["comfortable", "compact"] = "comfortable"
     theme: Literal["system", "light", "dark"] = "system"
     # Ordered panel ids; panels not listed are hidden.
-    overview_panels: list[str] = Field(default_factory=lambda: list(OVERVIEW_PANELS))
+    overview_panels: list[str] = Field(default_factory=lambda: list(OVERVIEW_PANELS), max_length=32)
 
 
 def _prefs_key(user_id: str) -> str:
@@ -280,8 +267,12 @@ async def mfa_activate(body: MfaIn, principal: CurrentPrincipal, db: DB, state: 
     user = principal.user
     if not user.totp_secret_ref or user.mfa_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "Start enrolment first.")
+    act_key = f"mfa-activate|{user.id}"
+    if throttle.blocked(act_key):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed codes. Try again later.")
     secret = await state.vault.reveal(db, user.totp_secret_ref)
     if not pyotp.TOTP(secret).verify(body.code, valid_window=1):
+        throttle.fail(act_key)
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "That code didn't match.")
     user.mfa_enabled = True
     await audit.record(db, principal.actor, "auth.mfa.enable", target_type="user", target_id=user.id)
@@ -289,12 +280,18 @@ async def mfa_activate(body: MfaIn, principal: CurrentPrincipal, db: DB, state: 
 
 
 class PasswordConfirm(BaseModel):
-    password: str
+    password: str = Field(max_length=1024)
 
 
 @router.post("/mfa/disable")
 async def mfa_disable(body: PasswordConfirm, principal: CurrentPrincipal, db: DB) -> dict:
+    pw_key = f"pw|{principal.user.id}"
+    if throttle.blocked(pw_key):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed attempts. Try again in 15 minutes.")
     if principal.via != "session" or not verify_password(principal.user.password_hash, body.password):
+        throttle.fail(pw_key)
+        await audit.record(db, principal.actor, "auth.mfa.disable", outcome="denied")
+        await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Password confirmation failed.")
     principal.user.mfa_enabled = False
     await audit.record(db, principal.actor, "auth.mfa.disable", target_type="user", target_id=principal.user.id)
@@ -306,7 +303,7 @@ async def mfa_disable(body: PasswordConfirm, principal: CurrentPrincipal, db: DB
 
 class TokenIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
-    permissions: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list, max_length=256)
     expires_in_days: int | None = Field(default=90, ge=1, le=3650)
 
 

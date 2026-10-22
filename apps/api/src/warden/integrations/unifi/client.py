@@ -14,6 +14,8 @@ from typing import Any
 
 import httpx
 
+from warden.security.outbound import guarded_transport
+
 DEFAULT_BASE_PATH = "/proxy/network/integration"
 PAGE_LIMIT = 200
 
@@ -56,6 +58,9 @@ class UniFiNetworkClient:
         verify: ssl.SSLContext | bool = verify_tls
         if verify_tls and ca_bundle_pem:
             verify = ssl.create_default_context(cadata=ca_bundle_pem)
+        if transport is None:
+            # Real controllers: refuse link-local / metadata destinations at connect time.
+            transport = guarded_transport(verify)
         self._http = httpx.AsyncClient(
             base_url=base_url.rstrip("/") + base_path,
             headers={"X-API-KEY": api_key, "Accept": "application/json"},

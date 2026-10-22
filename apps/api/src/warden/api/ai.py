@@ -15,7 +15,7 @@ from __future__ import annotations
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,7 @@ from warden.ai.simulator import DEMO_BASE_URL, DEMO_MODEL
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
 from warden.models import AiAgentConfig, AiAgentRun, AiProvider, AiUsage, Credential, Setting
+from warden.security.outbound import validate_optional_url
 from warden.security.rbac import P
 
 providers_router = APIRouter(prefix="/api/ai/providers", tags=["ai-providers"], dependencies=[Depends(require_module("ai-providers"))])
@@ -83,6 +84,11 @@ class ProviderIn(BaseModel):
     api_key: str = Field(default="", max_length=1024)
     verify_tls: bool = True
 
+    @field_validator("base_url")
+    @classmethod
+    def _safe_url(cls, v: str | None) -> str | None:
+        return validate_optional_url(v)
+
 
 class ProviderCreate(ProviderIn):
     name: str = Field(min_length=1, max_length=128)
@@ -108,6 +114,11 @@ class ProviderPatch(BaseModel):
     refusal_fallback: bool | None = None
     clear_token_limit: bool = False
     clear_cost_limit: bool = False
+
+    @field_validator("base_url")
+    @classmethod
+    def _safe_url(cls, v: str | None) -> str | None:
+        return validate_optional_url(v)
 
 
 async def _probe(
