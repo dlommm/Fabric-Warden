@@ -13,11 +13,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import delete
 
 from warden import __version__, metrics, monitoring
+from warden import automation as automation_engine
 from warden.api import (
     alerts,
     analytics,
     assets,
     auth,
+    automation,
+    batches,
     cabling,
     changes,
     clients,
@@ -40,10 +43,12 @@ from warden.api import (
     soc,
     system,
     topology,
+    twin,
     users,
     wan,
 )
 from warden.app_state import AppState
+from warden.changes.batches import advance_job as bulk_advance_job
 from warden.changes.engine import verify_job as changes_verify_job
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
@@ -96,6 +101,10 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(JobSpec("snmp.poll", "snmp", "Poll SNMP interface counters", snmp_poll_job, 60))
     state.scheduler.register(
         JobSpec("changes.verify", "change-engine", "Verify applied changes and expire stale proposals", changes_verify_job, 30)
+    )
+    state.scheduler.register(JobSpec("bulk-ops.advance", "bulk-ops", "Continue running bulk operations", bulk_advance_job, 30))
+    state.scheduler.register(
+        JobSpec("automation.evaluate", "automation", "Evaluate automation rules against new events", automation_engine.evaluate_job, 30)
     )
     return state
 
@@ -180,6 +189,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         servers.router,
         snmp.router,
         changes.router,
+        batches.router,
+        automation.router,
+        twin.router,
         firewall.router,
         config_history.router,
         compliance.router,

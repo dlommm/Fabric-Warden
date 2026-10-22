@@ -1257,6 +1257,132 @@ export interface ChangeRequest {
   expires_at: string;
   evidence: ChangeEvidence[];
   is_demo: boolean;
+  batch_id?: string | null;
+  batch_position?: number | null;
+  /** Present on a single change's detail when it is one item of a bulk operation. */
+  batch?: { id: string; ref: string; status: BatchStatus; title: string };
+}
+
+// -- bulk operations, automation, impact preview (Phase 6d) ----------------------------------
+
+export type BatchStatus = "proposed" | "approved" | "running" | "succeeded" | "stopped" | "rejected" | "cancelled" | "expired";
+
+export interface ChangeBatch {
+  id: string;
+  number: number;
+  ref: string;
+  operation: ChangeRequest["operation"];
+  title: string;
+  reason: string;
+  risk: ChangeRequest["risk"];
+  protected: boolean;
+  pause_seconds: number;
+  status: BatchStatus;
+  proposed_by: string;
+  proposed_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  decided_note: string;
+  started_by: string | null;
+  started_at: string | null;
+  next_at: string | null;
+  finished_at: string | null;
+  skipped: { target_id: string; params: Record<string, unknown>; reason: string }[];
+  log: ChangeEvidence[];
+  counts: Partial<Record<ChangeStatus, number>>;
+  is_demo: boolean;
+  items?: ChangeRequest[];
+}
+
+export interface BatchCandidate {
+  target_id: string;
+  params: Record<string, unknown>;
+  label: string;
+  group: string;
+  detail: string;
+  ready: boolean;
+  is_demo: boolean;
+}
+
+export interface ImpactPreview {
+  summary: string[];
+  traffic_change: boolean;
+  devices: { id: string; name: string; model: string; state: string; relation: "target" | "downstream" | "possibly"; depth: number; via: string }[];
+  clients: { count: number; possible: number; sample: { id: string; name: string; ip: string | null; type: string; via: string; certain: boolean }[] };
+  networks: { id: string; name: string; vlan_id: number | null; relation: string; clients: number | null }[];
+  zones: { id: string; name: string; relation: string }[];
+  policies: { id: string; name: string; action: string; enabled: boolean; relation: string }[];
+  notes: string[];
+  basis: { observed_at: string | null; text: string };
+}
+
+export interface RuleCondition {
+  field: string;
+  op: "eq" | "ne" | "in" | "not_in" | "contains" | "gte" | "lte" | "exists";
+  value?: string;
+}
+
+export type RuleAction =
+  | { kind: "propose"; operation: ChangeRequest["operation"]; target: "event" | "fixed"; target_id?: string; params?: Record<string, unknown>; reason?: string }
+  | { kind: "notify"; channel_ids: string[]; severity: "info" | "warning" | "critical"; title?: string };
+
+export interface AutomationRuleInput {
+  name: string;
+  description: string;
+  trigger_kind: "event" | "schedule";
+  event_type: string | null;
+  interval_minutes: number | null;
+  conditions: RuleCondition[];
+  action: RuleAction;
+  cooldown_minutes: number;
+}
+
+export type AutomationOutcome = "proposed" | "notified" | "refused" | "skipped" | "error";
+
+export interface AutomationRun {
+  id: string;
+  rule_id: string;
+  at: string;
+  trigger: "event" | "schedule" | "manual";
+  event_id: string | null;
+  event_type: string | null;
+  outcome: AutomationOutcome;
+  detail: string;
+  change_id: string | null;
+  change_ref: string | null;
+}
+
+export interface AutomationRule extends AutomationRuleInput {
+  id: string;
+  enabled: boolean;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  last_run_at: string | null;
+  stats: Partial<Record<AutomationOutcome, number>>;
+  runs?: AutomationRun[];
+}
+
+export interface AutomationMeta {
+  events: { type: string; label: string; notify_only: boolean }[];
+  ops: RuleCondition["op"][];
+  fields: string[];
+  operations: { id: ChangeRequest["operation"]; target_type: string }[];
+  target_entity: Record<string, string>;
+  min_interval_minutes: number;
+}
+
+export interface DryRunResult {
+  evaluated: number;
+  matched: number;
+  days: number;
+  items: {
+    event: { id: string; type: string; occurred_at: string; severity: string; entity_type: string | null; entity_id: string | null; summary: string } | null;
+    matched: boolean;
+    failed: RuleCondition | null;
+    outcome: "would_propose" | "would_notify" | "refused" | "skipped" | "no_match";
+    detail: string;
+  }[];
 }
 
 export interface ChangeSettings {

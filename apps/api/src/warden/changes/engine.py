@@ -92,6 +92,43 @@ async def _publish(db: AsyncSession, state: AppState, kind: str, cr: ChangeReque
     )
 
 
+async def open_change_for(db: AsyncSession, target_id: str, operation: str, params: dict[str, Any]) -> int | None:
+    """The number of an open change on the same target, if any.
+
+    PoE cycles of different ports on one switch do not touch each other, so
+    they may be open at the same time (a bulk PoE cycle relies on this).
+    """
+    rows = await db.execute(
+        select(ChangeRequest.number, ChangeRequest.operation, ChangeRequest.params).where(
+            ChangeRequest.target_id == target_id, ChangeRequest.status.in_(IN_FLIGHT + OPEN)
+        )
+    )
+    for number, other_op, other_params in rows:
+        if operation == other_op == "port.power_cycle" and (other_params or {}).get("port_idx") != params.get("port_idx"):
+            continue
+        return number
+    return None
+
+
+async def preview(db: AsyncSession, operation: str, target_id: str, params: dict[str, Any]) -> tuple[Target, str]:
+    """What a proposal would be about, from the inventory alone: no controller read, nothing stored.
+
+    Raises ChangeRefused for everything propose would refuse before reading the controller.
+    """
+    op = OPERATIONS.get(operation)
+    if op is None:
+        raise ChangeRefused(f"Unknown operation {operation}")
+    t = await op.resolve(db, target_id, params)
+    _capability(t.controller, op)
+    if busy := await open_change_for(db, t.id, op.id, params):
+        raise ChangeRefused(f"CHG-{busy:04d} is already open for this target")
+    try:
+        title = op.title(t, params)
+    except (KeyError, TypeError) as e:
+        raise ChangeRefused(f"The change is missing a setting: {e}") from e
+    return t, title
+
+
 async def propose(
     db: AsyncSession,
     state: AppState,
@@ -101,14 +138,14 @@ async def propose(
     params: dict[str, Any],
     reason: str,
     inverse_of: ChangeRequest | None = None,
+    batch: tuple[str, int, str] | None = None,  # (batch id, position, BAT-0001)
 ) -> ChangeRequest:
     op = OPERATIONS.get(operation)
     if op is None:
         raise ChangeRefused(f"Unknown operation {operation}")
     t = await op.resolve(db, target_id, params)
     _capability(t.controller, op)
-    busy = await db.scalar(select(ChangeRequest.number).where(ChangeRequest.target_id == t.id, ChangeRequest.status.in_(IN_FLIGHT + OPEN)))
-    if busy:
+    if busy := await open_change_for(db, t.id, op.id, params):
         raise ChangeRefused(f"CHG-{busy:04d} is already open for this target; finish or cancel it first")
     try:
         async with await _client(state, db, t.controller) as api:
@@ -148,10 +185,14 @@ async def propose(
         expires_at=now + APPROVAL_WINDOW,
         evidence=[],
         is_demo=t.is_demo,
+        batch_id=batch[0] if batch else None,
+        batch_position=batch[1] if batch else None,
     )
     _note(cr, "read", "Read the current state from the controller", before=before)
     if inverse_of:
         _note(cr, "revert", f"Reverts CHG-{inverse_of.number:04d}")
+    if batch:
+        _note(cr, "batch", f"Item {batch[1] + 1} of {batch[2]}")
     db.add(cr)
     await db.flush()
     await audit.record(
