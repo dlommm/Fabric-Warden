@@ -98,8 +98,15 @@ async def start_session(db: DB, state: State, request: Request, response: Respon
 async def login(body: LoginIn, request: Request, response: Response, db: DB, state: State) -> dict:
     key = f"{client_ip(request)}|{body.username.lower()}"
     ip_key = f"ip|{client_ip(request)}"
+    user_key = f"user|{body.username.lower()}"
     actor = Actor("user", None, body.username, client_ip(request))
-    if throttle.blocked(key) or throttle.blocked(ip_key, state.settings.login_ip_max_failures):
+    if (
+        throttle.blocked(key)
+        # Per-address spraying limit only when addresses are real clients (behind the web
+        # container alone every request shares its address, and this would lock everyone out).
+        or (state.settings.forwarded_hops > 0 and throttle.blocked(ip_key, state.settings.login_ip_max_failures))
+        or throttle.blocked(user_key, state.settings.login_user_max_failures)
+    ):
         await audit.record(db, actor, "auth.login", outcome="denied", detail={"reason": "throttled"})
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "Too many failed attempts. Try again in 15 minutes.")
@@ -109,6 +116,7 @@ async def login(body: LoginIn, request: Request, response: Response, db: DB, sta
     if user is None or not user.is_active or not verify_password(user.password_hash, body.password):
         throttle.fail(key)
         throttle.fail(ip_key)
+        throttle.fail(user_key)
         await audit.record(db, actor, "auth.login", outcome="denied", detail={"reason": "bad_credentials"})
         await db.commit()  # keep the denial even though the request fails
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Incorrect username or password.")

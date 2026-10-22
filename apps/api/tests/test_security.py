@@ -106,11 +106,43 @@ async def test_login_and_setup_require_csrf_header(app) -> None:  # type: ignore
 # -- rate limits ------------------------------------------------------------------------
 
 
-async def test_login_spraying_many_usernames_is_throttled_per_address(owner) -> None:  # type: ignore[no-untyped-def]
-    for i in range(20):
-        r = await owner.post("/api/auth/login", json={"username": f"nobody{i}", "password": "wrong password!!"})
-        assert r.status_code == 401
-    # A different username from the same address is now refused too, even with the right password.
+def _fwd_settings(tmp_path) -> Settings:  # type: ignore[no-untyped-def]
+    """A deployment behind a TLS reverse proxy that sets X-Forwarded-For."""
+    return Settings(
+        environment="test",
+        database_url=f"sqlite+aiosqlite:///{tmp_path}/fwd.db",
+        data_dir=tmp_path,
+        scheduler_enabled=False,
+        cookie_secure=False,
+        forwarded_hops=1,
+    )
+
+
+def _client(app) -> httpx.AsyncClient:  # type: ignore[no-untyped-def]
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test", headers={"x-warden-csrf": "1"})
+
+
+async def test_login_spraying_many_usernames_is_throttled_per_address(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    app = create_app(_fwd_settings(tmp_path))
+    real = {"x-forwarded-for": "198.51.100.7"}
+    async with app.router.lifespan_context(app), _client(app) as c:
+        assert (await c.post("/api/setup/owner", json={"username": "owner", "password": PASSWORD})).status_code == 201
+        for i in range(20):
+            r = await c.post("/api/auth/login", json={"username": f"nobody{i}", "password": "wrong password!!"}, headers=real)
+            assert r.status_code == 401
+        # A different username from the same address is now refused too, even with the right password.
+        r = await c.post("/api/auth/login", json={"username": "owner", "password": PASSWORD}, headers=real)
+        assert r.status_code == 429
+        # Another address is unaffected.
+        r = await c.post("/api/auth/login", json={"username": "owner", "password": PASSWORD}, headers={"x-forwarded-for": "198.51.100.8"})
+        assert r.status_code == 200
+
+
+async def test_username_is_throttled_across_addresses(owner) -> None:  # type: ignore[no-untyped-def]
+    from warden.api.auth import throttle
+
+    for _ in range(50):
+        throttle.fail("user|owner")
     r = await owner.post("/api/auth/login", json={"username": "owner", "password": PASSWORD})
     assert r.status_code == 429
 
@@ -316,3 +348,21 @@ async def test_api_security_headers(anon) -> None:  # type: ignore[no-untyped-de
     assert r.headers["x-content-type-options"] == "nosniff"
     assert "default-src 'none'" in r.headers["content-security-policy"]
     assert r.headers["cache-control"] == "no-store"
+
+
+async def test_spoofed_forwarded_for_does_not_bypass_sign_in_limits(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    app = create_app(_fwd_settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        async with _client(app) as c:
+            assert (await c.post("/api/setup/owner", json={"username": "owner", "password": PASSWORD})).status_code == 201
+            # The proxy appends the real address (203.0.113.9); the client invents the rest.
+            for i in range(5):
+                hdr = {"x-forwarded-for": f"10.9.9.{i}, 203.0.113.9"}
+                r = await c.post("/api/auth/login", json={"username": "owner", "password": "wrong password!!"}, headers=hdr)
+                assert r.status_code == 401
+            hdr = {"x-forwarded-for": "10.9.9.99, 203.0.113.9"}
+            r = await c.post("/api/auth/login", json={"username": "owner", "password": PASSWORD}, headers=hdr)
+            assert r.status_code == 429
+        async with app.state.warden.db.sessionmaker() as db:
+            rec = await db.scalar(select(AuditRecord).where(AuditRecord.action == "auth.login", AuditRecord.outcome == "denied"))
+            assert rec is not None and rec.ip_address == "203.0.113.9"

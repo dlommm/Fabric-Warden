@@ -227,4 +227,5 @@ def run() -> None:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO)
-    uvicorn.run("warden.main:create_app", factory=True, host="0.0.0.0", port=8000, proxy_headers=True)
+    # Client addresses come from WARDEN_FORWARDED_HOPS (api.deps.client_ip), not uvicorn's proxy headers.
+    uvicorn.run("warden.main:create_app", factory=True, host="0.0.0.0", port=8000, proxy_headers=False)

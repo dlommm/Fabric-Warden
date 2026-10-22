@@ -61,7 +61,23 @@ class Principal:
 
 
 def client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
+    """The address the request came from, for audit and rate limits.
+
+    The API sits behind the web container's /api proxy (and often a TLS proxy in
+    front of that). Each proxy appends the address it saw to X-Forwarded-For, so
+    only the last ``WARDEN_FORWARDED_HOPS`` entries are trustworthy; anything to
+    their left was supplied by the client and is ignored. Trusting the whole
+    header (``--forwarded-allow-ips=*``) would let a client pick its own address
+    and step around per-address sign-in limits.
+    """
+    peer = request.client.host if request.client else None
+    hops = request.app.state.warden.settings.forwarded_hops
+    if hops <= 0:
+        return peer
+    chain = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    if len(chain) < hops:
+        return chain[0] if chain else peer
+    return chain[-hops]
 
 
 async def _from_token(db: AsyncSession, raw: str, request: Request) -> Principal | None:

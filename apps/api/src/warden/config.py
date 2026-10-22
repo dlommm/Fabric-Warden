@@ -55,8 +55,18 @@ class Settings(BaseSettings):
     max_request_bytes: int = 2 * 1024 * 1024
     max_restore_bytes: int = 512 * 1024 * 1024
 
-    # Sign-in rate limits, per client address, on top of the per-account limit.
+    # Sign-in rate limits, per client address and per username (any address), on top
+    # of the per-address-and-username limit of 5.
     login_ip_max_failures: int = 20
+    login_user_max_failures: int = 50
+
+    # How many trusted proxies append to X-Forwarded-For before the API. The web
+    # container's /api proxy passes the header through unchanged and adds nothing, so:
+    # 0 = use the socket peer (default; behind the web container every client shares its
+    # address), 1 = a TLS reverse proxy in front of the web container sets or appends
+    # the real client address. Never more than the real number: extra hops would trust
+    # client-supplied addresses. The per-address sign-in limit applies only when > 0.
+    forwarded_hops: int = 0
 
 
 @lru_cache
