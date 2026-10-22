@@ -86,6 +86,9 @@ async def test_full_preset_reports_unavailable(owner):
         "logs",
         "soc",
         "investigations",
+        "unifi-protect",
+        "home-assistant",
+        "mcp",
     }
     assert "flows" in r["unavailable"] and "ai-agents" in r["unavailable"]
 

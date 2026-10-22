@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from warden.config import Settings
 from warden.db import Database
 from warden.events import EventBus
+from warden.integrations.homeassistant.simulator import HaSimState, create_home_assistant_app
 from warden.integrations.hosts.simulators import (
     HostSimState,
     create_docker_app,
@@ -19,11 +20,12 @@ from warden.integrations.hosts.simulators import (
     create_proxmox_app,
     create_unraid_app,
 )
+from warden.integrations.protect.simulator import ProtectSimState, create_protect_app
 from warden.integrations.snmp.simulator import SnmpSimState
 from warden.integrations.unifi.client import UniFiNetworkClient
 from warden.integrations.unifi.simulator import SimulatorState, create_simulator_app
 from warden.jobs import Scheduler
-from warden.models import Controller, HostConnection
+from warden.models import Controller, HostConnection, IntegrationConnection
 from warden.modules.service import ModuleService
 from warden.security.vault import Vault
 
@@ -44,6 +46,9 @@ class AppState:
     syslog: Any = None  # warden.syslog.Ingest, created in build_state
     snmp_sim: SnmpSimState = field(default_factory=SnmpSimState)
     _host_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
+    protect_sim: ProtectSimState = field(default_factory=ProtectSimState)
+    ha_sim: HaSimState = field(default_factory=HaSimState)
+    _integration_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
     # Seams for outbound I/O so tests never reach a real network.
     http_transport: httpx.AsyncBaseTransport | None = None  # notification webhooks / ntfy
     smtp_send: Callable[[dict[str, Any], str, Any], Awaitable[None]] | None = None  # (config, password, EmailMessage)
@@ -68,6 +73,17 @@ class AppState:
             }
             self._host_sim_apps[conn.kind] = factory[conn.kind](self.host_sim)
         return httpx.ASGITransport(app=self._host_sim_apps[conn.kind])
+
+    def integration_transport(self, conn: IntegrationConnection) -> httpx.AsyncBaseTransport | None:
+        """Demo Protect / Home Assistant connections are served in-process; real ones use the network."""
+        if not conn.is_demo:
+            return None
+        if conn.kind not in self._integration_sim_apps:
+            if conn.kind == "unifi-protect":
+                self._integration_sim_apps[conn.kind] = create_protect_app(self.protect_sim)
+            else:
+                self._integration_sim_apps[conn.kind] = create_home_assistant_app(self.ha_sim)
+        return httpx.ASGITransport(app=self._integration_sim_apps[conn.kind])
 
     def unifi_client(self, controller: Controller, api_key: str) -> UniFiNetworkClient:
         if controller.kind == "unifi-simulator":

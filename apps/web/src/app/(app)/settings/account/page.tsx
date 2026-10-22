@@ -11,6 +11,7 @@ import { StateLabel } from "@/components/ui/signs";
 import { ApiError, del, get, post } from "@/lib/api";
 import { ago, dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
+import { McpPanel } from "@/components/mcp";
 
 interface Token {
   id: string;
@@ -32,6 +33,9 @@ export default function AccountPage() {
         <MfaPanel />
         <div className="xl:col-span-2">
           <TokensPanel />
+        </div>
+        <div className="xl:col-span-2">
+          <McpPanel />
         </div>
       </div>
     </>
@@ -134,7 +138,8 @@ function TokensPanel() {
   const [created, setCreated] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const tokens = useQuery({ queryKey: ["tokens"], queryFn: () => get<Token[]>("/api/auth/tokens") });
-  const readPerms = me.permissions.filter((p) => p.endsWith(":read"));
+  // mcp:use only reaches read-only tools, so a read-only token may carry it.
+  const readPerms = me.permissions.filter((p) => p.endsWith(":read") || p === "mcp:use");
   const create = useMutation({
     mutationFn: () => post<{ token: string }>("/api/auth/tokens", { name, expires_in_days: Number(days) || null, permissions: readOnly ? readPerms : [] }),
     onSuccess: (r) => { setCreated(r.token); setName(""); setErr(null); qc.invalidateQueries({ queryKey: ["tokens"] }); },

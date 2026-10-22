@@ -1,0 +1,48 @@
+{
+  "retrieved": "2026-10-21",
+  "note": "Every UniFi Protect Integration API endpoint Fabric Warden calls, with the published spec it was checked against. All calls are GET. Endpoints were present in every mirrored spec from 5.3.38 to 7.3.70.",
+  "sources": [
+    "https://developer.ui.com (UniFi Protect Integration API, official; the site is rendered client-side)",
+    "https://github.com/opastorello/unifi-api-docs/tree/main/protect (unofficial, automated mirror of the official OpenAPI documents; 36 versions 5.3.38 to 7.3.70)",
+    "https://raw.githubusercontent.com/opastorello/unifi-api-docs/HEAD/protect/v7.3.70/openapi.json"
+  ],
+  "spec_versions_checked": ["5.3.38", "6.0.41", "7.3.70"],
+  "base": "https://<console>/proxy/protect/integration",
+  "auth": "X-API-KEY header with an API key created on the console (Settings > Control Plane > Integrations). Read-only use only.",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/v1/meta/info",
+      "summary": "Get application information",
+      "introduced": "5.3.38",
+      "used_for": "applicationVersion (the Protect version); doubles as the connection test",
+      "fields_used": ["applicationVersion"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/cameras",
+      "summary": "Get all cameras",
+      "introduced": "5.3.38",
+      "used_for": "Cameras: id, name, model, MAC and connection state; feature flags and smart-detection types",
+      "fields_used": ["id", "modelKey", "state", "name", "type", "mac", "isMicEnabled", "featureFlags.smartDetectTypes", "featureFlags.hasMic", "featureFlags.hasSpeaker", "smartDetectSettings.objectTypes", "hasPackageCamera"]
+    },
+    {
+      "method": "GET",
+      "path": "/v1/nvrs",
+      "summary": "Get NVR details",
+      "introduced": "5.3.38",
+      "used_for": "The NVR: id, name, model, MAC and alarm arm mode",
+      "fields_used": ["id", "modelKey", "name", "type", "mac", "armMode.status", "armMode.breachEventCount"]
+    }
+  ],
+  "not_published": [
+    "Camera IP address, uptime, firmware, recording state, bitrate or storage use",
+    "NVR storage, disk health, CPU, memory or temperature",
+    "Which switch port a camera is plugged into (LLDP)"
+  ],
+  "not_used": [
+    "Every PATCH, POST and DELETE endpoint (settings, PTZ, RTSPS streams, talkback, sirens, relays, alarm manager, arm profiles, file upload)",
+    "GET /v1/cameras/{id}/snapshot and /v1/cameras/{id}/rtsps-stream (video and images are out of scope)",
+    "GET /v1/subscribe/devices and /v1/subscribe/events (WebSocket streams; polling is used instead)"
+  ]
+}
