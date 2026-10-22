@@ -154,3 +154,29 @@ class UniFiNetworkClient:
 
     async def firewall_policies(self, site_id: str) -> list[dict[str, Any]]:
         return await self.collect(f"/v1/sites/{site_id}/firewall/policies")
+
+    async def firewall_policy(self, site_id: str, policy_id: str) -> dict[str, Any]:
+        return await self.get(f"/v1/sites/{site_id}/firewall/policies/{policy_id}")
+
+    # Writes ---------------------------------------------------------------
+    # Each needs a WriteAuthorization, which only the change engine can mint.
+    # Bodies follow the published request schemas (Network API 10.6.106).
+
+    async def patch_firewall_policy_logging(self, site_id: str, policy_id: str, enabled: bool, *, authorization: WriteAuthorization) -> Any:
+        """PATCH Firewall Policy: the published body has one field, loggingEnabled."""
+        return await self._request(
+            "PATCH", f"/v1/sites/{site_id}/firewall/policies/{policy_id}", json={"loggingEnabled": enabled}, authorization=authorization
+        )
+
+    async def restart_device(self, site_id: str, device_id: str, *, authorization: WriteAuthorization) -> Any:
+        return await self._request(
+            "POST", f"/v1/sites/{site_id}/devices/{device_id}/actions", json={"action": "RESTART"}, authorization=authorization
+        )
+
+    async def power_cycle_port(self, site_id: str, device_id: str, port_idx: int, *, authorization: WriteAuthorization) -> Any:
+        return await self._request(
+            "POST",
+            f"/v1/sites/{site_id}/devices/{device_id}/interfaces/ports/{port_idx}/actions",
+            json={"action": "POWER_CYCLE"},
+            authorization=authorization,
+        )

@@ -8,6 +8,7 @@ from warden.models.analytics import (
     NotificationChannel,
     NotificationDelivery,
 )
+from warden.models.changes import ChangeRequest
 from warden.models.config import ComplianceResult, ConfigSnapshot
 from warden.models.dcim import Asset, Cable, CableEnd, DocPage, DocVersion, Location, PowerFeed, PowerLink, Rack, RackItem
 from warden.models.inventory import (
@@ -94,4 +95,5 @@ __all__ = [
     "SnmpInterface",
     "SnmpProfile",
     "SnmpTarget",
+    "ChangeRequest",
 ]

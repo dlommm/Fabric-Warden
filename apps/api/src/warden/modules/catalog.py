@@ -443,6 +443,34 @@ SNMP = ModuleManifest(
     ],
 )
 
+CHANGE_ENGINE = ModuleManifest(
+    id="change-engine",
+    version=VERSION,
+    name="Change Approval & Recovery",
+    category=C.AUTOMATION,
+    description=(
+        "The single path for controller writes: changes are proposed with the live state, a diff, risk and impact, approved, "
+        "applied only after a fresh re-read, verified by re-reading the controller, and reverted when a reversible check fails."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=6,
+    requires=["core", "unifi-network", "inventory"],
+    permissions=["changes:propose", "changes:approve"],
+    controller_capabilities=["network.info.read"],
+    nav=[NavEntry(label="Changes", href="/changes", icon="git-pull-request", section="Operate")],
+    jobs=[JobDecl(id="changes.verify", title="Verify applied changes and expire stale proposals", default_interval_seconds=30)],
+    resources=ResourceEstimate(memory_mb=8),
+    data_ownership=["change_requests"],
+    uninstall_behavior=(
+        "Disabling stops all writes; change history is kept. Controllers stay in their current write mode until an owner changes it."
+    ),
+    warnings=[
+        "Operations today: turn firewall policy logging on or off, restart a device, power-cycle a PoE port. "
+        "Each controller is read-only until an owner allows changes on it. Only logging changes have an automatic revert; "
+        "restarts and PoE cycles cannot be undone and are verified by watching the device or port come back."
+    ],
+)
+
 FIREWALL = ModuleManifest(
     id="firewall",
     version=VERSION,
@@ -551,14 +579,6 @@ INVESTIGATIONS = ModuleManifest(
 PLANNED: list[ModuleManifest] = [
     _planned("ndr", "Network Detection & Response", C.SECURITY, 5, "Explainable flow-based anomaly detection.", ["flows"]),
     _planned(
-        "change-engine",
-        "Change Approval & Recovery",
-        C.AUTOMATION,
-        6,
-        "Central transactional write path with approvals, verification and guarded rollback.",
-        ["unifi-network"],
-    ),
-    _planned(
         "switching", "Switch Operations", C.NETWORK, 3, "Ports, PoE budgets, VLAN visibility, LAGs, flaps and utilisation.", ["inventory"]
     ),
     _planned(
@@ -634,6 +654,7 @@ CATALOG: dict[str, ModuleManifest] = {
         DOCS,
         SERVERS,
         SNMP,
+        CHANGE_ENGINE,
         FIREWALL,
         CONFIG_HISTORY,
         COMPLIANCE,

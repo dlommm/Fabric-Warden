@@ -1203,3 +1203,53 @@ export interface SnmpFinding {
   interface_id?: string;
   is_demo: boolean;
 }
+
+// -- change engine (Phase 6) ----------------------------------------------------------------
+
+export type ChangeStatus = "proposed" | "approved" | "applying" | "verifying" | "succeeded" | "failed" | "reverted" | "conflict" | "rejected" | "cancelled" | "expired";
+
+export interface ChangeEvidence {
+  at: string;
+  kind: string;
+  text: string;
+  data?: Record<string, unknown>;
+}
+
+export interface ChangeRequest {
+  id: string;
+  number: number;
+  ref: string;
+  operation: "firewall_policy.set_logging" | "device.restart" | "port.power_cycle";
+  title: string;
+  reason: string;
+  target: { type: string; id: string; label: string; params: Record<string, unknown> };
+  controller: { id: string; name: string; write_mode: string } | null;
+  before: Record<string, unknown>;
+  expected: Record<string, unknown>;
+  diff: { field: string; before: string; after: string }[];
+  impact: string[];
+  risk: "low" | "medium" | "high";
+  risk_reasons: string[];
+  protected: boolean;
+  reversible: boolean;
+  recovery: string;
+  inverse_of_id: string | null;
+  status: ChangeStatus;
+  proposed_by: string;
+  proposed_at: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  decided_note: string;
+  applied_by: string | null;
+  applied_at: string | null;
+  finished_at: string | null;
+  verify_deadline: string | null;
+  expires_at: string;
+  evidence: ChangeEvidence[];
+  is_demo: boolean;
+}
+
+export interface ChangeSettings {
+  require_second_person: boolean;
+  controllers: { id: string; name: string; write_mode: "read_only" | "changes"; is_demo: boolean; application_version: string | null }[];
+}

@@ -3,7 +3,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ArrowRight, ShieldCheck } from "lucide-react";
+import { ProposeChange, useCanPropose } from "@/components/changes";
 import { FindingsPlate } from "@/components/ipam";
+import { Button } from "@/components/ui/button";
 import { EmptyState, ModuleOff, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { DemoTag, StateLabel, ZonePatch } from "@/components/ui/signs";
 import { type Column, DataTable } from "@/components/ui/table";
@@ -80,7 +82,7 @@ function Matrix({ site }: { site: FwSite }) {
   );
 }
 
-const columns = (system = false): Column<FwPolicy>[] => [
+const columns = (system = false, propose = false): Column<FwPolicy>[] => [
   { key: "idx", header: "#", align: "right", className: "w-20", sort: (p) => p.index, cell: (p) => <span className="font-mono text-xs text-ink-2">{p.index ?? "—"}</span> },
   {
     key: "name",
@@ -98,6 +100,10 @@ const columns = (system = false): Column<FwPolicy>[] => [
           <Action a={p.action} />
         </span>
         <span className="mt-1 md:hidden"><Analysis p={p} /></span>
+        <span className="mt-1 inline-flex items-center gap-2 text-sm md:hidden">
+          <span className="text-ink-3">Logs</span> {p.logging ? "Yes" : "No"}
+          {propose && <LoggingChange p={p} />}
+        </span>
       </span>
     ),
   },
@@ -114,7 +120,17 @@ const columns = (system = false): Column<FwPolicy>[] => [
     ),
   },
   { key: "action", header: "Action", className: "hidden w-28 md:table-cell", sort: (p) => p.action, cell: (p) => <Action a={p.action} /> },
-  { key: "log", header: "Logs", className: "hidden w-20 md:table-cell", cell: (p) => (p.logging ? "Yes" : <span className={clsx(p.action !== "ALLOW" && !system ? "font-semibold text-warn-text" : "text-ink-3")}>No</span>) },
+  {
+    key: "log",
+    header: "Logs",
+    className: clsx("hidden md:table-cell", propose ? "w-40" : "w-20"),
+    cell: (p) => (
+      <span className="inline-flex items-center gap-2 whitespace-nowrap">
+        {p.logging ? "Yes" : <span className={clsx(p.action !== "ALLOW" && !system ? "font-semibold text-warn-text" : "text-ink-3")}>No</span>}
+        {propose && <LoggingChange p={p} />}
+      </span>
+    ),
+  },
   { key: "analysis", header: "Analysis", className: "hidden w-[22rem] md:table-cell", cell: (p) => <Analysis p={p} /> },
 ];
 
@@ -122,6 +138,7 @@ export default function FirewallPage() {
   const { can, moduleEnabled, modules } = useSession();
   const on = moduleEnabled("firewall");
   const q = useQuery({ queryKey: ["firewall"], queryFn: () => get<Overview>("/api/firewall"), enabled: on, refetchInterval: 60_000 });
+  const canPropose = useCanPropose();
   if (modules.length > 0 && !on) {
     return (
       <ModuleOff title="Firewall" name="Firewall & Policy Manager" canManage={can("modules:manage")}>
@@ -135,7 +152,7 @@ export default function FirewallPage() {
     <>
       <PageHeader
         title="Firewall"
-        description="Zone policies in the order the gateway evaluates them, checked for policies that can never match. Read-only: nothing here reorders or edits a policy."
+        description="Zone policies in the order the gateway evaluates them, checked for policies that can never match. Nothing here reorders or edits a policy; logging can be switched through a reviewed change."
         meta={demo ? <span className="inline-flex items-center gap-2 text-sm text-ink-2"><DemoTag /> Simulated policies</span> : undefined}
       />
       {q.error && <Notice tone="crit" className="mb-4">{(q.error as Error).message}</Notice>}
@@ -158,17 +175,17 @@ export default function FirewallPage() {
                 <Matrix site={s} />
               </Panel>
               <Panel title={`Policies in order (${s.policies.length})`} bodyClassName="p-0">
-                <DataTable folds caption="Policies in evaluation order" rows={s.policies} columns={columns()} initialSort={{ key: "idx", dir: "asc" }} rowClassName={(p) => (p.relation === "shadowed" ? "bg-warn-soft" : undefined)} />
+                <DataTable folds caption="Policies in evaluation order" rows={s.policies} columns={columns(false, canPropose)} initialSort={{ key: "idx", dir: "asc" }} rowClassName={(p) => (p.relation === "shadowed" ? "bg-warn-soft" : undefined)} />
               </Panel>
               {s.system_policies.length > 0 && (
                 <Panel title={`System policies (${s.system_policies.length})`} bodyClassName="p-0">
                   <p className="border-b border-rule px-4 py-2 text-sm text-ink-3">Defined by UniFi. The API gives them no position, so they are left out of ordering analysis.</p>
-                  <DataTable folds caption="System policies" rows={s.system_policies} columns={columns(true)} />
+                  <DataTable folds caption="System policies" rows={s.system_policies} columns={columns(true, canPropose)} />
                 </Panel>
               )}
               {s.disabled.length > 0 && (
                 <Panel title={`Disabled (${s.disabled.length})`} bodyClassName="p-0">
-                  <DataTable folds caption="Disabled policies" rows={s.disabled} columns={columns(true)} />
+                  <DataTable folds caption="Disabled policies" rows={s.disabled} columns={columns(true, canPropose)} />
                 </Panel>
               )}
             </div>
@@ -177,5 +194,24 @@ export default function FirewallPage() {
         </div>
       )}
     </>
+  );
+}
+
+/** Propose switching a policy's logging; the change is reviewed and approved on its own page. */
+function LoggingChange({ p }: { p: FwPolicy }) {
+  const on = !p.logging;
+  return (
+    <ProposeChange
+      operation="firewall_policy.set_logging"
+      targetId={p.id}
+      params={{ enabled: on }}
+      title={`Propose: turn ${on ? "on" : "off"} logging for “${p.name}”`}
+      summary={
+        on
+          ? "The gateway will write a syslog line each time this policy matches, so its traffic appears under Logs and Connections. Traffic itself is handled exactly as before."
+          : "The gateway stops logging this policy's matches. Connections analytics and SOC detections will no longer see them."
+      }
+      trigger={<Button size="sm" variant="ghost" aria-label={`Turn ${on ? "on" : "off"}… logging for ${p.name}`}>{on ? "Turn on…" : "Turn off…"}</Button>}
+    />
   );
 }

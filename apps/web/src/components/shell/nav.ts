@@ -7,6 +7,7 @@ import {
   ChartLine,
   ClipboardCheck,
   Gauge,
+  GitPullRequest,
   Globe,
   Grid3x3,
   History,
@@ -42,6 +43,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Overview", href: "/", icon: Gauge, permission: "inventory:read" },
       { label: "Alerts", href: "/alerts", icon: Siren, module: "monitoring", permission: "inventory:read" },
       { label: "Dashboards", href: "/analytics", icon: ChartLine, module: "analytics-studio", permission: "inventory:read" },
+      { label: "Changes", href: "/changes", icon: GitPullRequest, module: "change-engine", permission: "inventory:read" },
     ],
   },
   {

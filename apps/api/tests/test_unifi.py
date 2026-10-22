@@ -61,9 +61,12 @@ async def test_writes_refused_without_change_engine():
 
 
 def test_write_gate_issuer_not_imported_outside_change_engine():
-    offenders = [
-        p.relative_to(SRC) for p in SRC.rglob("*.py") if "_write_gate" in p.read_text() and p.name not in ("client.py", "_write_gate.py")
-    ]
+    allowed = {
+        pathlib.Path("integrations/unifi/client.py"),  # checks the sentinel when a WriteAuthorization is built
+        pathlib.Path("integrations/unifi/_write_gate.py"),
+        pathlib.Path("changes/engine.py"),  # the change engine, the only issuer
+    }
+    offenders = [p.relative_to(SRC) for p in SRC.rglob("*.py") if "_write_gate" in p.read_text() and p.relative_to(SRC) not in allowed]
     assert offenders == [], "only the change engine may mint WriteAuthorization"
 
 

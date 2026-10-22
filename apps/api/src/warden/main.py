@@ -19,6 +19,7 @@ from warden.api import (
     assets,
     auth,
     cabling,
+    changes,
     clients,
     compliance,
     config_history,
@@ -43,6 +44,7 @@ from warden.api import (
     wan,
 )
 from warden.app_state import AppState
+from warden.changes.engine import verify_job as changes_verify_job
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
 from warden.events import EventBus
@@ -92,6 +94,9 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(JobSpec("logs.retention", "logs", "Expire old log events", retention_job, 3600))
     state.scheduler.register(JobSpec("servers.sync", "servers", "Poll servers and hypervisors", servers_sync_job, 60))
     state.scheduler.register(JobSpec("snmp.poll", "snmp", "Poll SNMP interface counters", snmp_poll_job, 60))
+    state.scheduler.register(
+        JobSpec("changes.verify", "change-engine", "Verify applied changes and expire stale proposals", changes_verify_job, 30)
+    )
     return state
 
 
@@ -174,6 +179,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         demo_infra.router,
         servers.router,
         snmp.router,
+        changes.router,
         firewall.router,
         config_history.router,
         compliance.router,

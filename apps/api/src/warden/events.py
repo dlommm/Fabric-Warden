@@ -64,6 +64,10 @@ ALERT_FIRING = "monitoring.alert.firing"
 ALERT_RESOLVED = "monitoring.alert.resolved"
 CONFIG_CHANGED = "config.changed"  # a new configuration snapshot differs from the previous one
 MODULE_DISABLED = "module.disabled"
+CHANGE_PROPOSED = "change.proposed"
+CHANGE_DECIDED = "change.decided"  # approved, rejected or cancelled
+CHANGE_APPLIED = "change.applied"
+CHANGE_FINISHED = "change.finished"  # succeeded, failed, reverted or conflict
 
 Handler = Callable[[Event], Awaitable[None]]
 

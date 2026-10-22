@@ -63,6 +63,12 @@ CAPABILITIES: tuple[CapabilityDef, ...] = (
         (("GET", S + "/firewall/policies"), ("GET", S + "/firewall/policies/ordering")),
     ),
     CapabilityDef(
+        "network.firewall.policies.logging",
+        "Turn firewall policy logging on or off",
+        (("GET", S + "/firewall/policies/{firewallPolicyId}"), ("PATCH", S + "/firewall/policies/{firewallPolicyId}")),
+        write=True,
+    ),
+    CapabilityDef(
         "network.firewall.policies.write",
         "Edit / reorder firewall policies",
         (

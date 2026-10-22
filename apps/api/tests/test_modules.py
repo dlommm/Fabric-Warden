@@ -79,6 +79,7 @@ async def test_full_preset_reports_unavailable(owner):
         "docs",
         "servers",
         "snmp",
+        "change-engine",
         "firewall",
         "config-history",
         "compliance",

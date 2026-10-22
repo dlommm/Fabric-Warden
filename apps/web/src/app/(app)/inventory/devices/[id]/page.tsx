@@ -2,16 +2,17 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, Pencil, Plus, TriangleAlert, X, Zap } from "lucide-react";
+import { ChevronLeft, Pencil, Plus, RotateCw, TriangleAlert, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { MetricWidget, RangePicker } from "@/components/analytics";
+import { ProposeChange, useCanPropose } from "@/components/changes";
 import { DevicePhysical } from "@/components/device-physical";
 import { type Hop, RouteSign } from "@/components/route-sign";
 import { DevicePortCounters, perMinute, useDeviceSnmp } from "@/components/snmp";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { EmptyState, KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { Chip, DeviceState, ProvenanceLine, StateLabel, deviceTone } from "@/components/ui/signs";
 import { ApiError, get, patch } from "@/lib/api";
@@ -26,6 +27,7 @@ export default function DevicePage() {
   const q = useQuery({ queryKey: ["device", id], queryFn: () => get<DeviceDetail>(`/api/inventory/devices/${id}`) });
   const all = useQuery({ queryKey: ["devices", "all"], queryFn: () => get<{ items: DeviceSummary[] }>("/api/inventory/devices") });
   const snmp = useDeviceSnmp(id);
+  const canPropose = useCanPropose();
 
   if (q.error) {
     return (
@@ -66,6 +68,22 @@ export default function DevicePage() {
           </span>
         }
         meta={<ProvenanceLine p={d.provenance} />}
+        actions={
+          canPropose &&
+          d.state === "ONLINE" && (
+            <ProposeChange
+              operation="device.restart"
+              targetId={d.id}
+              title={`Propose a restart of ${d.name}`}
+              summary={
+                role === "gateway"
+                  ? "This is the gateway: routing, internet access and DNS stop for every network while it restarts, usually one to three minutes."
+                  : "The device is unavailable for one to three minutes, and everything that reaches the network through it loses connectivity meanwhile."
+              }
+              trigger={<Button icon={<RotateCw />}>Propose restart</Button>}
+            />
+          )
+        }
       />
 
       <div className="flex flex-col gap-[var(--gap)]">
@@ -107,6 +125,7 @@ export default function DevicePage() {
         {d.ports.length > 0 && (
           <Panel title={`Ports (${d.ports.filter((p) => p.state === "UP").length} of ${d.ports.length} up)`} id="ports">
             <PortStrip ports={d.ports} counters={snmp.byPort} />
+            {canPropose && d.state === "ONLINE" && d.ports.some((p) => p.poe?.enabled) && <PoeCycle d={d} />}
             {snmp.error ? (
               <Notice tone="crit" className="mt-4" title="Couldn't load the port counters">{snmp.error.message}</Notice>
             ) : snmp.target && snmp.interfaces ? (
@@ -281,6 +300,31 @@ function PortStrip({ ports, counters }: { ports: Port[]; counters: Map<number, S
         <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 rounded-full bg-warn p-0.5 text-black" /> PoE delivering</span>
         <span>Wider ports are SFP cages.</span>
       </p>
+    </div>
+  );
+}
+
+/** Propose a PoE power-cycle for one port; the change is reviewed and approved on its own page. */
+function PoeCycle({ d }: { d: DeviceDetail }) {
+  const poe = d.ports.filter((p) => p.poe?.enabled);
+  const [idx, setIdx] = useState(poe[0].idx);
+  return (
+    <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-rule pt-4">
+      <Field label="Power-cycle PoE" hint="The powered device loses power for a few seconds and reboots" className="w-56">
+        {(p) => (
+          <Select {...p} value={idx} onChange={(e) => setIdx(Number(e.target.value))}>
+            {poe.map((x) => <option key={x.idx} value={x.idx}>Port {x.idx}{x.poe?.state === "UP" ? ", delivering" : ", idle"}</option>)}
+          </Select>
+        )}
+      </Field>
+      <ProposeChange
+        operation="port.power_cycle"
+        targetId={d.id}
+        params={{ port_idx: idx }}
+        title={`Propose a PoE power-cycle of ${d.name} port ${idx}`}
+        summary="Whatever is powered by this port loses power for a few seconds and reboots. The UniFi API does not say which device is on a port, so check that first."
+        trigger={<Button icon={<Zap />}>Propose power-cycle</Button>}
+      />
     </div>
   );
 }

@@ -371,15 +371,34 @@ class SimulatorState:
     )
     # Fixed clock for deterministic statistics in tests; None = wall clock.
     clock: float | None = None
+    # Writes the simulator has accepted, newest last, so tests can see exactly what was sent.
+    writes: list[dict[str, Any]] = field(default_factory=list)
+    # Faults tests can switch on: "patch_ignored" (PATCH answers 200 but changes nothing),
+    # "restart_never_returns" (a restarted device stays offline), "writes_fail" (every write answers 500).
+    faults: set[str] = field(default_factory=set)
 
     def supports(self, method: str, template: str) -> bool:
         e = matrix().get((method, template))
         return e is not None and parse_version(self.version) >= parse_version(e["introduced"])
 
+    def now(self) -> float:
+        return self.clock if self.clock is not None else time.time()
+
+    def settle(self) -> None:
+        """Bring restarted devices back once their restart time has passed."""
+        for d in self.devices:
+            back = d.get("_back_at")
+            if back is not None and self.now() >= back and "restart_never_returns" not in self.faults:
+                d["state"] = "ONLINE"
+                d.pop("_back_at")
+
 
 def _page(items: list[dict[str, Any]], offset: int, limit: int) -> dict[str, Any]:
     chunk = items[offset : offset + limit]
     return {"offset": offset, "limit": limit, "count": len(chunk), "totalCount": len(items), "data": copy.deepcopy(chunk)}
+
+
+RESTART_SECONDS = 90
 
 
 def _overview(device: dict[str, Any]) -> dict[str, Any]:
@@ -473,7 +492,12 @@ def create_simulator_app(state: SimulatorState | None = None) -> FastAPI:
         app.get(prefix + template)(handler)
 
     S = "/v1/sites/{siteId}"
-    listing(S + "/devices", lambda: [_overview(d) for d in sim.devices])
+
+    def settled_devices() -> list[dict[str, Any]]:
+        sim.settle()
+        return [_overview(d) for d in sim.devices]
+
+    listing(S + "/devices", settled_devices)
     listing(S + "/clients", lambda: sim.clients)
     listing(S + "/networks", lambda: [{k: v for k, v in n.items() if k != "ipv4Configuration"} for n in sim.networks])
     listing(S + "/wans", lambda: sim.wans)
@@ -490,7 +514,8 @@ def create_simulator_app(state: SimulatorState | None = None) -> FastAPI:
     def device(request: Request, siteId: str, deviceId: str, x_api_key: str | None = K) -> dict[str, Any]:
         gate(request, "GET", S + "/devices/{deviceId}", x_api_key)
         site(siteId)
-        return find(sim.devices, deviceId)
+        sim.settle()
+        return {k: v for k, v in find(sim.devices, deviceId).items() if not k.startswith("_")}
 
     @app.get(prefix + S + "/devices/{deviceId}/statistics/latest")
     def device_stats(request: Request, siteId: str, deviceId: str, x_api_key: str | None = K) -> dict[str, Any]:
@@ -507,10 +532,64 @@ def create_simulator_app(state: SimulatorState | None = None) -> FastAPI:
         site(siteId)
         return find(sim.networks, networkId)
 
+    @app.get(prefix + S + "/firewall/policies/{policyId}")
+    def firewall_policy(request: Request, siteId: str, policyId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        gate(request, "GET", S + "/firewall/policies/{firewallPolicyId}", x_api_key)
+        site(siteId)
+        return find(sim.policies, policyId)
+
+    # -- the writes the change engine uses, with the published request bodies --------------
+
+    def accept(method: str, template: str, request: Request, key: str | None, siteId: str, body: dict[str, Any]) -> None:
+        gate(request, method, template, key)
+        site(siteId)
+        if "writes_fail" in sim.faults:
+            raise HTTPException(500, "simulated controller error")
+        sim.writes.append({"method": method, "path": request.url.path.removeprefix(prefix), "body": body, "at": sim.now()})
+
+    def raw(it: dict[str, Any]) -> dict[str, Any]:
+        for real in (sim.policies, sim.devices):
+            for x in real:
+                if x["id"] == it["id"]:
+                    return x
+        raise HTTPException(404, "Not Found")
+
+    @app.patch(prefix + S + "/firewall/policies/{policyId}")
+    async def patch_policy(request: Request, siteId: str, policyId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if set(body) - {"loggingEnabled"} or not isinstance(body.get("loggingEnabled"), bool):
+            raise HTTPException(400, "Only loggingEnabled can be patched")
+        target = raw(find(sim.policies, policyId))
+        accept("PATCH", S + "/firewall/policies/{firewallPolicyId}", request, x_api_key, siteId, body)
+        if "patch_ignored" not in sim.faults:
+            target["loggingEnabled"] = body["loggingEnabled"]
+        return copy.deepcopy(target)
+
+    @app.post(prefix + S + "/devices/{deviceId}/actions")
+    async def device_action(request: Request, siteId: str, deviceId: str, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if body != {"action": "RESTART"}:
+            raise HTTPException(400, "Unsupported action")
+        target = raw(find(sim.devices, deviceId))
+        accept("POST", S + "/devices/{deviceId}/actions", request, x_api_key, siteId, body)
+        target["state"], target["_back_at"] = "GETTING_READY", sim.now() + RESTART_SECONDS
+        return {}
+
+    @app.post(prefix + S + "/devices/{deviceId}/interfaces/ports/{portIdx}/actions")
+    async def port_action(request: Request, siteId: str, deviceId: str, portIdx: int, x_api_key: str | None = K) -> dict[str, Any]:
+        body = await request.json()
+        if body != {"action": "POWER_CYCLE"}:
+            raise HTTPException(400, "Unsupported action")
+        target = raw(find(sim.devices, deviceId))
+        port = next((p for p in target["interfaces"]["ports"] if p["idx"] == portIdx), None)
+        if port is None or not port.get("poe"):
+            raise HTTPException(400, "Port has no PoE")
+        accept("POST", S + "/devices/{deviceId}/interfaces/ports/{portIdx}/actions", request, x_api_key, siteId, body)
+        return {}
+
     @app.api_route(prefix + "/{path:path}", methods=["POST", "PUT", "PATCH", "DELETE"])
     def refuse_writes(path: str) -> None:
-        # The simulator is a read-only fixture. Write paths are exercised by
-        # change-engine tests against a dedicated fake, not by this app.
-        raise HTTPException(405, "simulator is read-only")
+        # Only the writes above are simulated; everything else stays refused.
+        raise HTTPException(405, "simulator does not implement this write")
 
     return app

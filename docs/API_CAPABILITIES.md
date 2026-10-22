@@ -124,6 +124,16 @@ API keys are per console: a key from a gateway does not authenticate against a s
 | 10.3.58 | `GET` | `/v1/sites/{siteId}/switching/switch-stacks` | List Switch Stacks |
 | 10.3.58 | `GET` | `/v1/sites/{siteId}/switching/switch-stacks/{switchStackId}` | Get Switch Stack |
 
+## Writes used by the change engine
+
+Only these writes are sent, only by the change engine, and only to a controller an owner has allowed changes on (see [CHANGE_ENGINE.md](CHANGE_ENGINE.md)):
+
+| Capability | Endpoint | Since | Body (Network API 10.6.106 schema) |
+|---|---|---|---|
+| `network.firewall.policies.logging` | `PATCH /v1/sites/{siteId}/firewall/policies/{firewallPolicyId}` | 10.1.84 | `{"loggingEnabled": boolean}`, the only property in the published PATCH schema |
+| `network.devices.restart` | `POST /v1/sites/{siteId}/devices/{deviceId}/actions` | 9.1.120 | `{"action": "RESTART"}` |
+| `network.ports.power_cycle` | `POST /v1/sites/{siteId}/devices/{deviceId}/interfaces/ports/{portIdx}/actions` | 9.1.120 | `{"action": "POWER_CYCLE"}` |
+
 ## Servers and virtualization
 
 Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoints were verified on 2026-10-21 against the published sources below; the machine-readable list with required permissions is `apps/api/src/warden/integrations/hosts/official_api_matrix.json`. Everything is read-only (see [SERVERS.md](SERVERS.md)).
