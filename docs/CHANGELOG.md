@@ -4,6 +4,9 @@
 
 First release candidate: Phases 1–7 and 9 plus Phase 10 hardening. Validated against the built-in simulators only; no live UniFi console, host or model server has been used. Phase 8 (advanced AI) is tracked separately.
 
+### Changed
+- SNMP: a target added by address before its controller was synced attaches to the live device at that address on its next poll, so it gains port matching and the device-page panel without being re-added.
+
 ### Security
 - Route-coverage test: every API route must be authenticated (except sign-in, setup, health and the MCP endpoint, which authenticates itself) and, outside core, gated by its module.
 - CSRF header now also required on sign-in, MFA verify, setup and sign-out (closes login CSRF).

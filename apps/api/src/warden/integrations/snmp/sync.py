@@ -113,6 +113,12 @@ async def poll_target(db: AsyncSession, state: AppState, target: SnmpTarget) -> 
     seen: set[str] = set()
     samples: list[metrics.Sample] = []
     device = await db.get(Device, target.device_id) if target.device_id else None
+    if device is None and not target.is_demo:
+        # Added by host before its controller was synced: attach to the live device at that address once it appears.
+        device = await db.scalar(
+            select(Device).where(Device.ip_address == target.host, Device.present.is_(True), Device.is_demo.is_(False))
+        )
+        target.device_id = device.id if device else None
     site_id = device.site_id if device else None
     for row in snap.interfaces:
         ext = str(row.if_index)

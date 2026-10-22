@@ -220,3 +220,26 @@ async def test_same_agent_at_two_addresses_is_reported(snmp, owner, app):
     assert (await owner.post(f"/api/snmp/targets/{second['id']}/poll")).json()["status"] == "ok"
     dup = [f for f in (await owner.get("/api/snmp/findings")).json()["items"] if f["kind"] == "duplicate_agent"]
     assert len(dup) == 1 and "are the same agent" in dup[0]["title"] and dup[0]["severity"] == "info"
+
+
+async def test_target_added_by_host_links_to_device_once_synced(snmp, owner, app):
+    """A live target added before its controller was synced attaches to the device at its address when polled."""
+    from warden.integrations.snmp.simulator import SIM_PASSWORD, SimulatedAgent
+    from warden.models import Device
+
+    profile = await owner.post("/api/snmp/profiles", json={"name": "Live", "version": "v2c", "community": SIM_PASSWORD})
+    assert profile.status_code == 201, profile.text
+    r = await owner.post("/api/snmp/targets", json={"profile_id": profile.json()["id"], "host": "10.99.0.5"})
+    assert r.status_code == 201, r.text
+    target = r.json()["items"][0]
+    assert target["device"] is None
+
+    state = app.state.warden
+    state.snmp_session = lambda host, port, creds: SimulatedAgent(state.snmp_sim, {"name": "sw", "ports": []}, creds)
+    async with state.db.sessionmaker() as db:
+        device = await db.get(Device, snmp["Gateway"]["device"]["id"])
+        device.is_demo, device.ip_address = False, "10.99.0.5"  # stands in for a device the live sync just added
+        await db.commit()
+    assert (await owner.post(f"/api/snmp/targets/{target['id']}/poll")).json()["status"] == "ok"
+    t = next(x for x in (await owner.get("/api/snmp/targets")).json()["items"] if x["id"] == target["id"])
+    assert t["device"]["id"] == snmp["Gateway"]["device"]["id"]
