@@ -20,6 +20,7 @@ dependencies = [
     "redis>=8.1.0",
     "sqlalchemy[asyncio]>=2",
     "uvicorn[standard]>=0.54.0",
+    "pysnmp>=7.1.30",
 ]
 
 [project.scripts]

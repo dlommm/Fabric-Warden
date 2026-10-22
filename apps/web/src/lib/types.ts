@@ -1115,3 +1115,91 @@ export interface ComplianceControl {
   waiver: { by: string; reason: string; until: string } | null;
   evaluated_at: string;
 }
+
+// -- SNMP port counters (Phase 5d) --------------------------------------------------------
+
+export interface SnmpProfile {
+  id: string;
+  name: string;
+  version: "v3" | "v2c";
+  username: string;
+  auth_protocol: string;
+  priv_protocol: string;
+  credential_fingerprint: string | null;
+  target_count: number;
+  is_demo: boolean;
+}
+
+export interface SnmpDeviceRef {
+  id: string;
+  name: string;
+  model: string;
+  ip_address: string | null;
+  state: string;
+}
+
+export interface SnmpTarget {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  profile: { id: string; name: string; version: string } | null;
+  device: SnmpDeviceRef | null;
+  enabled: boolean;
+  status: "ok" | "degraded" | "unreachable" | "unknown";
+  status_detail: string;
+  hint: string | null;
+  stale: boolean;
+  sys_name: string;
+  sys_descr: string;
+  uptime_s: number | null;
+  last_poll_at: string | null;
+  interfaces: number;
+  interfaces_up: number;
+  with_errors: number;
+  rx_bps: number;
+  tx_bps: number;
+  is_demo: boolean;
+}
+
+export interface SnmpCandidate extends SnmpDeviceRef {
+  ports: number;
+  targeted: boolean;
+  unavailable: string | null;
+  is_demo: boolean;
+}
+
+export interface SnmpInterface {
+  id: string;
+  if_index: number;
+  name: string;
+  descr: string;
+  alias: string;
+  physical: boolean;
+  port_idx: number | null;
+  mac_address: string | null;
+  admin_up: boolean | null;
+  oper_status: string;
+  speed_mbps: number | null;
+  rx_bps: number | null;
+  tx_bps: number | null;
+  utilisation_pct: number | null;
+  errors_per_min: number | null;
+  discards_per_min: number | null;
+  observed_at: string;
+  present: boolean;
+  source: string;
+  is_demo: boolean;
+  target?: { id: string; name: string };
+  device?: SnmpDeviceRef | null;
+}
+
+export interface SnmpFinding {
+  kind: "target_failing" | "errors" | "discards" | "saturated";
+  severity: "critical" | "warning" | "info";
+  title: string;
+  detail: string;
+  target_id: string;
+  interface_id?: string;
+  is_demo: boolean;
+}

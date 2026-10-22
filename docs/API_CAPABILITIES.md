@@ -34,9 +34,9 @@ API keys are per console: a key from a gateway does not authenticate against a s
 
 | Fact | Consequence |
 |---|---|
-| SFP/SFP28 optical DOM (TX/RX power, temperature) | Needs SNMP/SSH collectors (Fiber module, Phase 3+) — never fabricated |
+| SFP/SFP28 optical DOM (TX/RX power, temperature) | Not read: Ubiquiti publishes no MIB for it, so SNMP does not cover it either; never fabricated |
 | FEC mode/state | Same |
-| Per-port CRC/symbol/discard and byte/packet counters | Same; port utilisation history needs SNMP or IPFIX |
+| Per-port CRC/symbol/discard and byte/packet counters | Read over SNMP instead (SNMP Port Counters, below) |
 | DHCP lease table | IPAM shows configured pools and address-matched clients only |
 | Controller fixed-IP / DHCP reservations | IPAM reservations are local documentation; they are compared with observed clients, not with controller config |
 | Client OS / device-type fingerprint | Client Intelligence reports no fingerprint (`null`) rather than guessing |
@@ -134,3 +134,15 @@ Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoint
 | Unraid API | [docs.unraid.net/API](https://docs.unraid.net/API/), [GraphQL schema](https://github.com/unraid/api/blob/main/api/generated-schema.graphql) | one `query` on `/graphql`: `info`, `metrics`, `networkInterfaces`, `array`, `docker.containers`, `vms.domains`, `upsDevices` |
 | Docker Engine API v1.47 | [Engine API reference](https://docs.docker.com/reference/api/engine/version/v1.47/) | `GET /version`, `/info`, `/containers/json?all=true`, `/containers/{id}/json` |
 | node_exporter | [Prometheus guide](https://prometheus.io/docs/guides/node-exporter/), [collector source](https://github.com/prometheus/node_exporter/tree/master/collector) | `GET /metrics` |
+
+## SNMP port counters
+
+Phase 5d reads standard MIB-II / IF-MIB objects (RFC 3418, RFC 2863) over SNMP v3 or v2c: `sysDescr`, `sysUpTime`, `sysName`, and per interface `ifDescr`, `ifType`, `ifPhysAddress`, `ifAdminStatus`, `ifOperStatus`, `ifIn/OutErrors`, `ifIn/OutDiscards`, `ifName`, `ifHCIn/OutOctets`, `ifHighSpeed`, `ifAlias`. Only GET and GETBULK walks are sent; SET is never used (a test enforces it). The list with OIDs is `apps/api/src/warden/integrations/snmp/official_api_matrix.json`.
+
+What Ubiquiti publishes ([SNMP Monitoring in UniFi Network](https://help.ui.com/hc/en-us/articles/33502980942615-SNMP-Monitoring-in-UniFi-Network); the page refuses automated fetches, so it was read from a search engine's index of it on 2026-10-21):
+
+- SNMP is turned on per site under **Settings › CyberSecure › Traffic Logging**; there is no per-device switch.
+- v1/v2c use a community; v3 uses a username and password with SHA authentication and AES-128 privacy, the same password for both.
+- USW Flex and USW Ultra switches do not support SNMP. Fabric Warden marks them unavailable when picking devices.
+
+Not published, so not assumed: which MIBs each model implements, how `ifName`/`ifDescr` map to front-panel ports (Fabric Warden matches "Port N" names and labels the match inferred), and any optics or FEC MIB.

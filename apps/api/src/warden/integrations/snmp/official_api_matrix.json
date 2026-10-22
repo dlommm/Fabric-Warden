@@ -1,0 +1,35 @@
+{
+  "retrieved": "2026-10-21",
+  "note": "Every SNMP object Fabric Warden reads, with the standard that defines it, and what UniFi publishes about its SNMP agent. Only GET and GETBULK/GETNEXT walks are sent; SET is never used.",
+  "unifi": {
+    "sources": [
+      "https://help.ui.com/hc/en-us/articles/33502980942615-SNMP-Monitoring-in-UniFi-Network"
+    ],
+    "source_note": "The Help Center page refuses automated fetches (HTTP 403); its content was read from the search engine's index of the page on the retrieval date.",
+    "enable": "UniFi Network: Settings > CyberSecure > Traffic Logging > SNMP. One setting for the whole site; there is no per-device switch.",
+    "versions": "v1/v2c (community) or v3 (username and password).",
+    "v3_security": "SHA authentication and AES-128 privacy. Where a tool asks for separate authentication and privacy keys, the same password is used for both.",
+    "unsupported_devices": "USW Flex and USW Ultra switches do not support SNMP.",
+    "not_published": "Ubiquiti does not publish which MIBs each device implements or how ifName/ifDescr map to front-panel ports. Fabric Warden reads only the standard objects below and labels port matching as inferred."
+  },
+  "objects": [
+    {"oid": "1.3.6.1.2.1.1.1.0", "name": "sysDescr", "mib": "SNMPv2-MIB", "rfc": "RFC 3418", "used_for": "Agent description"},
+    {"oid": "1.3.6.1.2.1.1.3.0", "name": "sysUpTime", "mib": "SNMPv2-MIB", "rfc": "RFC 3418", "used_for": "Agent restarts (counter discontinuity)"},
+    {"oid": "1.3.6.1.2.1.1.5.0", "name": "sysName", "mib": "SNMPv2-MIB", "rfc": "RFC 3418", "used_for": "Agent name"},
+    {"oid": "1.3.6.1.2.1.2.2.1.2", "name": "ifDescr", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Interface description, port matching"},
+    {"oid": "1.3.6.1.2.1.2.2.1.3", "name": "ifType", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Physical vs virtual interfaces"},
+    {"oid": "1.3.6.1.2.1.2.2.1.6", "name": "ifPhysAddress", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Interface MAC"},
+    {"oid": "1.3.6.1.2.1.2.2.1.7", "name": "ifAdminStatus", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Administratively up/down"},
+    {"oid": "1.3.6.1.2.1.2.2.1.8", "name": "ifOperStatus", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Link state"},
+    {"oid": "1.3.6.1.2.1.2.2.1.13", "name": "ifInDiscards", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Discards per minute"},
+    {"oid": "1.3.6.1.2.1.2.2.1.14", "name": "ifInErrors", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Errors per minute"},
+    {"oid": "1.3.6.1.2.1.2.2.1.19", "name": "ifOutDiscards", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Discards per minute"},
+    {"oid": "1.3.6.1.2.1.2.2.1.20", "name": "ifOutErrors", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Errors per minute"},
+    {"oid": "1.3.6.1.2.1.31.1.1.1.1", "name": "ifName", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Interface name, port matching"},
+    {"oid": "1.3.6.1.2.1.31.1.1.1.6", "name": "ifHCInOctets", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Receive rate (64-bit counter)"},
+    {"oid": "1.3.6.1.2.1.31.1.1.1.10", "name": "ifHCOutOctets", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Transmit rate (64-bit counter)"},
+    {"oid": "1.3.6.1.2.1.31.1.1.1.15", "name": "ifHighSpeed", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Negotiated speed in Mbit/s"},
+    {"oid": "1.3.6.1.2.1.31.1.1.1.18", "name": "ifAlias", "mib": "IF-MIB", "rfc": "RFC 2863", "used_for": "Operator-set port name"}
+  ],
+  "not_used": "SET requests, traps/informs, vendor MIBs, ENTITY-MIB optics (no published UniFi support)."
+}

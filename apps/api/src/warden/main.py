@@ -35,6 +35,7 @@ from warden.api import (
     notifications,
     power,
     servers,
+    snmp,
     soc,
     system,
     topology,
@@ -47,6 +48,7 @@ from warden.db import Base, Database, utcnow
 from warden.events import EventBus
 from warden.integrations.hosts.sync import sync_job as servers_sync_job
 from warden.integrations.probe import probe_job
+from warden.integrations.snmp.sync import poll_job as snmp_poll_job
 from warden.integrations.unifi.sync import sync_job
 from warden.jobs import JobContext, JobSpec, Scheduler
 from warden.models import AuthSession, JobRun, NotificationDelivery
@@ -89,6 +91,7 @@ def build_state(settings: Settings) -> AppState:
     state.syslog = Ingest(state)
     state.scheduler.register(JobSpec("logs.retention", "logs", "Expire old log events", retention_job, 3600))
     state.scheduler.register(JobSpec("servers.sync", "servers", "Poll servers and hypervisors", servers_sync_job, 60))
+    state.scheduler.register(JobSpec("snmp.poll", "snmp", "Poll SNMP interface counters", snmp_poll_job, 60))
     return state
 
 
@@ -170,6 +173,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         docs.router,
         demo_infra.router,
         servers.router,
+        snmp.router,
         firewall.router,
         config_history.router,
         compliance.router,

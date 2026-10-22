@@ -23,8 +23,10 @@ The official UniFi Integration API returns only the *latest* statistics (`GET â€
 | `network.clients` | network | clients whose address is inside the network's subnet |
 | `controller.reachable` | controller | last sync succeeded (1/0) |
 | `wan.latency_ms`, `wan.loss_pct` | probe target | Warden's own TCP probe (below) |
+| `port.rx_bps`, `port.tx_bps` | interface | SNMP `ifHCIn/OutOctets` delta between two polls (SNMP Port Counters) |
+| `port.errors`, `port.discards` | interface | SNMP `ifIn+OutErrors`, `ifIn+OutDiscards` per minute; a counter that goes backwards or an agent restart gives no value for that interval |
 
-Not available, and not faked: per-port byte/error counters, per-client traffic, WAN throughput, link state or failover events, optical levels.
+Not available, and not faked: per-client traffic, WAN throughput, link state or failover events, optical levels. Per-port counters exist only for devices polled over SNMP. The built-in alert rule "Port errors" fires when a port logs errors for 10 minutes.
 
 ### Storage and retention
 

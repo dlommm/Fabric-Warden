@@ -54,6 +54,16 @@ BUILTIN_RULES: list[tuple[str, str, str, str, float, int, str, str]] = [
     ("wifi_retries", "High Wi-Fi retries", "radio.tx_retries_pct", "gt", 15, 600, "warning", "Transmit retries above 15% for 10 minutes."),
     ("probe_loss", "Probe loss", "wan.loss_pct", "gt", 20, 180, "critical", "More than 20% of probe attempts failing for 3 minutes."),
     ("probe_latency", "High latency", "wan.latency_ms", "gt", 150, 300, "warning", "Probe latency above 150 ms for 5 minutes."),
+    (
+        "port_errors",
+        "Port errors",
+        "port.errors",
+        "gt",
+        0,
+        600,
+        "warning",
+        "A port has logged input or output errors for 10 minutes (SNMP); usually cabling, optics or a duplex mismatch.",
+    ),
 ]
 
 

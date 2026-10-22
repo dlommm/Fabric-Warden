@@ -23,7 +23,9 @@ from warden.security.rbac import P
 async def _any_consumer(state: State, db: DB) -> None:
     enabled = await state.modules.enabled_ids(db)
     if not any(m in enabled for m in metrics.CONSUMERS):
-        raise HTTPException(status.HTTP_409_CONFLICT, "metric history needs Analytics Studio, Monitoring or WAN enabled")
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "metric history needs Analytics Studio, Monitoring, WAN or SNMP Port Counters enabled"
+        )
 
 
 metrics_router = APIRouter(prefix="/api/metrics", tags=["metrics"], dependencies=[Depends(_any_consumer)])

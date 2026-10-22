@@ -1,4 +1,5 @@
 import {
+  Activity,
   BellRing,
   Blocks,
   BookOpen,
@@ -51,6 +52,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Networks", href: "/inventory/networks", icon: Network, module: "inventory", permission: "inventory:read" },
       { label: "Topology", href: "/topology", icon: Waypoints, module: "topology", permission: "inventory:read" },
       { label: "WAN", href: "/wan", icon: Globe, module: "wan", permission: "inventory:read" },
+      { label: "Port counters", href: "/snmp", icon: Activity, module: "snmp", permission: "inventory:read" },
       { label: "IP plan", href: "/ipam", icon: Grid3x3, module: "ipam", permission: "inventory:read" },
       { label: "VLANs", href: "/ipam/vlans", icon: Layers, module: "ipam", permission: "inventory:read" },
     ],

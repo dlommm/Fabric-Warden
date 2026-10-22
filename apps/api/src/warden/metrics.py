@@ -31,7 +31,7 @@ STEPS = [60, 120, 300, 600, 900, 1800, 3600, 7200, 10800, 21600, 43200, 86400]
 STALE_AFTER = timedelta(minutes=5)
 WATERMARK_KEY = "metrics.rollup"
 # Modules that consume metric history; sync records samples while any is enabled.
-CONSUMERS = ("analytics-studio", "monitoring", "wan")
+CONSUMERS = ("analytics-studio", "monitoring", "wan", "snmp")
 
 
 @dataclass(frozen=True)
@@ -70,6 +70,10 @@ METRICS: dict[str, MetricDef] = {
         MetricDef("host.cpu_pct", "Host CPU", "pct", "host", "CPU utilisation reported by Proxmox, Unraid or node_exporter."),
         MetricDef("host.mem_pct", "Host memory", "pct", "host", "Memory in use on a server or hypervisor node."),
         MetricDef("host.load_1m", "Host load (1 min)", "load", "host", "One-minute load average on a server."),
+        MetricDef("port.rx_bps", "Port receive", "bps", "interface", "Receive rate from SNMP ifHCInOctets."),
+        MetricDef("port.tx_bps", "Port transmit", "bps", "interface", "Transmit rate from SNMP ifHCOutOctets."),
+        MetricDef("port.errors", "Port errors", "count", "interface", "Input plus output errors per minute (SNMP).", alarm=True),
+        MetricDef("port.discards", "Port discards", "count", "interface", "Input plus output discards per minute (SNMP).", alarm=True),
     ]
 }
 

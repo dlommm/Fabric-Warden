@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, Pencil, Plus, X, Zap } from "lucide-react";
+import { ChevronLeft, Pencil, Plus, TriangleAlert, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, useState } from "react";
 import { MetricWidget, RangePicker } from "@/components/analytics";
 import { DevicePhysical } from "@/components/device-physical";
 import { type Hop, RouteSign } from "@/components/route-sign";
+import { DevicePortCounters, perMinute, useDeviceSnmp } from "@/components/snmp";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { EmptyState, KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
@@ -17,13 +18,14 @@ import { ApiError, get, patch } from "@/lib/api";
 import { describeEvent } from "@/lib/events";
 import { ROLE_LABEL, ago, bps, dateTime, deviceRole, speed, uptime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AlertItem, AssetRecord, DeviceDetail, DeviceSummary, Port, RangeKey, Widget } from "@/lib/types";
+import type { AlertItem, AssetRecord, DeviceDetail, DeviceSummary, Port, RangeKey, SnmpInterface, Widget } from "@/lib/types";
 
 export default function DevicePage() {
   const { id } = useParams<{ id: string }>();
   const { moduleEnabled } = useSession();
   const q = useQuery({ queryKey: ["device", id], queryFn: () => get<DeviceDetail>(`/api/inventory/devices/${id}`) });
   const all = useQuery({ queryKey: ["devices", "all"], queryFn: () => get<{ items: DeviceSummary[] }>("/api/inventory/devices") });
+  const snmp = useDeviceSnmp(id);
 
   if (q.error) {
     return (
@@ -104,11 +106,23 @@ export default function DevicePage() {
 
         {d.ports.length > 0 && (
           <Panel title={`Ports (${d.ports.filter((p) => p.state === "UP").length} of ${d.ports.length} up)`} id="ports">
-            <PortStrip ports={d.ports} />
-            {hasSfp && (
-              <Notice tone="info" className="mt-4" title="Optics, FEC and error counters aren't available yet">
-                The UniFi Integration API doesn&apos;t expose SFP optical power, FEC mode or CRC/discard counters. They need the SNMP/SSH collectors planned for the Fiber & High-Speed Diagnostics module.
-              </Notice>
+            <PortStrip ports={d.ports} counters={snmp.byPort} />
+            {snmp.error ? (
+              <Notice tone="crit" className="mt-4" title="Couldn't load the port counters">{snmp.error.message}</Notice>
+            ) : snmp.target && snmp.interfaces ? (
+              <DevicePortCounters target={snmp.target} interfaces={snmp.interfaces} />
+            ) : (
+              !snmp.loading && (
+                <Notice tone="info" className="mt-4" title={hasSfp ? "Optics, FEC and error counters aren't available here" : "Per-port throughput and error counters aren't available here"}>
+                  The UniFi Integration API doesn&apos;t expose per-port traffic, errors or discards{hasSfp ? ", SFP optical power or FEC mode" : ""}.{" "}
+                  {snmp.on ? (
+                    <>This device isn&apos;t polled yet: add it on <Link href="/snmp" className="font-semibold text-accent hover:underline">Port counters</Link>.</>
+                  ) : (
+                    <>The SNMP Port Counters module reads traffic and errors over SNMP.</>
+                  )}
+                  {hasSfp && " Optical power and FEC stay unavailable: UniFi publishes no MIB for them."}
+                </Notice>
+              )
             )}
           </Panel>
         )}
@@ -224,29 +238,36 @@ function hopsFooter(d: DeviceDetail, all: DeviceSummary[]) {
     : "The controller doesn't report a complete uplink chain to the gateway for this device.";
 }
 
-function portLabel(p: Port) {
-  return `Port ${p.idx}, ${p.connector}, ${p.state === "UP" ? `up at ${speed(p.speed_mbps)}b/s` : "down"}${p.poe ? `, PoE ${p.poe.state === "UP" ? "delivering" : "idle"}` : ""}`;
+function portLabel(p: Port, c?: SnmpInterface) {
+  const base = `Port ${p.idx}, ${p.connector}, ${p.state === "UP" ? `up at ${speed(p.speed_mbps)}b/s` : "down"}${p.poe ? `, PoE ${p.poe.state === "UP" ? "delivering" : "idle"}` : ""}`;
+  if (!c || p.state !== "UP") return base;
+  const rates = c.rx_bps != null ? `, receiving ${bps(c.rx_bps)}, transmitting ${bps(c.tx_bps)}` : "";
+  return `${base}${rates}${c.errors_per_min ? `, ${perMinute(c.errors_per_min)} errors per minute` : ""}`;
 }
 
-function PortStrip({ ports }: { ports: Port[] }) {
+function PortStrip({ ports, counters }: { ports: Port[]; counters: Map<number, SnmpInterface> }) {
+  const anyErrors = ports.some((p) => (counters.get(p.idx)?.errors_per_min ?? 0) > 0);
   return (
     <div>
       <ul className="flex flex-wrap gap-1.5" aria-label="Port states">
         {ports.map((p) => {
           const up = p.state === "UP";
           const sfp = p.connector !== "RJ45";
+          const c = counters.get(p.idx);
+          const errors = up && (c?.errors_per_min ?? 0) > 0;
           return (
             <li
               key={p.idx}
-              title={portLabel(p)}
-              aria-label={portLabel(p)}
+              title={portLabel(p, c)}
+              aria-label={portLabel(p, c)}
               className={clsx(
                 "relative flex h-12 flex-col items-center justify-between rounded-[3px] py-1 text-[11px] leading-none font-bold",
                 sfp ? "w-14" : "w-11",
-                up ? "bg-[#00704a] text-white" : "border border-dashed border-rule-strong text-ink-3",
+                errors ? "sign bg-warn text-warn-ink" : up ? "bg-[#00704a] text-white" : "border border-dashed border-rule-strong text-ink-3",
               )}
+              style={errors ? { outlineColor: "#14171a" } : undefined}
             >
-              <span className="tabular">{p.idx}</span>
+              <span className="flex items-center gap-0.5 tabular">{errors && <TriangleAlert className="size-3" aria-hidden strokeWidth={2.75} />}{p.idx}</span>
               <span className="tabular">{up ? speed(p.speed_mbps) : sfp ? p.connector.replace("PLUS", "+") : "—"}</span>
               {p.poe?.state === "UP" && <Zap className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-warn p-0.5 text-black" aria-hidden />}
             </li>
@@ -256,6 +277,7 @@ function PortStrip({ ports }: { ports: Port[] }) {
       <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-3">
         <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] bg-[#00704a]" /> Link up (speed)</span>
         <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] border border-dashed border-rule-strong" /> Down</span>
+        {anyErrors && <span className="inline-flex items-center gap-1.5"><TriangleAlert className="size-3.5 rounded-[2px] bg-warn p-0.5 text-black" aria-hidden /> Logging errors (SNMP)</span>}
         <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 rounded-full bg-warn p-0.5 text-black" /> PoE delivering</span>
         <span>Wider ports are SFP cages.</span>
       </p>
@@ -418,7 +440,7 @@ function dateOnly(v?: string) {
   return v ? new Date(`${v}T00:00:00`).toLocaleDateString(undefined, { dateStyle: "medium" }) : "—";
 }
 
-const METRIC_MODULES = ["analytics-studio", "monitoring", "wan"];
+const METRIC_MODULES = ["analytics-studio", "monitoring", "wan", "snmp"];
 
 /** Metric history for this device, when a module that records it is enabled. */
 function DeviceHistory({ d }: { d: DeviceDetail }) {

@@ -24,6 +24,7 @@ class P(StrEnum):
     COMPLIANCE_MANAGE = "compliance:manage"  # waive controls
     SOC_MANAGE = "soc:manage"  # open and work security cases
     SERVERS_MANAGE = "servers:manage"  # host connections hold API credentials; read-only access to the hosts
+    SNMP_MANAGE = "snmp:manage"  # SNMP profiles hold credentials; polling is read-only
     MODULES_READ = "modules:read"
     MODULES_MANAGE = "modules:manage"
     JOBS_READ = "jobs:read"

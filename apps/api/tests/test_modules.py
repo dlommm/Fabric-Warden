@@ -78,6 +78,7 @@ async def test_full_preset_reports_unavailable(owner):
         "topology",
         "docs",
         "servers",
+        "snmp",
         "firewall",
         "config-history",
         "compliance",

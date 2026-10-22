@@ -115,8 +115,8 @@ UNIFI_NETWORK = ModuleManifest(
     data_ownership=["controllers"],
     warnings=[
         "The official API does not expose SFP optical diagnostics, FEC state, port error counters, "
-        "DHCP leases, LLDP neighbours, IDS/IPS events or historical statistics. Those need the "
-        "syslog/SNMP/SSH collectors planned for later phases."
+        "DHCP leases, LLDP neighbours, IDS/IPS events or historical statistics. Port counters come from the "
+        "SNMP Port Counters module and IDS events from Log Management; the rest stay unavailable."
     ],
 )
 
@@ -417,6 +417,32 @@ SERVERS = ModuleManifest(
     ],
 )
 
+SNMP = ModuleManifest(
+    id="snmp",
+    version=VERSION,
+    name="SNMP Port Counters",
+    category=C.OBSERVABILITY,
+    description=(
+        "Read-only IF-MIB polling of switches and gateways: per-port throughput, errors, discards and link state "
+        "with history, matched to the devices the controller reports."
+    ),
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    permissions=["snmp:manage"],
+    nav=[NavEntry(label="Port counters", href="/snmp", icon="activity", section="Network")],
+    jobs=[JobDecl(id="snmp.poll", title="Poll SNMP interface counters", default_interval_seconds=60)],
+    external_integrations=["SNMP v2c/v3 agents (IF-MIB, RFC 2863); UniFi: Settings > CyberSecure > Traffic Logging"],
+    resources=ResourceEstimate(memory_mb=16, disk_mb_per_day=20),
+    data_ownership=["snmp_profiles", "snmp_targets", "snmp_interfaces"],
+    uninstall_behavior="Disabling stops polling; interfaces, history and credentials are kept until targets and profiles are deleted.",
+    warnings=[
+        "Only GET and walk requests are sent; SET is never used. History starts at the first poll. "
+        "Matching an interface to a front-panel port is inferred from its name. USW Flex and USW Ultra switches have no SNMP agent. "
+        "Optical levels and FEC are not read: UniFi publishes no MIB for them."
+    ],
+)
+
 FIREWALL = ModuleManifest(
     id="firewall",
     version=VERSION,
@@ -607,6 +633,7 @@ CATALOG: dict[str, ModuleManifest] = {
         TOPOLOGY,
         DOCS,
         SERVERS,
+        SNMP,
         FIREWALL,
         CONFIG_HISTORY,
         COMPLIANCE,
@@ -621,7 +648,7 @@ PRESETS: dict[str, dict[str, object]] = {
     "minimal": {"name": "Minimal Core", "modules": ["core", "unifi-network", "inventory"]},
     "monitoring": {
         "name": "Network Monitoring",
-        "modules": ["core", "unifi-network", "inventory", "monitoring", "analytics-studio", "wan", "notifications", "topology"],
+        "modules": ["core", "unifi-network", "inventory", "monitoring", "analytics-studio", "wan", "notifications", "topology", "snmp"],
     },
     "administrator": {
         "name": "Network Administrator",
@@ -630,6 +657,7 @@ PRESETS: dict[str, dict[str, object]] = {
             "unifi-network",
             "inventory",
             "ipam",
+            "snmp",
             "switching",
             "wifi",
             "firewall",

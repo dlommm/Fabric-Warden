@@ -38,6 +38,7 @@ from warden.models.platform import (
 )
 from warden.models.security import LogEvent, SocCase
 from warden.models.servers import Host, HostConnection, HostStorage, Workload
+from warden.models.snmp import SnmpInterface, SnmpProfile, SnmpTarget
 
 __all__ = [
     "Alert",
@@ -90,4 +91,7 @@ __all__ = [
     "VlanRecord",
     "Wan",
     "Workload",
+    "SnmpInterface",
+    "SnmpProfile",
+    "SnmpTarget",
 ]

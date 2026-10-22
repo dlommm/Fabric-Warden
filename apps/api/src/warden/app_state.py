@@ -19,6 +19,7 @@ from warden.integrations.hosts.simulators import (
     create_proxmox_app,
     create_unraid_app,
 )
+from warden.integrations.snmp.simulator import SnmpSimState
 from warden.integrations.unifi.client import UniFiNetworkClient
 from warden.integrations.unifi.simulator import SimulatorState, create_simulator_app
 from warden.jobs import Scheduler
@@ -41,11 +42,13 @@ class AppState:
     _sim_app: FastAPI | None = None
     host_sim: HostSimState = field(default_factory=HostSimState)
     syslog: Any = None  # warden.syslog.Ingest, created in build_state
+    snmp_sim: SnmpSimState = field(default_factory=SnmpSimState)
     _host_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
     # Seams for outbound I/O so tests never reach a real network.
     http_transport: httpx.AsyncBaseTransport | None = None  # notification webhooks / ntfy
     smtp_send: Callable[[dict[str, Any], str, Any], Awaitable[None]] | None = None  # (config, password, EmailMessage)
     probe_connect: Callable[[str, int, float], Awaitable[float | None]] | None = None  # host, port, timeout -> ms
+    snmp_session: Callable[[str, int, Any], Any] | None = None  # host, port, Credentials -> snmp Session
 
     def simulator_transport(self) -> httpx.AsyncBaseTransport:
         if self._sim_app is None:
