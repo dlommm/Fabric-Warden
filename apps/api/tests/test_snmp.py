@@ -182,3 +182,30 @@ async def test_pysnmp_session_v3_get_walk_and_errors(agent):
             await bad.get(["1.3.6.1.2.1.1.1.0"])
         bad.close()
         assert e.value.kind == "auth"
+
+
+def test_virtual_interfaces_on_linux_agents_are_not_ports():
+    from warden.integrations.snmp.client import is_physical
+
+    # Names and types as a UniFi gateway on UniFi OS 5.1 reports them (all ifType 6 unless noted).
+    assert all(is_physical(6, n) for n in ("eth2", "eth8", "eth13", "Port 7"))
+    virtual = ["eth13.100", "br0", "br100", "switch0", "switch0.1", "ifb0", "gretap0", "erspan0", "enP2p1s0v3", "wgsrv1"]
+    assert not any(is_physical(6, n) for n in virtual)
+    assert not is_physical(24, "lo") and not is_physical(131, "gre1")
+
+
+async def test_same_agent_at_two_addresses_is_reported(snmp, owner, app):
+    from warden.models import SnmpTarget
+
+    gw = snmp["Gateway"]
+    async with app.state.warden.db.sessionmaker() as db:
+        db.add(
+            SnmpTarget(
+                profile_id=gw["profile"]["id"], name="Gateway (management IP)", host="10.0.9.1", device_id=gw["device"]["id"], is_demo=True
+            )
+        )
+        await db.commit()
+    second = next(t for t in (await owner.get("/api/snmp/targets")).json()["items"] if t["host"] == "10.0.9.1")
+    assert (await owner.post(f"/api/snmp/targets/{second['id']}/poll")).json()["status"] == "ok"
+    dup = [f for f in (await owner.get("/api/snmp/findings")).json()["items"] if f["kind"] == "duplicate_agent"]
+    assert len(dup) == 1 and "are the same agent" in dup[0]["title"] and dup[0]["severity"] == "info"

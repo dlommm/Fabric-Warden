@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from warden import audit
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
-from warden.integrations.snmp.client import AUTH_PROTOCOLS, PRIV_PROTOCOLS, SnmpError
+from warden.integrations.snmp.client import AUTH_PROTOCOLS, PRIV_PROTOCOLS, SnmpError, is_physical
 from warden.integrations.snmp.simulator import SIM_PASSWORD, SIM_USER
 from warden.integrations.snmp.sync import credentials, poll_target, probe
 from warden.models import Credential, Device, Port, SnmpInterface, SnmpProfile, SnmpTarget
@@ -187,7 +187,7 @@ def _device_ref(d: Device | None) -> dict[str, Any] | None:
 
 async def _target_out(db: AsyncSession, t: SnmpTarget) -> dict[str, Any]:
     ifaces = list(await db.scalars(select(SnmpInterface).where(SnmpInterface.target_id == t.id, SnmpInterface.present.is_(True))))
-    phys = [i for i in ifaces if i.port_idx is not None or i.if_type in (6, 62, 69, 117)]
+    phys = [i for i in ifaces if i.port_idx is not None or is_physical(i.if_type, i.name or i.descr)]
     stale = t.last_poll_at is None or t.last_poll_at < utcnow() - STALE
     profile = await db.get(SnmpProfile, t.profile_id)
     return {
@@ -381,7 +381,7 @@ def _iface(i: SnmpInterface, t: SnmpTarget | None = None, d: Device | None = Non
         "name": i.name or i.descr,
         "descr": i.descr,
         "alias": i.alias,
-        "physical": i.if_type in (6, 62, 69, 117),
+        "physical": is_physical(i.if_type, i.name or i.descr),
         "port_idx": i.port_idx,
         "mac_address": i.mac_address,
         "admin_up": i.admin_up,
@@ -463,8 +463,11 @@ async def findings(db: DB, principal: Reader) -> dict:
                 }
             )
     by_id = {t.id: t for t in targets}
+    macs: dict[str, set[str]] = {}
     for i in await db.scalars(select(SnmpInterface).where(SnmpInterface.present.is_(True), SnmpInterface.target_id.in_(list(by_id)))):
         t = by_id[i.target_id]
+        if i.mac_address and is_physical(i.if_type, i.name or i.descr):
+            macs.setdefault(t.id, set()).add(i.mac_address)
         name = f"{t.name} {i.name or i.descr}"
         base = {"target_id": t.id, "interface_id": i.id, "is_demo": i.is_demo}
         if (i.errors_per_min or 0) > 0:
@@ -497,6 +500,29 @@ async def findings(db: DB, principal: Reader) -> dict:
                     "detail": "Sustained high utilisation adds latency.",
                 }
             )
+    # The same agent reached at two addresses (e.g. a gateway's LAN and management IPs) double-counts its traffic.
+    seen: dict[frozenset[str], SnmpTarget] = {}
+    for tid, ms in macs.items():
+        key = frozenset(ms)
+        if len(key) < 2:
+            continue
+        if (first := seen.get(key)) is not None:
+            t = by_id[tid]
+            items.append(
+                {
+                    "kind": "duplicate_agent",
+                    "severity": "info",
+                    "title": f"{t.name} and {first.name} are the same agent",
+                    "detail": (
+                        "Both addresses answer with the same interfaces and MAC addresses. "
+                        "Keep one target so its traffic is not counted twice."
+                    ),
+                    "target_id": t.id,
+                    "is_demo": t.is_demo,
+                }
+            )
+        else:
+            seen[key] = by_id[tid]
     order = {"critical": 0, "warning": 1, "info": 2}
     items.sort(key=lambda f: order[f["severity"]])
     return {"items": items}

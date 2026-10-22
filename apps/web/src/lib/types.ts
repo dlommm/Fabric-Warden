@@ -1195,7 +1195,7 @@ export interface SnmpInterface {
 }
 
 export interface SnmpFinding {
-  kind: "target_failing" | "errors" | "discards" | "saturated";
+  kind: "target_failing" | "errors" | "discards" | "saturated" | "duplicate_agent";
   severity: "critical" | "warning" | "info";
   title: string;
   detail: string;

@@ -145,4 +145,11 @@ What Ubiquiti publishes ([SNMP Monitoring in UniFi Network](https://help.ui.com/
 - v1/v2c use a community; v3 uses a username and password with SHA authentication and AES-128 privacy, the same password for both.
 - USW Flex and USW Ultra switches do not support SNMP. Fabric Warden marks them unavailable when picking devices.
 
+Observed on a live UniFi gateway (UniFi OS 5.1.33, Linux 6.6, 2026-10-21):
+
+- Ports are named `ethN` (no "Port N"), so they are not matched to front-panel numbers.
+- VLAN subinterfaces (`eth13.100`), bridges (`br0`), the switch CPU port (`switch0`), IFB queues, tunnels, WireGuard and SR-IOV functions (`enP2p1s0v3`) all report ifType 6 (ethernetCsmacd); Fabric Warden excludes them from ports by name.
+- The built-in switch ports `eth2`–`eth9` report ifHighSpeed 50000 whether up or down, so their utilisation is understated; the SFP28 port reported 25000 as expected.
+- The agent answers on every gateway address, so the same device can be added twice; a finding says so.
+
 Not published, so not assumed: which MIBs each model implements, how `ifName`/`ifDescr` map to front-panel ports (Fabric Warden matches "Port N" names and labels the match inferred), and any optics or FEC MIB.

@@ -39,6 +39,19 @@ COUNTERS = ("in_octets", "out_octets", "in_errors", "out_errors", "in_discards",
 OPER_STATUS = {1: "up", 2: "down", 3: "testing", 4: "unknown", 5: "dormant", 6: "notPresent", 7: "lowerLayerDown"}
 # ethernetCsmacd, gigabitEthernet, fastEther, fastEtherFX: the types switch and gateway ports report.
 PHYSICAL_TYPES = {6, 62, 69, 117}
+# Linux-based agents (UniFi gateways among them) report VLAN subinterfaces, bridges, the switch CPU port,
+# IFB queues, tunnels and SR-IOV virtual functions as ethernetCsmacd too. Observed on a UniFi gateway
+# running UniFi OS 5.1: eth13.100, br0, switch0, ifb0, gretap0, wgsrv1, enP2p1s0v3.
+_VIRTUAL_NAME = re.compile(
+    r"\.\d+$|^(lo|br|switch|ifb|gre|gretap|erspan|wg|ip_vti|ip6|sit|tun|tap|veth|docker|vxlan|dummy|ppp|bond|enP\d+p\d+s\d+v)",
+    re.I,
+)
+
+
+def is_physical(if_type: int | None, name: str) -> bool:
+    """A front-panel or uplink port, by ifType and, for Linux agents, by name. A heuristic."""
+    return if_type in PHYSICAL_TYPES and not _VIRTUAL_NAME.search(name or "")
+
 
 AUTH_PROTOCOLS = ("none", "MD5", "SHA", "SHA-224", "SHA-256", "SHA-384", "SHA-512")
 PRIV_PROTOCOLS = ("none", "DES", "AES", "AES-192", "AES-256")
@@ -207,7 +220,7 @@ class IfData:
 
     @property
     def physical(self) -> bool:
-        return self.if_type in PHYSICAL_TYPES
+        return is_physical(self.if_type, self.name or self.descr)
 
 
 @dataclass
