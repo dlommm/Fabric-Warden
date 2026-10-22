@@ -30,6 +30,8 @@ Reader = Allowed(P.INVENTORY_READ)
 Manager = Allowed(P.SOC_MANAGE)
 Severity = Literal["low", "medium", "high", "critical"]
 AUTH_FAIL_THRESHOLD = 5
+SCAN_PORTS = 20  # distinct destination ports from one source within an hour
+NOISY_BLOCKS = 200  # blocks of one source within an hour
 RANK = {"critical": 0, "high": 1, "medium": 2, "low": 3}
 
 
@@ -143,6 +145,47 @@ async def signals(db: DB, state: State) -> list[dict[str, Any]]:
                         [{"type": "ip", "id": ip, "label": ip}],
                         sample.received_at,
                         sample.is_demo,
+                    )
+                )
+        fw = list(
+            await db.scalars(select(LogEvent).where(LogEvent.received_at >= utcnow() - timedelta(hours=1), LogEvent.category == "firewall"))
+        )
+        targets: dict[str, set[tuple[str, str]]] = {}
+        blocked: Counter[str] = Counter()
+        for e in fw:
+            src = e.fields.get("src")
+            if not src:
+                continue
+            if e.fields.get("dpt"):
+                targets.setdefault(src, set()).add((e.fields.get("dst", ""), e.fields["dpt"]))
+            if e.fields.get("action") == "block":
+                blocked[src] += 1
+        for src, t in targets.items():
+            ports = {p for _, p in t}
+            if len(ports) >= SCAN_PORTS:
+                out.append(
+                    _sig(
+                        f"scan:{src}",
+                        "scan",
+                        "high",
+                        f"Possible port scan: {src} tried {len(ports)} ports in the last hour",
+                        f"{len(t)} address/port pairs, for example {', '.join(sorted(ports)[:6])}.",
+                        "Logs",
+                        [{"type": "ip", "id": src, "label": src}],
+                    )
+                )
+        for src, n in blocked.items():
+            if n >= NOISY_BLOCKS:
+                out.append(
+                    _sig(
+                        f"noisy:{src}",
+                        "noisy",
+                        "low",
+                        f"{src} was blocked {n} times in the last hour",
+                        "Often a device retrying something a policy forbids (discovery, telemetry). "
+                        "Check whether the policy or the device is wrong.",
+                        "Logs",
+                        [{"type": "ip", "id": src, "label": src}],
                     )
                 )
     open_keys = {c.signal_key: c for c in await db.scalars(select(SocCase).where(SocCase.signal_key.is_not(None)))}

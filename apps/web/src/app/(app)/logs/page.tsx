@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { ScrollText } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
+import { ConnectionsPanel } from "@/components/connections";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState, ModuleOff, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
@@ -162,6 +163,7 @@ export default function LogsPage() {
             )}
           </Panel>
         </div>
+        <ConnectionsPanel />
         <Panel bodyClassName="p-0">
           <div className="flex flex-wrap items-end gap-3 border-b border-rule px-4 py-3">
             <Field label="Search" className="w-full sm:w-80">{(p) => <Input {...p} type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Text, host, app or address" />}</Field>

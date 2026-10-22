@@ -145,3 +145,65 @@ async def remove_demo(db: DB, principal: Manager) -> dict:
     n = (await db.execute(delete(LogEvent).where(LogEvent.is_demo.is_(True)))).rowcount or 0
     await audit.record(db, principal.actor, "logs.demo.remove", detail={"events": n})
     return {"removed": n}
+
+
+@router.get("/connections")
+async def connections(db: DB, principal: Reader, hours: Annotated[int, Query(ge=1, le=168)] = 24, client_id: str | None = None) -> dict:
+    """Firewall log lines read as connections: who talks to what, on which port, and which rules fire."""
+    stmt = (
+        select(LogEvent)
+        .where(LogEvent.category == "firewall", LogEvent.received_at >= utcnow() - timedelta(hours=hours))
+        .order_by(LogEvent.received_at.desc())
+        .limit(50_000)
+    )
+    if client_id:
+        stmt = stmt.where(LogEvent.client_id == client_id)
+    rows = [r for r in await db.scalars(stmt) if r.fields.get("src")]
+    names = {
+        c.id: c.alias or c.name for c in await db.scalars(select(Client).where(Client.id.in_({r.client_id for r in rows if r.client_id})))
+    }
+    sources: dict[str, dict[str, Any]] = {}
+    dests: dict[str, dict[str, int]] = {}
+    ports: dict[str, dict[str, int]] = {}
+    rules: dict[str, dict[str, Any]] = {}
+    totals = {"allow": 0, "block": 0, "unknown": 0}
+    for r in rows:
+        f = r.fields
+        action = f.get("action", "unknown")
+        totals[action] = totals.get(action, 0) + 1
+        s = sources.setdefault(
+            f["src"],
+            {
+                "src": f["src"],
+                "client": {"id": r.client_id, "name": names.get(r.client_id or "")} if r.client_id else None,
+                "allow": 0,
+                "block": 0,
+                "unknown": 0,
+            },
+        )
+        s[action] = s.get(action, 0) + 1
+        d = dests.setdefault(f.get("dst", "?"), {"allow": 0, "block": 0, "unknown": 0})
+        d[action] = d.get(action, 0) + 1
+        if f.get("dpt"):
+            p = ports.setdefault(f"{f.get('proto', '?')}/{f['dpt']}", {"allow": 0, "block": 0, "unknown": 0})
+            p[action] = p.get(action, 0) + 1
+        key = f.get("descr") or f.get("rule_id") or "unnamed"
+        ru = rules.setdefault(
+            key, {"rule": key, "rule_id": f.get("rule_id"), "ruleset": f.get("ruleset"), "action": action, "hits": 0, "sources": set()}
+        )
+        ru["hits"] += 1
+        ru["sources"].add(f["src"])
+    total = lambda x: x["allow"] + x["block"] + x["unknown"]  # noqa: E731
+    return {
+        "hours": hours,
+        "lines": len(rows),
+        "totals": totals,
+        "sources": sorted(sources.values(), key=total, reverse=True)[:15],
+        "destinations": sorted(({"dst": k, **v} for k, v in dests.items()), key=total, reverse=True)[:15],
+        "ports": sorted(({"port": k, **v} for k, v in ports.items()), key=total, reverse=True)[:15],
+        "rules": [
+            {**{k: v for k, v in r.items() if k != "sources"}, "sources": len(r["sources"])}
+            for r in sorted(rules.values(), key=lambda r: r["hits"], reverse=True)[:20]
+        ],
+        "note": "Built from firewall log lines: only connections a logging policy recorded are counted, and there are no byte counts.",
+    }

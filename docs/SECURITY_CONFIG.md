@@ -49,3 +49,9 @@ One queue of **signals** computed live from firewall findings (shadowed, permiss
 ## Investigation workbench (`/api/investigate?q=`) — Phase 5b
 
 Resolves an IP address, MAC address or name to the clients, devices, servers and workloads it matches (a match brings in their addresses), then merges onto one timeline: inventory events, client sightings, log lines from or mentioning those addresses, alerts, audit records and SOC cases, over 1–90 days.
+
+## Firewall connections and detections — Phase 5c (replaces flow collection)
+
+UniFi gateways have no supported NetFlow/IPFIX export and the official Integration API has no traffic-flow endpoints, so Fabric Warden does not collect flows. Instead it reads the **firewall log lines** UniFi sends over syslog. The line format was taken from a real gateway (it is not published): a `[RULESET-A|D-RULEID]` prefix, then kernel firewall key=value pairs. The parser extracts the rule description (your policy name), allow or block, the rule id, interfaces, source and destination address, protocol and ports, and the source MAC, and matches the line to the client that sent the traffic (by source address, then MAC).
+
+`GET /api/logs/connections` turns those lines into top sources, destinations, ports and the rules that fire, each split into blocked and allowed. Only connections a logging policy recorded are counted, and there are no byte counts. Detections added to the SOC queue (each explains why it fired): **possible port scan** (one source, 20+ distinct destination ports in an hour) and **repeatedly blocked source** (200+ blocks in an hour, usually a device retrying something a policy forbids). Per-port throughput needs SNMP, which is the next step.

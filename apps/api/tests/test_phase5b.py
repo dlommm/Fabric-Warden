@@ -104,3 +104,30 @@ async def test_investigation_pivots_on_ip(sec5, owner):
     assert any(e["type"] == "device" for e in by_name["entities"]) and "10.0.1.1" in by_name["addresses"]
     mac = (await owner.get("/api/investigate", params={"q": "02:c1:00:00:00:01"})).json()
     assert mac["kind"] == "mac" and mac["entities"][0]["name"] == "unraid-tower"
+
+
+async def test_connections_and_scan_detection(sec5, owner, app):
+    from warden.syslog import Ingest
+
+    ing = Ingest(app.state.warden)
+    head = 'Oct 21 20:07:29 Home Home [CUSTOM2_WAN-D-10002] DESCR="Block-WAN" IN=eth8 OUT= '
+    for port in range(20, 45):
+        ing.submit(head + f"SRC=203.0.113.66 DST=10.0.30.101 PROTO=TCP SPT=4000 DPT={port}", "10.0.1.1")
+    allow = 'Oct 21 20:07:30 Home Home [CUSTOM7_CUSTOM7-A-10000] DESCR="Allow-Trusted" IN=br30 OUT=br2 '
+    ing.submit(allow + "SRC=10.0.30.101 DST=10.0.1.5 PROTO=TCP SPT=5000 DPT=443", "10.0.1.1")
+    assert await ing.flush() == 26
+    c = (await owner.get("/api/logs/connections")).json()
+    assert c["totals"]["block"] == 25 and c["totals"]["allow"] == 1
+    assert c["sources"][0]["src"] == "203.0.113.66" and c["rules"][0] == {
+        "rule": "Block-WAN",
+        "rule_id": "10002",
+        "ruleset": "CUSTOM2_WAN",
+        "action": "block",
+        "hits": 25,
+        "sources": 1,
+    }
+    allowed = next(s for s in c["sources"] if s["src"] == "10.0.30.101")
+    assert allowed["client"]["name"] == "unraid-tower"
+    sigs = (await owner.get("/api/soc")).json()["signals"]
+    scan = next(s for s in sigs if s["kind"] == "scan")
+    assert "203.0.113.66" in scan["title"] and "25 ports" in scan["title"]
