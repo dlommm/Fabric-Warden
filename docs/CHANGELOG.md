@@ -8,7 +8,7 @@ First release candidate: Phases 1–7 and 9 plus Phase 10 hardening. Validated a
 - `warden-admin reset-password <user> [--clear-mfa]`: reset a forgotten password from the server shell; signs out the account's sessions and is audited.
 
 ### Changed
-- SNMP: a target added by address before its controller was synced attaches to the live device at that address on its next poll, so it gains port matching and the device-page panel without being re-added.
+- SNMP: a target added by address before its controller was synced attaches to the live device at that address on its next poll (or, for a gateway listed under its WAN address, the device whose MAC one of its interfaces reports), so it gains port matching and the device-page panel without being re-added.
 
 ### Security
 - Route-coverage test: every API route must be authenticated (except sign-in, setup, health and the MCP endpoint, which authenticates itself) and, outside core, gated by its module.

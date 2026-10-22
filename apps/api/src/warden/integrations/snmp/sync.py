@@ -7,7 +7,7 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from warden import metrics
@@ -94,10 +94,27 @@ def rates(prev: dict[str, Any], cur: dict[str, int], dt: float) -> dict[str, flo
     return out
 
 
+async def _device_by_mac(db: AsyncSession, macs: set[str]) -> Device | None:
+    """The one live device whose MAC an interface reports: a gateway is listed under its WAN address, not the one polled."""
+    if not macs:
+        return None
+    found = list(
+        await db.scalars(
+            select(Device).where(func.lower(Device.mac_address).in_(macs), Device.present.is_(True), Device.is_demo.is_(False))
+        )
+    )
+    return found[0] if len(found) == 1 else None
+
+
 async def poll_target(db: AsyncSession, state: AppState, target: SnmpTarget) -> dict[str, Any]:
     profile = await db.get(SnmpProfile, target.profile_id)
     if profile is None:
         return {"target": target.id, "status": "unknown", "error": "profile missing"}
+    if target.device_id is None and not target.is_demo:
+        # Added by host before its controller was synced: attach to the live device at that address once it appears.
+        target.device_id = await db.scalar(
+            select(Device.id).where(Device.ip_address == target.host, Device.present.is_(True), Device.is_demo.is_(False))
+        )
     secret = await state.vault.reveal(db, profile.credential_id) if profile.credential_id else None
     try:
         snap = await probe(db, state, target, profile, credentials(profile, secret))
@@ -114,10 +131,7 @@ async def poll_target(db: AsyncSession, state: AppState, target: SnmpTarget) -> 
     samples: list[metrics.Sample] = []
     device = await db.get(Device, target.device_id) if target.device_id else None
     if device is None and not target.is_demo:
-        # Added by host before its controller was synced: attach to the live device at that address once it appears.
-        device = await db.scalar(
-            select(Device).where(Device.ip_address == target.host, Device.present.is_(True), Device.is_demo.is_(False))
-        )
+        device = await _device_by_mac(db, {r.mac_address.lower() for r in snap.interfaces if r.mac_address})
         target.device_id = device.id if device else None
     site_id = device.site_id if device else None
     for row in snap.interfaces:

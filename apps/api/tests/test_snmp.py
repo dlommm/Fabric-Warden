@@ -243,3 +243,32 @@ async def test_target_added_by_host_links_to_device_once_synced(snmp, owner, app
     assert (await owner.post(f"/api/snmp/targets/{target['id']}/poll")).json()["status"] == "ok"
     t = next(x for x in (await owner.get("/api/snmp/targets")).json()["items"] if x["id"] == target["id"])
     assert t["device"]["id"] == snmp["Gateway"]["device"]["id"]
+
+
+async def test_unanswered_target_links_by_address_and_gateway_by_mac(snmp, owner, app):
+    """A silent agent still attaches by address; a gateway listed under its WAN address attaches by interface MAC."""
+    from warden.integrations.snmp.simulator import SIM_PASSWORD, SimulatedAgent
+    from warden.models import Device
+
+    state = app.state.warden
+    port = {"idx": 1, "connector": "rj45", "state": "up", "speed_mbps": 1000, "max_speed_mbps": 1000}
+    state.snmp_session = lambda host, p, creds: SimulatedAgent(
+        state.snmp_sim, {"name": "gw", "model": "UDM", "mac_address": "aa:bb:cc:dd:ee:00", "ports": [port]}, creds
+    )
+    async with state.db.sessionmaker() as db:
+        pdu = await db.get(Device, snmp["Office Switch"]["device"]["id"])
+        pdu.is_demo, pdu.ip_address = False, "10.99.0.13"
+        gw = await db.get(Device, snmp["Gateway"]["device"]["id"])
+        gw.is_demo, gw.ip_address, gw.mac_address = False, "203.0.113.7", "AA:BB:CC:DD:EE:01"
+        await db.commit()
+
+    async def add(host, community):
+        p = await owner.post("/api/snmp/profiles", json={"name": f"Live {host}", "version": "v2c", "community": community})
+        return (await owner.post("/api/snmp/targets", json={"profile_id": p.json()["id"], "host": host})).json()["items"][0]
+
+    silent, gateway = await add("10.99.0.13", "wrong-community"), await add("10.99.0.1", SIM_PASSWORD)
+    assert (await owner.post(f"/api/snmp/targets/{silent['id']}/poll")).json()["status"] != "ok"
+    assert (await owner.post(f"/api/snmp/targets/{gateway['id']}/poll")).json()["status"] == "ok"
+    by_id = {x["id"]: x for x in (await owner.get("/api/snmp/targets")).json()["items"]}
+    assert by_id[silent["id"]]["device"]["id"] == snmp["Office Switch"]["device"]["id"]
+    assert by_id[gateway["id"]]["device"]["id"] == snmp["Gateway"]["device"]["id"]
