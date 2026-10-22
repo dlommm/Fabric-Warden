@@ -1,0 +1,112 @@
+# Fabric Warden CI: backend tests and lint, web typecheck/lint/build, browser E2E.
+# No secrets are used. Every test runs against SQLite and the built-in simulators;
+# nothing contacts a real controller, device or AI endpoint.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  UV_VERSION: "0.12.19"
+  PYTHON_VERSION: "3.13"
+  NODE_VERSION: "24"
+  PNPM_VERSION: "12.6.0"
+
+jobs:
+  api:
+    name: API tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check src tests
+      - name: Format
+        run: uv run ruff format --check src tests
+      - name: Tests
+        run: uv run pytest -q
+
+  web:
+    name: Web typecheck, lint and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: pnpm lint
+      - name: Build
+        run: pnpm build
+
+  e2e:
+    name: Browser E2E (simulator)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [api, web]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+      - run: uv sync --frozen
+        working-directory: apps/api
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+          cache-dependency-path: apps/web/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/web
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/web
+      - name: Run E2E
+        run: pnpm e2e
+        working-directory: apps/web
+        env:
+          CI: "true"
+      - name: Upload report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 7

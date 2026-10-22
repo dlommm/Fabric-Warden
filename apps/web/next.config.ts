@@ -27,13 +27,15 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "same-origin" },
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()" },
   // HSTS is only meaningful over HTTPS; enable it at the TLS proxy or with WARDEN_HSTS=true.
   ...(process.env.WARDEN_HSTS === "true" ? [{ key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" }] : []),
 ];
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // The E2E suite builds into its own directory so it never clobbers a dev or release build.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   // The browser talks only to this origin; the API stays private behind it,
   // which keeps session cookies first-party and avoids CORS entirely.
