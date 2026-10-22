@@ -12,6 +12,16 @@ Day-two tasks for a running installation: health, backups and restore, upgrades 
 
 The web container's `HEALTHCHECK` fetches `/login`. In the 1.0.0-rc.1 compose test both containers reported `healthy` within about 15 seconds of start. The API starts answering only after migrations have run, so readiness also means the schema is current.
 
+## Forgotten password
+
+From the server, reset any account's password; you are prompted for the new one, every session for that account is signed out, and the reset is audited (`auth.password.reset`, actor `warden-admin`). Add `--clear-mfa` if the authenticator is lost too.
+
+```bash
+docker compose -f deploy/docker-compose.yml exec api warden-admin reset-password admin
+```
+
+Anyone who can run this already controls the database, so it adds no new way in.
+
 ## Backups
 
 A backup is an encrypted, portable dump of the application database. It is **owner-only** (`system:manage`).

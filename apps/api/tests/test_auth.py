@@ -114,3 +114,18 @@ async def test_change_password_revokes_other_sessions(app, owner):
         assert r.status_code == 200
         assert (await owner.get("/api/auth/me")).status_code == 200
         assert (await other.get("/api/auth/me")).status_code == 401
+
+
+async def test_admin_cli_resets_password_signs_out_and_audits(app, owner, anon) -> None:  # type: ignore[no-untyped-def]
+    from warden.admin_cli import reset_password
+
+    db = app.state.warden.db
+    with pytest.raises(LookupError):
+        await reset_password(db, "nobody", "Another-horse-battery-7", clear_mfa=False)
+    assert await reset_password(db, "owner", "Another-horse-battery-7", clear_mfa=False) >= 1
+    assert (await owner.get("/api/auth/me")).status_code == 401  # the existing session was signed out
+    assert (await anon.post("/api/auth/login", json={"username": "owner", "password": PASSWORD})).status_code == 401
+    r = await anon.post("/api/auth/login", json={"username": "owner", "password": "Another-horse-battery-7"})
+    assert r.status_code == 200, r.text
+    audit = (await anon.get("/api/audit", params={"action": "auth.password.reset"})).json()["records"]
+    assert audit and audit[0]["actor_name"] == "warden-admin" and audit[0]["detail"]["sessions_revoked"] >= 1
