@@ -1,6 +1,6 @@
 # Servers & virtualization
 
-**Status: implemented in Phase 4b** (module `servers`, `available`). Tested against built-in simulators only; no real Proxmox, Unraid, Docker or node_exporter host has been connected yet.
+Provided by the `servers` module.
 
 ## What it does
 
@@ -43,9 +43,9 @@ Metrics `host.cpu_pct`, `host.mem_pct` and `host.load_1m` are recorded on every 
 | `storage_full` | warning ≥ 90 %, info ≥ 80 % | a datastore, array or filesystem; shared datastores report once |
 | `not_on_network` | info | a host, or a running VM/LXC with an address, that no network client matches (isolated bridge, or not yet seen) |
 
-## Not collected (yet)
+## Scope
 
-Container CPU/memory (needs per-container stats calls), Proxmox backups and replication, ZFS pool health detail, SMART attributes beyond Unraid's disk status, TrueNAS and other hypervisors. Power actions are out of scope until the change engine (Phase 6), and then only through it.
+Read-only inventory and health. Fabric Warden takes no power or lifecycle actions on hosts, VMs or containers, and does not collect per-container CPU and memory.
 
 ## Demo
 

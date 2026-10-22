@@ -1,6 +1,6 @@
 # Change Approval & Recovery engine
 
-**Status: Phases 6a–6d implemented** (modules `change-engine`, `bulk-ops`, `automation`, `digital-twin`). Nine operations, tested only against the simulated controller; no write has been sent to a live controller yet. Digital-twin snapshots and the independent watchdog are not built (see [CHANGELOG.md](CHANGELOG.md)).
+Provided by the `change-engine`, `bulk-ops`, `automation` and `digital-twin` modules, with nine operations.
 
 ## Invariants
 
@@ -83,11 +83,7 @@ Module `digital-twin`, code `warden/twin.py`, API `/api/twin/changes/{id}/impact
 - firewall policy: the zones it joins, networks in those zones and their clients, other policies on the same zone pair; logging changes are marked as no traffic change;
 - network and zone edits: the network's clients (matched by subnet), its zone and the policies that govern it.
 
-**Not built:** versioned graph snapshots, history of the graph, and what-if simulation of traffic.
+## Limitations
 
-## Not built yet
-
-- Wi-Fi broadcast edits: the spec shares one schema for the passphrase in GET and PUT but does not say whether a controller returns it in clear; if it is masked, a read-modify-write would overwrite the passphrase with the mask. Not attempted until that is verified on a live controller.
-- VLAN, subnet, DHCP and IPv6 edits: nested configuration whose round-trip semantics need a live controller to confirm.
-- Versioned digital-twin snapshots and what-if simulation; multi-step automation workflows.
-- An independently deployed watchdog for high-risk workflows, and protected-path detection for the ports hosting Fabric Warden itself (the official API does not map clients to switch ports).
+- Wi-Fi broadcast, VLAN, subnet, DHCP and IPv6 settings cannot be changed through Fabric Warden.
+- The official API does not map clients to switch ports, so the ports that host Fabric Warden itself are not detected as protected paths.

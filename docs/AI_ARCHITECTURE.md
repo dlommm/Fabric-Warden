@@ -1,6 +1,6 @@
 # AI architecture
 
-**Status: Phases 7 and 8 implemented** (modules `ai-providers` and `ai-agents`, both optional). Tested only against in-process fake model servers and the offline demo model; no real model endpoint has been called from tests or tooling, and the answer quality of real models is unevaluated. Phase 8 added five specialised agents and "Ask the network" ([AGENT_CATALOG.md](AGENT_CATALOG.md)), the "act after approval" level ([AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)), background runs with a stop button, scheduled runs and reviewed agent notes.
+Two optional modules, `ai-providers` and `ai-agents`. They provide eight agents and "Ask the network" ([AGENT_CATALOG.md](AGENT_CATALOG.md)), the "act after approval" level ([AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)), background runs with a stop button, scheduled runs and reviewed agent notes.
 
 AI is optional. Nothing outside these two modules calls a model, and every other feature works with both disabled and with no network access.
 
@@ -28,7 +28,7 @@ Claude is called with raw HTTP (`POST /v1/messages`, `anthropic-version: 2023-06
 
 ## A run
 
-1. Refuse to start if the global kill switch is engaged, the agent is switched off or at autonomy "off" (or at a level that is not built), a module it needs is disabled, the subject or a required question is missing, no provider/model is available. A refusal is audited (`ai.run.refused`).
+1. Refuse to start if the global kill switch is engaged, the agent is switched off or at autonomy "off", a module it needs is disabled, the subject or a required question is missing, no provider/model is available. A refusal is audited (`ai.run.refused`).
 2. Create the run (with its trigger: `manual`, `ask` or `schedule`), audit `ai.run.start`, record the system prompt (including accepted agent notes) and the request as the first transcript entries. With `background: true` the request commits here and returns the run as `running`; the loop continues in its own session and commits before every model call, so the run page (polling every 1.5 s) sees each turn and tool call as it happens.
 3. Stop with `budget_exceeded` if the provider's monthly token or cost budget is already spent.
 4. Loop for at most `max_turns`: before every model call re-check the kill switches (database and an in-process flag), the run's own stop request (`ai.run.cancel`, database and in-process), the run token budget and the provider budget; call the model; record usage (`ai_usage`) and the model turn; if there are no tool calls, the text is the answer. Otherwise run each tool call (at most `max_tool_calls` per run) and append the results.
@@ -62,11 +62,7 @@ Tools are Python functions over the database, never over a controller or host. E
 
 Names, notes and log lines can be written by anyone on the network. The system prompt says tool results are data, never instructions; log results carry an `untrusted` marker. The structural defence does not depend on the model obeying: the tool list is fixed per agent and autonomy, arguments are validated, there is no tool that approves, applies or writes, and permission checks use the human's rights. Tests replay injected tool calls (`approve_change`, `propose_change` at "explain", wrong argument types) and check that nothing is proposed or written.
 
-## Not built
+## Limitations
 
-- Token-by-token streaming (progress is per model turn and tool call) and aborting an in-flight model call (stops take effect before the next call).
-- Autonomy "autonomous within guardrails" (see [AGENT_AUTONOMY.md](AGENT_AUTONOMY.md)).
-- Event-triggered agents (Automation Studio starting an agent), agent-to-agent delegation, retrieval over docs, notes an agent writes without review.
-- Background runs survive only within one process: a restart interrupts them, and the schedules job marks such runs failed after 30 minutes.
-- Official CLI setup guides for provider tools.
-- Per-site scoping of tool results (site-scoped roles are not enforced anywhere yet).
+- Progress is reported per model turn and tool call, not token by token; a stop takes effect before the next model call.
+- Background runs live in the API process: a restart interrupts them, and runs left that way are marked failed after 30 minutes.

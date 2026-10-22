@@ -1,6 +1,6 @@
 # Deployment
 
-Release candidate **1.0.0-rc.1**. Day-two tasks (backups, restore, upgrades, sizing) are in [OPERATIONS.md](OPERATIONS.md).
+Day-two tasks (backups, restore, upgrades, sizing) are in [OPERATIONS.md](OPERATIONS.md).
 
 ## Docker Compose
 
@@ -11,8 +11,6 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 Open `http://<host>:8080` (or `WARDEN_HTTP_PORT`) and complete setup. Services: `db` (PostgreSQL 17), `redis` (job coordination, no persistence), `api` (not published), `web` (published).
 
-**Status (1.0.0-rc.1):** verified on the development host (Docker 29) as a separate compose project: both hardened images build (API about 350 MB, web about 340 MB); all four services become healthy with read-only root filesystems and dropped capabilities; migrations apply on PostgreSQL 17; through the web container, setup → full preset → demo controller sync, the SSRF refusal, API and web security headers, system health (database, Redis, scheduler, audit chain ok), encrypted backup export, **restore on PostgreSQL** (sessions signed out, sign-in, controller sync and audit chain intact afterwards) and the `warden-backup` CLI inside the container all work. Read-only sync has since been checked against a live console; no change has been written to one. Treat as a release candidate.
-
 Docker keeps images and build cache under `/var/lib/docker` and `/var/lib/containerd`. If that partition is small, move both to a larger disk (for example bind-mount them from `/home`) before building.
 
 ## Image and container hardening
@@ -21,7 +19,7 @@ Docker keeps images and build cache under `/var/lib/docker` and `/var/lib/contai
 - **Multi-stage builds:** build tools (uv, pnpm, corepack, the full `node_modules`) stay in build stages. The API runtime contains only the virtualenv (installed non-editable); the web runtime contains the Next.js standalone server, with npm and corepack removed.
 - **Non-root:** API runs as `warden` (uid 10001), web as `web` (uid 10001). Application files are owned by root and not writable by the service user. Only `/data` (API) and `/app/.next/cache` (web) are writable.
 - **Compose:** `read_only` root filesystems with a `tmpfs` `/tmp` for `api` and `web`, `cap_drop: [ALL]`, `no-new-privileges` on every service, log rotation (10 MB × 5). The API port is never published; syslog is published on localhost only by default.
-- **Health checks:** API `GET /api/health/ready` (database reachable), web `GET /login`; both report healthy in the compose test above. Compose starts `web` only after `api` is healthy and `api` only after `db` and `redis` are.
+- **Health checks:** API `GET /api/health/ready` (database reachable), web `GET /login`; both must report healthy before dependent services start. Compose starts `web` only after `api` is healthy and `api` only after `db` and `redis` are.
 - **Proxy headers:** uvicorn runs with `--no-proxy-headers`. Client addresses for audit and sign-in limits come from `WARDEN_FORWARDED_HOPS` (below), never from a header the browser can set.
 
 ## TLS and reverse proxy
@@ -74,4 +72,3 @@ Back up, pull the new release, `up -d --build`; migrations run at API start. Det
 
 Outbound policy: Fabric Warden connects to equipment on your network, so private and loopback addresses are allowed. Link-local and cloud-metadata destinations (169.254.169.254, `metadata.google.internal`, …), unspecified, multicast and reserved addresses are refused for controllers, servers, Protect/Home Assistant, AI providers, notification webhooks/ntfy/SMTP, WAN probe targets and SNMP targets when they are saved. HTTP(S) connections are checked again at connect time after DNS resolution, so a name that resolves to a blocked address (or a redirect to one) is refused too; SMTP hosts are re-checked by literal address only, and WAN probe and SNMP hosts only when saved.
 
-Unraid and Proxmox deployment guides are not written yet.

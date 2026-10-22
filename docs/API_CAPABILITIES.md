@@ -6,7 +6,7 @@ Fabric Warden only uses **official, versioned, documented** UniFi APIs. Nothing 
 
 - UniFi Network **Integration API** — published per application version at developer.ui.com; retrieved 2026-10-20 via the unofficial mirror `opastorello/unifi-api-docs` (OpenAPI JSON per version). Versions analysed: 9.1.120, 9.2.87, 9.3.45, 9.4.19, 9.5.21, 10.0.162, 10.1.84, 10.3.58, 10.4.57, 10.5.67, 10.6.106.
 - Machine-readable matrix: `apps/api/src/warden/integrations/unifi/official_api_matrix.json` (generated from those specs; used at runtime by capability detection).
-- UniFi Protect Integration API — specs 5.3.38 to 7.3.70 from the same mirror; used read-only by the Phase 9 Cameras module (see [UniFi Protect](#unifi-protect)).
+- UniFi Protect Integration API — specs 5.3.38 to 7.3.70 from the same mirror; used read-only by the Cameras module (see [UniFi Protect](#unifi-protect)).
 
 **Live validation against a real console is pending** — all development used the simulator.
 
@@ -28,7 +28,7 @@ API keys are per console: a key from a gateway does not authenticate against a s
 2. Each Fabric Warden capability (e.g. `network.firewall.policies.read`) maps to one or more endpoints; it is **supported** when the version is ≥ the newest `introduced` version of those endpoints.
 3. Versions newer than the newest known spec are flagged `beyond_known_spec`; endpoints are probed, not assumed.
 4. During sync, a read that succeeds marks the capability **verified**; a 404 downgrades it to unsupported.
-5. Write capabilities are listed but **disabled**: the client refuses non-GET calls without a change-engine `WriteAuthorization` (Phase 6).
+5. Write capabilities are listed but **disabled**: the client refuses non-GET calls without a change-engine `WriteAuthorization`.
 
 ## Not exposed by the official API (any analysed version)
 
@@ -41,7 +41,7 @@ API keys are per console: a key from a gateway does not authenticate against a s
 | Controller fixed-IP / DHCP reservations | IPAM reservations are local documentation; they are compared with observed clients, not with controller config |
 | Client OS / device-type fingerprint | Client Intelligence reports no fingerprint (`null`) rather than guessing |
 | LLDP neighbours | Topology uses controller-reported uplinks only |
-| IDS/IPS events | Needs syslog/CEF ingestion (Log Management, Phase 5) |
+| IDS/IPS events | Needs syslog/CEF ingestion (Log Management) |
 | Historical statistics | Only `statistics/latest`; Fabric Warden samples it on every sync (see ANALYTICS.md), so history starts when a metrics module is enabled |
 | WAN state, addresses, throughput, failover | `GET /v1/sites/{siteId}/wans` (10.0.162+) lists id and name only; WAN latency/loss come from Warden's own probe |
 | Device actions beyond `RESTART`; port actions beyond `POWER_CYCLE` | Port enable/disable, profiles, VLAN changes not available via this API |
@@ -148,7 +148,7 @@ First read-only sync against a real console (UDM Beast, Network 10.6.106, 2026-1
 
 ## Servers and virtualization
 
-Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoints were verified on 2026-10-21 against the published sources below; the machine-readable list with required permissions is `apps/api/src/warden/integrations/hosts/official_api_matrix.json`. Everything is read-only (see [SERVERS.md](SERVERS.md)).
+The Servers module reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoints were verified on 2026-10-21 against the published sources below; the machine-readable list with required permissions is `apps/api/src/warden/integrations/hosts/official_api_matrix.json`. Everything is read-only (see [SERVERS.md](SERVERS.md)).
 
 | Integration | Source | Endpoints used |
 |---|---|---|
@@ -159,7 +159,7 @@ Phase 4b reads Proxmox VE, Unraid, the Docker Engine and node_exporter. Endpoint
 
 ## SNMP port counters
 
-Phase 5d reads standard MIB-II / IF-MIB objects (RFC 3418, RFC 2863) over SNMP v3 or v2c: `sysDescr`, `sysUpTime`, `sysName`, and per interface `ifDescr`, `ifType`, `ifPhysAddress`, `ifAdminStatus`, `ifOperStatus`, `ifIn/OutErrors`, `ifIn/OutDiscards`, `ifName`, `ifHCIn/OutOctets`, `ifHighSpeed`, `ifAlias`. Only GET and GETBULK walks are sent; SET is never used (a test enforces it). The list with OIDs is `apps/api/src/warden/integrations/snmp/official_api_matrix.json`.
+The SNMP module reads standard MIB-II / IF-MIB objects (RFC 3418, RFC 2863) over SNMP v3 or v2c: `sysDescr`, `sysUpTime`, `sysName`, and per interface `ifDescr`, `ifType`, `ifPhysAddress`, `ifAdminStatus`, `ifOperStatus`, `ifIn/OutErrors`, `ifIn/OutDiscards`, `ifName`, `ifHCIn/OutOctets`, `ifHighSpeed`, `ifAlias`. Only GET and GETBULK walks are sent; SET is never used (a test enforces it). The list with OIDs is `apps/api/src/warden/integrations/snmp/official_api_matrix.json`.
 
 What Ubiquiti publishes ([SNMP Monitoring in UniFi Network](https://help.ui.com/hc/en-us/articles/33502980942615-SNMP-Monitoring-in-UniFi-Network); the page refuses automated fetches, so it was read from a search engine's index of it on 2026-10-21):
 
@@ -188,7 +188,7 @@ Not published, so not assumed: which MIBs each model implements, how `ifName`/`i
 
 ## UniFi Protect
 
-Phase 9 reads the **UniFi Protect Integration API** (`https://<console>/proxy/protect/integration`, `X-API-KEY`). Checked on 2026-10-21 against the OpenAPI documents published at developer.ui.com, via the automated mirror `opastorello/unifi-api-docs` (36 Protect versions, 5.3.38 to 7.3.70). The list with fields used is `apps/api/src/warden/integrations/protect/official_api_matrix.json`; details in [PROTECT.md](PROTECT.md).
+The Cameras module reads the **UniFi Protect Integration API** (`https://<console>/proxy/protect/integration`, `X-API-KEY`). Checked on 2026-10-21 against the OpenAPI documents published at developer.ui.com, via the automated mirror `opastorello/unifi-api-docs` (36 Protect versions, 5.3.38 to 7.3.70). The list with fields used is `apps/api/src/warden/integrations/protect/official_api_matrix.json`; details in [PROTECT.md](PROTECT.md).
 
 | Method | Path | In every spec since | Used for |
 |---|---|---|---|
@@ -200,7 +200,7 @@ Published in 7.3.70 but not used: every PATCH/POST/DELETE (camera, light, sensor
 
 ## Home Assistant
 
-Phase 9 reads the **Home Assistant REST API** ([developer docs](https://developers.home-assistant.io/docs/api/rest/), retrieved 2026-10-21), `Authorization: Bearer <long-lived access token>`. Details in [HOME_ASSISTANT.md](HOME_ASSISTANT.md); list in `apps/api/src/warden/integrations/homeassistant/official_api_matrix.json`.
+The Home Assistant module reads the **Home Assistant REST API** ([developer docs](https://developers.home-assistant.io/docs/api/rest/), retrieved 2026-10-21), `Authorization: Bearer <long-lived access token>`. Details in [HOME_ASSISTANT.md](HOME_ASSISTANT.md); list in `apps/api/src/warden/integrations/homeassistant/official_api_matrix.json`.
 
 | Method | Path | Admin only | Used for |
 |---|---|---|---|
@@ -212,4 +212,4 @@ Tracker attribute names (`ip`, `mac`, `host_name`, `source_type`) are from [`dev
 
 ## MCP
 
-The Phase 9 MCP gateway implements the Model Context Protocol Streamable HTTP transport, [specification 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18) (retrieved 2026-10-21), with read-only tools. See [MCP.md](MCP.md).
+The MCP gateway implements the Model Context Protocol Streamable HTTP transport, [specification 2025-06-18](https://modelcontextprotocol.io/specification/2025-06-18) (retrieved 2026-10-21), with read-only tools. See [MCP.md](MCP.md).

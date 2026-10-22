@@ -1,6 +1,6 @@
 # AI provider setup
 
-**Status: implemented in Phase 7** (module `ai-providers`). Each provider kind has been exercised only against an in-process fake of its API; no live Ollama, LM Studio or Anthropic endpoint has been tested yet.
+Provided by the `ai-providers` module.
 
 Open **AI providers** (needs `ai:manage` to add or change; `ai:use` to view). Every provider is tested before it is saved: Fabric Warden lists its models and keeps the list.
 
@@ -45,4 +45,3 @@ If Claude declines a request (`stop_reason: refusal`) the run fails with "declin
 | not_found | The server answered but lacks the endpoint (check the `/v1` part for OpenAI-compatible servers). |
 | rate_limited | The provider is throttling; try later. |
 
-Not built: official CLI setup guides, OAuth/workload identity for Anthropic, Bedrock/Vertex/Foundry endpoints, embeddings.

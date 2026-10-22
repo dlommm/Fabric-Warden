@@ -11,5 +11,5 @@
 - Never add controller writes outside the change engine. Do not import `warden.integrations.unifi._write_gate` anywhere else (a test enforces this).
 - Never invent UniFi endpoints or capabilities: update `official_api_matrix.json` from published specs and cite them in `docs/API_CAPABILITIES.md`.
 - Never run tests or tools against a real controller. Use the simulator.
-- Planned features stay `maturity=PLANNED` and docs say so.
+- Unbuilt features stay `maturity=PLANNED` in the module catalog. Public docs describe only what is available; plans are not documented here.
 - Demo data must stay labelled (`is_demo`).

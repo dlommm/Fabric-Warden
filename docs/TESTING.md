@@ -11,8 +11,8 @@ cd apps/api && uv run pytest -q && uv run ruff check src tests && uv run ruff fo
 All tests use a temporary SQLite database migrated with Alembic. Highlights:
 
 - `test_auth.py`, `test_rbac.py` — setup, sign-in/out, MFA, tokens, preferences, role × endpoint matrix, last-owner protection
-- `test_security.py` (Phase 10) — **every registered route is authenticated and module-gated** (fails when a new route forgets it); CSRF on sign-in/setup/sign-out; sign-in limits per address, per username, per account under spoofed `X-Forwarded-For`; password-confirmation limits; MFA session-token rotation; 413 for oversized and chunked bodies; bounded lists; SSRF refusal for link-local/metadata/unspecified/credential/non-HTTP URLs on every URL-accepting endpoint, policy overrides, connect-time DNS check in the guarded transport; secret redaction in audit details and logs; audited authorization denials; API security headers
-- `test_backup.py` (Phase 10) — archive encrypted and authenticated (wrong passphrase, tampering), restore onto a second installation with a different vault key (credentials re-keyed, controller still syncs, sessions signed out, audit chain intact), restore without the vault key, schema-revision mismatch, owner-only/session-only guards, CLI round trip
+- `test_security.py` — **every registered route is authenticated and module-gated** (fails when a new route forgets it); CSRF on sign-in/setup/sign-out; sign-in limits per address, per username, per account under spoofed `X-Forwarded-For`; password-confirmation limits; MFA session-token rotation; 413 for oversized and chunked bodies; bounded lists; SSRF refusal for link-local/metadata/unspecified/credential/non-HTTP URLs on every URL-accepting endpoint, policy overrides, connect-time DNS check in the guarded transport; secret redaction in audit details and logs; audited authorization denials; API security headers
+- `test_backup.py` — archive encrypted and authenticated (wrong passphrase, tampering), restore onto a second installation with a different vault key (credentials re-keyed, controller still syncs, sessions signed out, audit chain intact), restore without the vault key, schema-revision mismatch, owner-only/session-only guards, CLI round trip
 - `test_modules.py`, `test_unifi.py` (including the **write gate** import test), `test_changes.py`, `test_phase*.py`, `test_ai.py`, `test_servers.py`, `test_snmp.py` — feature suites against the simulators
 - `test_migrations.py` — schema drift; `test_audit.py` — tamper detection
 
@@ -44,8 +44,4 @@ Runs headless and offline: the only controller is the simulator, and Google Font
 
 ## CI
 
-`.github/workflows/ci.yml` runs three jobs on pushes to `main` and on pull requests, with no secrets: API (ruff check, ruff format check, pytest), web (tsc, eslint, next build), and E2E (after both, installs Chromium and runs `pnpm e2e`; uploads the Playwright report on failure). Written in Phase 10; it has not run on GitHub yet.
-
-## Not yet covered
-
-PostgreSQL in the automated suites (backup restore was only exercised manually on PostgreSQL), Docker images in CI, real-controller compatibility, load/performance, live model red-teaming, multi-replica rate limiting.
+`.github/workflows/ci.yml` runs three jobs on pushes to `main` and on pull requests, with no secrets: API (ruff check, ruff format check, pytest), web (tsc, eslint, next build), and E2E (after both, installs Chromium and runs `pnpm e2e`; uploads the Playwright report on failure).

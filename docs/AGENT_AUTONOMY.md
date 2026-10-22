@@ -1,16 +1,15 @@
 # Agent autonomy
 
-**Status: levels 0–3 implemented (0–2 in Phase 7, 3 in Phase 8); level 4 planned.** The highest level any agent can reach in this release is **Act after approval**, and only the firewall review agent can reach it.
+The highest level any agent can reach is **Act after approval**, and only the firewall review agent can reach it.
 
-| Level | Name | What the agent may do | Status |
-|---|---|---|---|
-| 0 | Off | Nothing; the agent cannot run. | ✅ |
-| 1 | Explain | Call its read-only tools and answer. It has no tool that changes anything. Default for every agent. | ✅ |
-| 2 | Propose | Also call `propose_change`, which creates a change proposal through the change engine, for the operations the agent lists. People review, approve and apply it in Change Approval; the agent cannot. | ✅ |
-| 3 | Act after approval | Proposes exactly as at Propose, but the proposal is flagged `apply_on_approval`. When a person approves it, that same approval request also applies it, under the approver's name, through `engine.apply` (re-read, drift check, single write, verification, automatic revert). The approver can choose "Approve only" instead. The agent never approves or applies, and has no tool that could. | ✅ ⏳ (simulator only) |
-| 4 | Autonomous within guardrails | Apply pre-authorised low-risk changes on its own. | ⬜ planned; refused by the API (`422`) and never offered in the UI |
+| Level | Name | What the agent may do |
+|---|---|---|
+| 0 | Off | Nothing; the agent cannot run. |
+| 1 | Explain | Call its read-only tools and answer. It has no tool that changes anything. Default for every agent. |
+| 2 | Propose | Also call `propose_change`, which creates a change proposal through the change engine, for the operations the agent lists. People review, approve and apply it in Change Approval; the agent cannot. |
+| 3 | Act after approval | Proposes exactly as at Propose, but the proposal is flagged `apply_on_approval`. When a person approves it, that same approval request also applies it, under the approver's name, through `engine.apply` (re-read, drift check, single write, verification, automatic revert). The approver can choose "Approve only" instead. The agent never approves or applies, and has no tool that could. |
 
-Each agent has a ceiling (`max_autonomy`): only the firewall review agent can be set above Explain. Setting a level above the ceiling is refused; `autonomous` is not accepted by the API at all, and a stored value that is not a built level refuses the run.
+Each agent has a ceiling (`max_autonomy`): only the firewall review agent can be set above Explain. Setting a level above the ceiling is refused, and the API accepts no level beyond Act after approval.
 
 ## How "act after approval" stays inside the change engine
 

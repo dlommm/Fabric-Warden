@@ -1,6 +1,6 @@
 # Infrastructure: racks, cabling, power, assets, topology and docs
 
-**Status: implemented in Phase 4a** (modules `dcim`, `cabling`, `power`, `asset-lifecycle`, `topology`, `docs`, all `available`). Tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)). Servers & Virtualization (Proxmox, Unraid, Docker, Linux hosts) is Phase 4b and still `planned`.
+Provided by the `dcim`, `cabling`, `power`, `asset-lifecycle`, `topology` and `docs` modules. Servers and virtualization are covered in [SERVERS.md](SERVERS.md).
 
 The master specification describes these modules only in outline, so the detailed behaviour below is this project's design, not a transcription of the spec.
 
@@ -58,13 +58,13 @@ Every source shows load now, load on failover, projected load with planned items
 
 **PoE.** `GET /api/power/poe` lists, per switch, the ports delivering PoE and an **upper bound**: the maximum PSE power for each active port's negotiated standard (802.3af 15.4 W, at 30 W, bt type 3 60 W, type 4 90 W). The API reports no wattage, so no actual figure is shown.
 
-**Findings** (`GET /api/power/findings`): `over_capacity` (critical now, warning on failover, info with planned items), `near_capacity` (≥ 80 %), `low_runtime` (estimate under 10 min), `shared_feed` (a load with two or more inputs that all trace back to one feed: redundancy that does not survive losing that circuit), `no_capacity`, `no_draw`. Sensors (temperature, humidity) and SNMP/NUT telemetry are not implemented.
+**Findings** (`GET /api/power/findings`): `over_capacity` (critical now, warning on failover, info with planned items), `near_capacity` (≥ 80 %), `low_runtime` (estimate under 10 min), `shared_feed` (a load with two or more inputs that all trace back to one feed: redundancy that does not survive losing that circuit), `no_capacity`, `no_draw`.
 
 ## Asset Lifecycle (`asset-lifecycle`)
 
 **Data.** `assets`: kind (`hardware`, `spare`, `licence`, `subscription`, `consumable`), status (`ordered`, `in_service`, `spare`, `in_repair`, `retired`, `disposed`), tag, vendor, model, serial, quantity and minimum stock, supplier, order reference, unit cost and currency, warranty / support / end-of-sale / end-of-life dates, licence seats, expiry and auto-renew, optional links to a device, a rack item and a location, labels and notes. **Licence keys are not stored here**; keep them in the credential vault and reference them.
 
-**Views.** The list shows each asset's soonest upcoming date. The renewal calendar (`GET /api/assets/calendar`) lists every lifecycle date in the window, overdue first, and includes warranty dates from Phase 2 **device asset records** (marked "device record"; they are still edited on the device). Summary: active count, dates due within 90 days, purchase value per currency. CSV export.
+**Views.** The list shows each asset's soonest upcoming date. The renewal calendar (`GET /api/assets/calendar`) lists every lifecycle date in the window, overdue first, and includes warranty dates from **device asset records** (marked "device record"; they are still edited on the device). Summary: active count, dates due within 90 days, purchase value per currency. CSV export.
 
 **Findings** (`GET /api/assets/findings`): `expired` (a date passed; info instead of warning when the asset renews automatically), `expiring` (within 90 days and not auto-renewing), `low_stock` (quantity below the minimum), and device warranty expiry.
 

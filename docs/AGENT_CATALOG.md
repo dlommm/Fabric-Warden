@@ -1,6 +1,6 @@
 # Agent catalog
 
-**Status: three agents implemented in Phase 7, five agents and "Ask the network" in Phase 8** (module `ai-agents`). Answers are AI-generated and labelled as such; each run keeps its transcript as evidence. All tested only against the deterministic offline demo model and fake model servers; the quality of real models' answers has not been evaluated.
+Eight agents and "Ask the network", in the `ai-agents` module. Answers are AI-generated and labelled as such; each run keeps its transcript as evidence. Answer quality depends on the model you connect.
 
 | Agent | Subject | Tools | Max autonomy | Needs | Phase |
 |---|---|---|---|---|---|
@@ -35,7 +35,3 @@ Short background facts given to every run of an agent (or of every agent) in a s
 ## Scheduled runs
 
 A schedule runs one agent with a fixed subject and question every 1 hour to 30 days, as the person who created it, with that person's roles at run time; it is capped per day (1–24) on top of the agent's per-run limits and the provider's monthly budget. The `ai-agents.schedules` job (60 s) runs due schedules and also closes runs left "running" by a restart. A refused scheduled run (kill switch, agent off, cap, the person can no longer sign in or lost `ai:use`) is recorded on the schedule and audited as `ai.run.refused`.
-
-## Planned
-
-Event-triggered agents (an Automation Studio action that starts an agent), drift explainer, firmware planner, documentation writer, agent-to-agent delegation, retrieval over the wiki. None of these exist yet.

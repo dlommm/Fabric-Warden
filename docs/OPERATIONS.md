@@ -10,7 +10,7 @@ Day-two tasks for a running installation: health, backups and restore, upgrades 
 | `GET /api/health/ready` | none | The API can query its database. Used by the API container's `HEALTHCHECK` and by compose `depends_on`. |
 | `GET /api/system/health` | `system:read` | Database, Redis, scheduler and audit-chain status, failed job runs, version. Shown on the System page. |
 
-The web container's `HEALTHCHECK` fetches `/login`. In the 1.0.0-rc.1 compose test both containers reported `healthy` within about 15 seconds of start. The API starts answering only after migrations have run, so readiness also means the schema is current.
+The web container's `HEALTHCHECK` fetches `/login`. The API starts answering only after migrations have run, so readiness also means the schema is current.
 
 ## Forgotten password
 
@@ -53,7 +53,7 @@ warden-backup inspect ./warden.fwbk   # decrypts and prints the summary (row cou
 
 The passphrase comes from `WARDEN_BACKUP_PASSPHRASE` or a prompt, never an argument. Files are written `0600`. Every export is in the audit trail (`backup.export`).
 
-There is no backup scheduler or UI page yet; schedule the API call or CLI from cron/systemd on the host.
+To back up on a schedule, run the API call or CLI from cron or a systemd timer on the host.
 
 ### Restoring
 
@@ -74,7 +74,6 @@ Restore **replaces every row** in this installation's database with the backup's
 
 The restored audit chain is verified like any other and continues with a `backup.restore` record. Failed or refused restores are audited too and change nothing.
 
-Tested: export, restore onto a second installation with a different vault key (credentials re-keyed, demo controller still syncs), restore without the vault key (refused on a different key, accepted on the same key), wrong passphrase, tampered archive, schema-revision mismatch, non-owner and token refusals, CLI round trip — all on SQLite (`apps/api/tests/test_backup.py`). On PostgreSQL 17 it was exercised manually in the compose test (export, restore over the API including the serial-sequence reset for `audit_records.seq`/`events.seq`, sign-in, sync and a verified audit chain afterwards, CLI export/inspect in the container); the automated suites do not run PostgreSQL yet.
 
 ### PostgreSQL-native backups
 

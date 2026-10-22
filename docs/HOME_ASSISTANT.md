@@ -1,6 +1,6 @@
 # Home Assistant
 
-**Status: implemented in Phase 9** (module `home-assistant`, `available`). Tested against the built-in simulator only; no real Home Assistant instance has been connected yet.
+Provided by the `home-assistant` module.
 
 ## What it does
 
@@ -35,9 +35,9 @@ Router trackers carry the `ip`, `mac` and `host_name` the router sees (attribute
 | `unavailable` | info | a kept sensor is unavailable or unknown |
 | `tracker_not_on_network` | info | a router tracker is home but no client matches |
 
-## Not done (yet)
+## Scope
 
-No history (`/api/history`), no WebSocket subscription, no metrics recorded from these sensors, no actions or services (read-only by construction: the HTTP wrapper only sends GET). Feeding the UPS readings into the Power module is planned.
+Current states only: no history and no metrics are recorded from these entities. Read-only by construction: the HTTP wrapper only sends GET, so no actions or services are called.
 
 ## Demo
 

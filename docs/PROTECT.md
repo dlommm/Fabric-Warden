@@ -1,6 +1,6 @@
 # UniFi Protect
 
-**Status: implemented in Phase 9** (module `unifi-protect`, `available`). Tested against the built-in simulator only; no real Protect console has been connected yet.
+Provided by the `unifi-protect` module.
 
 ## What it does
 

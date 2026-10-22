@@ -4,7 +4,6 @@ Self-hosted, modular network operations for UniFi: inventory, analytics, configu
 
 Your UniFi controller stays in charge. Fabric Warden reads it through Ubiquiti's **official** Integration API and is **read-only by default**. Any change goes through a single audited change engine that you approve, and every controller starts with writes switched off.
 
-> **Status: release candidate 1.0.0-rc.1.** Everything is tested against the built-in simulators, and read-only sync has been checked against a live UniFi console (Network 10.6.106). No change has yet been written to a live controller, so treat writes as experimental. Five catalog modules are still *planned*; the Module Center shows which. See the [changelog](docs/CHANGELOG.md).
 
 ## Features
 
@@ -46,7 +45,6 @@ Your UniFi controller stays in charge. Fabric Warden reads it through Ubiquiti's
 
 - **No writes outside the change engine**, and only operations in Ubiquiti's published API are offered.
 - Nothing the official API doesn't expose: no DHCP leases, LLDP, IDS events, SFP optics or client fingerprints. See [API capabilities](docs/API_CAPABILITIES.md).
-- No OIDC/SSO sign-in, site-scoped roles or backup scheduler yet.
 
 ## Quick start (Docker)
 

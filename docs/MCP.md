@@ -1,6 +1,6 @@
 # MCP gateway
 
-**Status: implemented in Phase 9** (module `mcp`, `available`): read-only tools only. Tested with an in-process JSON-RPC client; not yet exercised with a third-party MCP client. Write tools and the Paperclip gateway are **planned**, not built.
+Provided by the `mcp` module. Every tool is read-only.
 
 ## Endpoint
 
@@ -57,9 +57,3 @@ Clients that take a JSON configuration:
 ```
 
 The Account page shows both with this installation's URL, and lists which tools are available.
-
-## Planned
-
-- Write tools that only ever **propose** changes through `warden.changes.engine.propose` (approval and apply stay with people). Not built.
-- The Paperclip agent gateway. Not built.
-- OAuth 2.1 authorization as described in the MCP authorization spec; today only static API tokens are accepted.

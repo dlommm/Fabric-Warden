@@ -1,6 +1,6 @@
 # Analytics, alerts, notifications and WAN
 
-**Status: implemented in Phase 3** (modules `analytics-studio`, `monitoring`, `notifications` and `wan`, all `available`). Everything below is tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)). `switching`, `wifi` and `fiber` remain **planned**.
+Provided by the `analytics-studio`, `monitoring`, `notifications` and `wan` modules.
 
 ## Where the numbers come from
 
@@ -59,7 +59,6 @@ Firing alerts can be acknowledged. A **maintenance window** (everything, or chos
 
 Built-in rules (created once, never recreated after deletion): Device offline, Controller unreachable, High CPU, High memory, High Wi-Fi retries, Probe loss, High latency.
 
-Not yet: escalation policies, on-call schedules, rate limiting or retries of failed deliveries.
 
 ## Notification channels
 
@@ -73,7 +72,7 @@ Each channel has a minimum severity. A rule with no channels selected notifies e
 
 ## WAN
 
-`/wan` shows the WAN interfaces as the controller lists them (name only: the official WAN endpoint has no state, addresses or throughput), the gateway's health, and the **probe**: an opt-in TCP connect from the Warden host to up to five targets, `attempts` times a minute, recording median latency and loss. It measures the active path from wherever Warden runs, not each WAN separately, and it is not an ICMP ping. It is off until targets are configured. Speed and bufferbloat tests are not implemented.
+`/wan` shows the WAN interfaces as the controller lists them (name only: the official WAN endpoint has no state, addresses or throughput), the gateway's health, and the **probe**: an opt-in TCP connect from the Warden host to up to five targets, `attempts` times a minute, recording median latency and loss. It measures the active path from wherever Warden runs, not each WAN separately, and it is not an ICMP ping. It is off until targets are configured.
 
 ## Permissions and audit
 

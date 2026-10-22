@@ -1,6 +1,6 @@
 # IPAM and Client Intelligence
 
-**Status: implemented in Phase 2** (modules `ipam` and `client-intel`, both `available`). Everything below is tested against the simulator only; read-only sync has since been checked against one live console (see [CHANGELOG.md](CHANGELOG.md)).
+Provided by the `ipam` and `client-intel` modules.
 
 ## Principle: documentation, compared against observation
 
@@ -9,7 +9,7 @@ IPAM records (prefixes, VLAN records, reservations) are **documentation owned by
 Controller-side DHCP leases and fixed-IP reservations are **not exposed** by the official Integration API (no such endpoint in any analysed version, see [API_CAPABILITIES.md](API_CAPABILITIES.md)). So:
 
 - "In use" means a client or device the controller currently reports at that address, not a lease.
-- A reservation here does not create a fixed IP on the controller. That needs the change engine (Phase 6) and an API that supports it.
+- A reservation here is documentation: it does not create a fixed IP on the controller.
 
 ## Data
 
@@ -58,7 +58,3 @@ Merges VLAN IDs from VLAN records, observed networks and prefixes. States: `docu
 ## Permissions and audit
 
 Reads need `inventory:read`. IPAM writes need `ipam:edit` (owner, admin, operator). Client identity and device asset edits need `inventory:edit`. Every write is recorded in the audit trail (`ipam.prefix.*`, `ipam.reservation.*`, `ipam.vlan.*`, `inventory.client.identity`, `inventory.device.metadata`).
-
-## Not yet
-
-IPv6 address maps (IPv6 prefixes are documented and counted, not mapped), site-scoped IPAM views, CSV import/export, DHCP lease ingestion (needs a collector outside the official API), and pushing reservations to the controller (change engine).
