@@ -24,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from warden.db import utcnow
 from warden.models import NotificationChannel, NotificationDelivery
+from warden.security.outbound import check_host, guarded_transport
 
 if TYPE_CHECKING:
     from warden.app_state import AppState
@@ -64,7 +65,8 @@ async def _secret(state: AppState, db: AsyncSession, channel: NotificationChanne
 
 
 def _http(state: AppState) -> httpx.AsyncClient:
-    return httpx.AsyncClient(transport=state.http_transport, timeout=TIMEOUT, follow_redirects=False)
+    transport = state.http_transport or guarded_transport()
+    return httpx.AsyncClient(transport=transport, timeout=TIMEOUT, follow_redirects=False)
 
 
 async def _webhook(state: AppState, secret: dict[str, Any], msg: Message) -> None:
@@ -121,6 +123,7 @@ async def _email(state: AppState, config: dict[str, Any], secret: dict[str, Any]
     if state.smtp_send is not None:
         await state.smtp_send(config, secret.get("password", ""), em)
     else:
+        check_host(str(config.get("host", "")))
         await asyncio.to_thread(_smtp_send, config, secret.get("password", ""), em)
 
 

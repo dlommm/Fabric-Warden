@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_validator
 from sqlalchemy import func, select
 
 from warden import audit
@@ -16,6 +16,7 @@ from warden.integrations.unifi import capabilities
 from warden.integrations.unifi.client import UniFiError
 from warden.integrations.unifi.simulator import SIM_API_KEY
 from warden.models import Client, Controller, Credential, Device, Site
+from warden.security.outbound import check_url
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/controllers", tags=["controllers"])
@@ -88,6 +89,12 @@ class ConnectionIn(BaseModel):
     api_key: str = Field(min_length=8, max_length=512)
     verify_tls: bool = True
     ca_bundle_pem: str | None = Field(default=None, max_length=65536)
+
+    @field_validator("base_url")
+    @classmethod
+    def _safe_url(cls, v: HttpUrl) -> HttpUrl:
+        check_url(str(v))
+        return v
 
 
 class ControllerIn(ConnectionIn):

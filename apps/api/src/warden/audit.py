@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from warden.db import new_id, utcnow
 from warden.models import AuditRecord
+from warden.security.redact import redact
 
 GENESIS = "0" * 64
 
@@ -72,7 +73,8 @@ async def record(
         target_type=target_type,
         target_id=target_id,
         outcome=outcome,
-        detail=detail or {},
+        # Secrets never enter the (permanent) audit trail.
+        detail=redact(detail) if detail else {},
         ip_address=actor.ip_address,
         prev_hash=prev or GENESIS,
         hash="",

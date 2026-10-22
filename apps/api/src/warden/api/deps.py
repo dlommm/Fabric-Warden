@@ -10,6 +10,7 @@ from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from warden import audit
 from warden.app_state import AppState
 from warden.audit import Actor
 from warden.db import utcnow
@@ -62,7 +63,23 @@ class Principal:
 
 
 def client_ip(request: Request) -> str | None:
-    return request.client.host if request.client else None
+    """The address the request came from, for audit and rate limits.
+
+    The API sits behind the web container's /api proxy (and often a TLS proxy in
+    front of that). Each proxy appends the address it saw to X-Forwarded-For, so
+    only the last ``WARDEN_FORWARDED_HOPS`` entries are trustworthy; anything to
+    their left was supplied by the client and is ignored. Trusting the whole
+    header (``--forwarded-allow-ips=*``) would let a client pick its own address
+    and step around per-address sign-in limits.
+    """
+    peer = request.client.host if request.client else None
+    hops = request.app.state.warden.settings.forwarded_hops
+    if hops <= 0:
+        return peer
+    chain = [p.strip() for p in request.headers.get("x-forwarded-for", "").split(",") if p.strip()]
+    if len(chain) < hops:
+        return chain[0] if chain else peer
+    return chain[-hops]
 
 
 async def _from_token(db: AsyncSession, raw: str, request: Request) -> Principal | None:
@@ -116,9 +133,32 @@ async def current_principal(request: Request, db: DB) -> Principal:
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
 
 
+def _csrf_header(request: Request) -> None:
+    """Unauthenticated cookie endpoints (sign-in, setup, sign-out) need the CSRF header too.
+
+    Without it a cross-site form could sign a victim into an attacker's account
+    (login CSRF) or sign them out. Bearer-token clients are exempt.
+    """
+    if request.method in UNSAFE and not request.headers.get("authorization", "").lower().startswith("bearer "):
+        if request.headers.get(CSRF_HEADER) != "1":
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "missing CSRF header")
+
+
+CsrfHeader = Depends(_csrf_header)
+
+
 def require(perm: P) -> Callable[..., Principal]:
-    async def dep(principal: CurrentPrincipal) -> Principal:
+    async def dep(principal: CurrentPrincipal, request: Request, db: DB) -> Principal:
         if not principal.can(perm):
+            # Authorization denials are part of the audit trail (committed before raising).
+            await audit.record(
+                db,
+                principal.actor,
+                "authz.denied",
+                outcome="denied",
+                detail={"permission": perm.value, "method": request.method, "path": request.url.path},
+            )
+            await db.commit()
             raise HTTPException(status.HTTP_403_FORBIDDEN, f"missing permission {perm.value}")
         return principal
 

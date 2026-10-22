@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
@@ -10,7 +11,7 @@ from sqlalchemy import func, select
 
 from warden import audit
 from warden.api.auth import start_session
-from warden.api.deps import DB, Allowed, State, client_ip
+from warden.api.deps import DB, Allowed, CsrfHeader, State, client_ip
 from warden.audit import Actor
 from warden.db import utcnow
 from warden.models import AuthSession, Controller, RoleAssignment, User
@@ -40,9 +41,18 @@ class OwnerIn(BaseModel):
     password: str = Field(max_length=1024)
 
 
-@router.post("/api/setup/owner", status_code=201)
+_setup_lock = asyncio.Lock()
+
+
+@router.post("/api/setup/owner", status_code=201, dependencies=[CsrfHeader])
 async def create_owner(body: OwnerIn, request: Request, response: Response, db: DB, state: State) -> dict:
-    # Serialise first-run creation: only possible while no users exist.
+    # Serialise first-run creation: only possible while no users exist. The lock stops two
+    # concurrent requests (in this process) from both seeing zero users and creating two owners.
+    async with _setup_lock:
+        return await _create_owner(body, request, response, db, state)
+
+
+async def _create_owner(body: OwnerIn, request: Request, response: Response, db: DB, state: State) -> dict:
     if await db.scalar(select(func.count()).select_from(User)):
         raise HTTPException(status.HTTP_409_CONFLICT, "Setup has already been completed.")
     if err := validate_password_strength(body.password):
@@ -60,6 +70,7 @@ async def create_owner(body: OwnerIn, request: Request, response: Response, db: 
         db, Actor("user", user.id, user.username, client_ip(request)), "setup.owner_created", target_type="user", target_id=user.id
     )
     await start_session(db, state, request, response, user, mfa_pending=False)
+    await db.commit()  # commit inside the lock so the next request sees the owner
     return {"id": user.id}
 
 

@@ -10,7 +10,7 @@ from datetime import timedelta
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,7 @@ from warden.integrations.hosts.clients import HostError
 from warden.integrations.hosts.simulators import SIM_PVE_TOKEN, SIM_UNRAID_KEY
 from warden.integrations.hosts.sync import collect, sync_connection
 from warden.models import Client, Credential, Host, HostConnection, HostStorage, Workload
+from warden.security.outbound import validate_optional_url
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/servers", tags=["servers"], dependencies=[Depends(require_module("servers"))])
@@ -72,6 +73,11 @@ class ConnIn(BaseModel):
     secret: str = Field(default="", max_length=1024)
     verify_tls: bool = True
     ca_bundle_pem: str | None = Field(default=None, max_length=65536)
+
+    @field_validator("base_url")
+    @classmethod
+    def _safe_url(cls, v: str | None) -> str | None:
+        return validate_optional_url(v, allow_unix=True)
 
     @model_validator(mode="after")
     def _needs(self) -> ConnIn:

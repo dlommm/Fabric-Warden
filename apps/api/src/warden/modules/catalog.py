@@ -7,6 +7,7 @@ be enabled until their implementation lands.
 
 from __future__ import annotations
 
+from warden import __version__
 from warden.events import (
     ALERT_FIRING,
     ALERT_RESOLVED,
@@ -34,7 +35,7 @@ from warden.modules.contracts import (
 )
 
 C = Category
-VERSION = "0.1.0"
+VERSION = __version__  # bundled first-party modules ship with the platform
 
 
 def _planned(

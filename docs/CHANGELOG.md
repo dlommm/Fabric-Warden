@@ -1,6 +1,38 @@
 # Changelog
 
-## 0.1.0 — unreleased
+## 1.0.0-rc.1 — release candidate (unreleased)
+
+First release candidate: Phases 1–7 and 9 plus Phase 10 hardening. Validated against the built-in simulators only; no live UniFi console, host or model server has been used. Phase 8 (advanced AI) is tracked separately.
+
+### Security
+- Route-coverage test: every API route must be authenticated (except sign-in, setup, health and the MCP endpoint, which authenticates itself) and, outside core, gated by its module.
+- CSRF header now also required on sign-in, MFA verify, setup and sign-out (closes login CSRF).
+- Sign-in limits: per username from any address (50 / 15 min) and per address across usernames (20 / 15 min, only when client addresses are trustworthy) on top of the per-account limit; password confirmation and MFA activation are limited too; throttle memory is bounded.
+- Client addresses: uvicorn no longer trusts `X-Forwarded-For` from anyone (`--forwarded-allow-ips=*` let a client choose its own address and step around sign-in limits). New `WARDEN_FORWARDED_HOPS` (default 0; 1 behind a TLS reverse proxy).
+- The half-signed-in session token is replaced with a fresh one when MFA completes.
+- SSRF guard for every user-supplied address (controllers, servers, Protect/Home Assistant, AI providers, webhooks, ntfy, SMTP, WAN probe, SNMP): http/https only, no credentials in URLs, link-local/metadata/unspecified/multicast/reserved refused unless allowed (`WARDEN_OUTBOUND_*`); HTTP connections re-checked after DNS resolution and on redirects.
+- Request bodies over 2 MiB are refused with 413 (also when streamed without a length); list fields bounded.
+- Secrets are redacted from audit details and log lines; authorization denials are audited (`authz.denied`).
+- First-run owner creation serialised (two concurrent requests can no longer create two owners).
+- Security headers: API adds a deny-all CSP, `Cache-Control: no-store` and CORP; the web app sends CSP, frame, referrer, COOP and permissions policies.
+
+### Added
+- Encrypted backup and restore of application state: owner-only `POST /api/backup/export` and `/api/backup/restore`, `warden-backup export|inspect|restore` CLI; AES-256-GCM under a scrypt passphrase key, optional vault key with credential re-keying on restore. See OPERATIONS.md.
+- Browser E2E suite (Playwright, `pnpm e2e`): setup, sign-in, devices, firewall, change propose → approve → apply → verify on the simulator, logs, SOC, audit. Runs headless and offline.
+- GitHub Actions CI: API tests/lint/format, web typecheck/lint/build, E2E. No secrets.
+
+### Changed
+- Version 1.0.0-rc.1 across the API, web app, bundled modules and images.
+- Docker: base images pinned by version and digest, non-root users with read-only application files, compose services with read-only root filesystems, dropped capabilities, `no-new-privileges`, log rotation and a web health check.
+- Docs: DEPLOYMENT (hardening, TLS/reverse proxy, configuration), OPERATIONS (health, backups, restore, upgrades, sizing), TESTING, SECURITY_MODEL, MODULE_ARCHITECTURE (catalog table regenerated).
+
+### Upgrade notes
+- Clients that call `POST /api/auth/login`, `/api/auth/logout`, `/api/auth/mfa/verify` or `/api/setup/owner` with a cookie session must send `X-Warden-CSRF: 1` (the web app always did). Bearer-token clients are unaffected.
+- Behind a TLS reverse proxy, set `WARDEN_FORWARDED_HOPS=1` to keep real client addresses in the audit trail.
+- Saved addresses that point at link-local or metadata destinations stop working until allowed with `WARDEN_OUTBOUND_ALLOW_LINK_LOCAL` or `WARDEN_OUTBOUND_ALLOWED_CIDRS`.
+- No database migration in this release.
+
+## 0.1.0 — development history
 - Phase 0 research: UniFi Network/Protect official API matrices.
 - Phase 8: advanced AI. Five specialised agents (Wi-Fi and RF review, Capacity and IP plan, Compliance and security review, Summarise this SOC case, Explain this change with the digital twin) and "Ask the network" over seven new read-only tools; autonomy "act after approval" (the approving person's approval also applies the agent's proposal through `engine.apply`, in their name; the agent still only proposes); background runs with live progress and a per-run stop; scheduled runs as their creator with a daily cap; agent notes with agent suggestions held for review. Change requests gain `apply_on_approval` and the approve endpoint an optional `apply`. Pages: Ask the network, Agent Center schedules and notes, live run page, "Approve and apply" on change detail. Migration `0013` (after `0011`). Tested only against the offline demo model and fake model servers.
 - Phase 9: UniFi Protect (cameras and NVR read-only from the official Integration API, matched to network clients by MAC with uplink and documented port/PoE; findings; Cameras page), Home Assistant (read-only REST API; temperature, UPS, connectivity and router-tracker entities, trackers matched to clients; GPS trackers and location never stored; findings; page), MCP gateway (`/api/mcp`, Streamable HTTP, 7 read-only tools, API-token auth with `mcp:use` and per-tool scoping, audited; Account page guide). All three with in-process simulators and published-source matrices. New permissions `integrations:manage`, `mcp:use`. Migration `0012`.

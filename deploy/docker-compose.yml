@@ -2,12 +2,20 @@
 #   cp deploy/.env.example deploy/.env   # then edit secrets
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d
 # Open http://<host>:${WARDEN_HTTP_PORT:-8080} and complete first-run setup.
+# Images are pinned by version and digest; see docs/DEPLOYMENT.md for upgrades.
 name: fabric-warden
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
 
 services:
   db:
-    image: postgres:17-alpine
-    restart: unless-stopped
+    <<: *hardening
+    image: postgres:17.11-alpine@sha256:1bcc18d81671b02906296aad470ec9778a6b71016ce953092024b680bad007b0
     environment:
       POSTGRES_DB: warden
       POSTGRES_USER: warden
@@ -21,8 +29,8 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
-    restart: unless-stopped
+    <<: *hardening
+    image: redis:7.4.11-alpine@sha256:892022f9f18c26c92c30e15194d132f90044af87b94a491a75429bbc3982eab1
     command: ["redis-server", "--save", "", "--appendonly", "no"]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -31,8 +39,9 @@ services:
       retries: 10
 
   api:
+    <<: *hardening
     build: ../apps/api
-    restart: unless-stopped
+    image: fabric-warden/api:1.0.0-rc.1
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -42,9 +51,14 @@ services:
       WARDEN_SECRET_KEY: ${WARDEN_SECRET_KEY:?set WARDEN_SECRET_KEY in deploy/.env}
       WARDEN_COOKIE_SECURE: ${WARDEN_COOKIE_SECURE:-true}
       WARDEN_DEMO_CONTROLLER_ENABLED: ${WARDEN_DEMO_CONTROLLER_ENABLED:-true}
+      # 1 only behind a TLS reverse proxy that sets X-Forwarded-For (DEPLOYMENT.md).
+      WARDEN_FORWARDED_HOPS: ${WARDEN_FORWARDED_HOPS:-0}
       WARDEN_SYSLOG_PORT: "5514"
     volumes:
       - data:/data
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
     # The HTTP API is not published: only the web container talks to it.
     # Syslog (UDP) is published on localhost only; set WARDEN_SYSLOG_BIND=0.0.0.0
     # in deploy/.env to receive logs from your gateway and servers.
@@ -52,13 +66,17 @@ services:
       - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
 
   web:
+    <<: *hardening
     build:
       context: ../apps/web
       args:
         WARDEN_API_URL: http://api:8000
-    restart: unless-stopped
+    image: fabric-warden/web:1.0.0-rc.1
     depends_on:
       api: { condition: service_healthy }
+    read_only: true
+    tmpfs: ["/tmp", "/app/.next/cache:uid=10001,mode=0700"]
+    cap_drop: [ALL]
     ports:
       - "${WARDEN_HTTP_PORT:-8080}:3000"
 

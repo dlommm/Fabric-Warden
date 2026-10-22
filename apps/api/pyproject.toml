@@ -1,6 +1,6 @@
 [project]
 name = "warden"
-version = "0.1.0"
+version = "1.0.0rc1"
 description = "Fabric Warden API: self-hosted modular network operations platform"
 authors = [
     { name = "dlomm", email = "118149483+dlommm@users.noreply.github.com" }
@@ -25,6 +25,7 @@ dependencies = [
 
 [project.scripts]
 warden = "warden.main:run"
+warden-backup = "warden.backup_cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.19,<0.13.0"]

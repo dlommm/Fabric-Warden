@@ -22,6 +22,7 @@ from warden.api import (
     assets,
     auth,
     automation,
+    backup,
     batches,
     cabling,
     changes,
@@ -66,6 +67,9 @@ from warden.integrations.unifi.sync import sync_job
 from warden.jobs import JobContext, JobSpec, Scheduler
 from warden.models import AuthSession, JobRun, NotificationDelivery
 from warden.modules.service import ModuleService
+from warden.security import outbound
+from warden.security.limits import BodySizeLimit, SecurityHeaders
+from warden.security.redact import install_log_filter
 from warden.security.vault import Vault, load_master_key
 from warden.syslog import Ingest, retention_job
 
@@ -128,8 +132,14 @@ async def migrate(state: AppState) -> None:
     await upgrade_head(state.db.engine)
 
 
+RESTORE_PATH = "/api/backup/restore"
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
+    outbound.set_policy(outbound.OutboundPolicy.from_settings(settings))
+    auth.throttle.clear()
+    install_log_filter()
     state = build_state(settings)
 
     @asynccontextmanager
@@ -169,13 +179,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             allow_headers=["*"],
         )
 
-    @app.middleware("http")
-    async def security_headers(request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
-        response.headers.setdefault("X-Content-Type-Options", "nosniff")
-        response.headers.setdefault("Referrer-Policy", "same-origin")
-        response.headers.setdefault("X-Frame-Options", "DENY")
-        return response
+    app.add_middleware(SecurityHeaders)
+    # Outermost: refuse oversized bodies before anything parses them.
+    app.add_middleware(BodySizeLimit, limit=settings.max_request_bytes, overrides={RESTORE_PATH: settings.max_restore_bytes})
 
     for r in (
         auth.router,
@@ -215,6 +221,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         soc.router,
         investigate.router,
         system.router,
+        backup.router,
     ):
         app.include_router(r)
     return app
@@ -224,4 +231,5 @@ def run() -> None:
     import uvicorn
 
     logging.basicConfig(level=logging.INFO)
-    uvicorn.run("warden.main:create_app", factory=True, host="0.0.0.0", port=8000, proxy_headers=True)
+    # Client addresses come from WARDEN_FORWARDED_HOPS (api.deps.client_ip), not uvicorn's proxy headers.
+    uvicorn.run("warden.main:create_app", factory=True, host="0.0.0.0", port=8000, proxy_headers=False)

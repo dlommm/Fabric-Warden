@@ -44,6 +44,30 @@ class Settings(BaseSettings):
     log_retention_days: int = 14
     log_max_rows: int = 2_000_000
 
+    # Outbound connections to user-supplied addresses (see security/outbound.py).
+    # Private and loopback ranges are allowed (equipment lives there); link-local and
+    # metadata addresses are refused unless allowed here.
+    outbound_allow_link_local: bool = False
+    outbound_allowed_cidrs: list[str] = Field(default_factory=list)
+    outbound_blocked_cidrs: list[str] = Field(default_factory=list)
+
+    # Request body limits (bytes). Restoring a backup has its own, larger limit.
+    max_request_bytes: int = 2 * 1024 * 1024
+    max_restore_bytes: int = 512 * 1024 * 1024
+
+    # Sign-in rate limits, per client address and per username (any address), on top
+    # of the per-address-and-username limit of 5.
+    login_ip_max_failures: int = 20
+    login_user_max_failures: int = 50
+
+    # How many trusted proxies append to X-Forwarded-For before the API. The web
+    # container's /api proxy passes the header through unchanged and adds nothing, so:
+    # 0 = use the socket peer (default; behind the web container every client shares its
+    # address), 1 = a TLS reverse proxy in front of the web container sets or appends
+    # the real client address. Never more than the real number: extra hops would trust
+    # client-supplied addresses. The per-address sign-in limit applies only when > 0.
+    forwarded_hops: int = 0
+
 
 @lru_cache
 def get_settings() -> Settings:

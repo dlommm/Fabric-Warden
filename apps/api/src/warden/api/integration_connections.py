@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,6 +19,7 @@ from warden.api.deps import DB, Allowed, State
 from warden.integrations.ecosystem import collect, sync_connection
 from warden.integrations.hosts.clients import HostError
 from warden.models import Credential, HaEntity, IntegrationConnection, ProtectDevice
+from warden.security.outbound import validate_optional_url
 from warden.security.rbac import P
 
 Manager = Allowed(P.INTEGRATIONS_MANAGE)
@@ -50,6 +51,11 @@ class ConnIn(BaseModel):
     secret: str = Field(min_length=1, max_length=4096)
     verify_tls: bool = True
     ca_bundle_pem: str | None = Field(default=None, max_length=65536)
+
+    @field_validator("base_url")
+    @classmethod
+    def _safe_url(cls, v: str | None) -> str | None:
+        return validate_optional_url(v)
 
 
 class ConnCreate(ConnIn):

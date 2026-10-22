@@ -81,6 +81,7 @@ class Scheduler:
         self.locker = Locker(redis_url)
         self._task: asyncio.Task[None] | None = None
         self._stop = asyncio.Event()
+        self.paused = False  # set while a restore replaces the database
 
     def register(self, spec: JobSpec) -> None:
         self.jobs[spec.id] = spec
@@ -126,6 +127,8 @@ class Scheduler:
         return run
 
     async def tick(self) -> None:
+        if self.paused:
+            return
         now = utcnow()
         for job_id, spec in self.jobs.items():
             if spec.interval_seconds is None or self.next_due[job_id] > now:

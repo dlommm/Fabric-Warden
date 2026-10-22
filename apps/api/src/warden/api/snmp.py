@@ -22,6 +22,7 @@ from warden.integrations.snmp.client import AUTH_PROTOCOLS, PRIV_PROTOCOLS, Snmp
 from warden.integrations.snmp.simulator import SIM_PASSWORD, SIM_USER
 from warden.integrations.snmp.sync import credentials, poll_target, probe
 from warden.models import Credential, Device, Port, SnmpInterface, SnmpProfile, SnmpTarget
+from warden.security.outbound import check_host
 from warden.security.rbac import P
 
 router = APIRouter(prefix="/api/snmp", tags=["snmp"], dependencies=[Depends(require_module("snmp"))])
@@ -220,6 +221,11 @@ class TargetIn(BaseModel):
     host: str = Field(min_length=1, max_length=255, pattern=r"^[A-Za-z0-9.:\-\[\]]+$")
     port: int = Field(default=161, ge=1, le=65535)
 
+    @model_validator(mode="after")
+    def _safe_host(self) -> TargetIn:
+        check_host(self.host)
+        return self
+
 
 class TargetCreate(BaseModel):
     profile_id: str
@@ -231,6 +237,8 @@ class TargetCreate(BaseModel):
 
     @model_validator(mode="after")
     def _one(self) -> TargetCreate:
+        if self.host:
+            check_host(self.host)
         if bool(self.device_ids) == bool(self.host):
             raise ValueError("Give either device_ids or a host")
         return self
