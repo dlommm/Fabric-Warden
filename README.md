@@ -2,7 +2,7 @@
 
 Self-hosted, modular network operations for UniFi: inventory, analytics, configuration history, security investigation, rack/DCIM documentation and optional AI agents in one web interface. The UniFi controller stays the authoritative control plane; Fabric Warden reads it through the **official** Integration API and is **read-only by default**.
 
-> **Status: Phases 1 (core platform), 2 (inventory and IPAM), 3 (analytics and alerting) and 4 (racks, cabling, power, assets, topology, wiki, servers and virtualization) implemented.** Most modules in the catalog are declared but *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: release candidate 1.0.0-rc.1.** Phases 1–7 and 9 are implemented and Phase 10 hardening is done; everything has been validated against the built-in simulators only, not yet a live UniFi console. Five catalog modules remain *planned*; the Module Center shows exactly which. See [docs/ROADMAP.md](docs/ROADMAP.md) and [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## What works today
 
@@ -23,13 +23,17 @@ Self-hosted, modular network operations for UniFi: inventory, analytics, configu
 - Infrastructure: locations and racks with front/rear elevations and occupancy checks; cables traced through patch panels with schedules and labels; power chains with failover headroom and UPS runtime estimates; asset lifecycle with a renewal calendar; topology with a VLAN overlay; a versioned wiki whose `[[device:…]]` references stay live. See [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md)
 - Servers: read-only Proxmox VE, Unraid, Docker and node_exporter inventory, with each host and VM matched to the network client it is. See [docs/SERVERS.md](docs/SERVERS.md)
 - Web UI: customizable Overview (exceptions first), devices, device detail with upstream route, clients, networks + zones, controllers + capability matrix, Module Center, audit, users, account; light/dark, comfortable/compact
+- Security and configuration: firewall policy analysis, configuration history, compliance, syslog log management, SOC signals and cases, investigation workbench, SNMP port counters
+- Changes: a single audited change engine (propose with live state, approve, re-read, apply, verify, revert where possible), bulk operations, automation rules that can only propose, digital-twin impact preview. Every controller starts read-only
+- Ecosystem and AI (optional): UniFi Protect and Home Assistant read-only, an MCP server with read-only tools, AI providers and read-only agents that can at most propose a change
+- Operations: encrypted owner-only backup and restore (API and `warden-backup` CLI), health checks, hardened non-root containers. See [docs/OPERATIONS.md](docs/OPERATIONS.md)
 - Deterministic simulated UniFi controller for demos and tests (always labelled *Demo data*)
 
 ## What it deliberately does not do (yet)
 
-- **No controller writes.** The client refuses non-GET requests unless the (not yet built) change engine issues a write authorization.
+- **No writes outside the change engine.** The client refuses non-GET requests unless the change engine issues a write authorization for an approved change; only operations in the published API spec are offered.
 - No SFP optics/FEC, port error counters, DHCP leases, controller fixed-IP reservations, client fingerprints, LLDP or IDS events: the official API does not expose them. See [docs/API_CAPABILITIES.md](docs/API_CAPABILITIES.md).
-- No AI features yet (Phase 7+).
+- No OIDC/SSO sign-in, site-scoped roles, backup scheduler or Phase 8 advanced AI yet.
 
 ## Quick start (development)
 
@@ -60,6 +64,7 @@ PRODUCT.md    Product context; DESIGN.md: design system
 ## Tests
 
 ```bash
-cd apps/api && uv run pytest     # 61 tests: auth, RBAC matrix, modules, UniFi capability gating, sync, audit chain, migrations
+cd apps/api && uv run pytest && uv run ruff check src tests   # unit/integration tests against SQLite and the simulators
 cd apps/web && npx tsc --noEmit && pnpm lint && pnpm build
+cd apps/web && pnpm e2e                                         # browser E2E (Playwright, headless, offline)
 ```

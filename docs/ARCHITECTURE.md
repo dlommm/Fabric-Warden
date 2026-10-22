@@ -17,7 +17,8 @@ browser ──► web (Next.js, :3000) ──/api/*──► api (FastAPI, :8000
 | `config.py` | Settings from `WARDEN_*` env vars |
 | `db.py` | Async SQLAlchemy engine, `UTCDateTime`, naming conventions |
 | `models/` | `platform.py` (users, sessions, tokens, credentials, module state, audit, events, job runs, settings), `inventory.py` (controllers, sites, devices, ports, radios, clients, networks, WANs, zones, policies) |
-| `security/` | `crypto.py` (argon2, tokens), `vault.py` (Fernet credential vault), `rbac.py` (permissions and roles) |
+| `security/` | `crypto.py` (argon2, tokens), `vault.py` (Fernet credential vault), `rbac.py` (permissions and roles), `outbound.py` (SSRF policy + guarded transport), `limits.py` (body size, throttles, security headers), `redact.py` (secret masking for audit and logs) |
+| `backup.py`, `backup_cli.py` | Encrypted portable backup and restore (`/api/backup`, `warden-backup`) |
 | `audit.py` | Hash-chained audit records + `verify_chain` |
 | `events.py` | Typed event bus: persisted + in-process subscribers + SSE listeners |
 | `jobs.py` | Scheduler; jobs run only while their module is enabled; Redis lock when configured |
@@ -39,7 +40,7 @@ browser ──► web (Next.js, :3000) ──/api/*──► api (FastAPI, :8000
 
 ## Request authentication
 
-Session cookie (`httpOnly`, `SameSite=Lax`, `Secure` in production) or `Authorization: Bearer wdn_…`. Cookie-authenticated unsafe methods must send `X-Warden-CSRF: 1`. See [SECURITY_MODEL.md](SECURITY_MODEL.md).
+Session cookie (`httpOnly`, `SameSite=Lax`, `Secure` in production) or `Authorization: Bearer wdn_…`. Cookie-authenticated unsafe methods, and sign-in, MFA verify, setup and sign-out, must send `X-Warden-CSRF: 1`. Client addresses come from the socket peer or the last `WARDEN_FORWARDED_HOPS` entries of `X-Forwarded-For`. See [SECURITY_MODEL.md](SECURITY_MODEL.md).
 
 ## Live updates
 
