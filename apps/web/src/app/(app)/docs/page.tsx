@@ -61,7 +61,7 @@ export default function DocsIndex() {
         }
       />
       {pages.error && <Notice tone="crit" className="mb-4">{(pages.error as Error).message}</Notice>}
-      <div className="grid gap-[var(--gap)] lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
         <DocTree />
         <div className="flex min-w-0 flex-col gap-[var(--gap)]">
           {creating && <NewPageForm onDone={() => setCreating(false)} />}
@@ -101,7 +101,7 @@ export default function DocsIndex() {
                 {shown.map((p) => (
                   <li key={p.id} className="border-b border-rule last:border-b-0">
                     <Link href={`/docs/${p.slug}`} className="flex min-h-[var(--row-h)] flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 hover:bg-surface-2">
-                      <span className="min-w-0 flex-1 truncate font-bold">{p.title}</span>
+                      <span className="min-w-0 flex-[1_1_12rem] truncate font-bold">{p.title}</span>
                       <span className="flex flex-wrap gap-1">{p.tags.map((t) => <Chip key={t}>{t}</Chip>)}</span>
                       <span className="text-sm text-ink-3">v{p.version} · {p.updated_by || "unknown"} · {ago(p.updated_at)}</span>
                       {p.is_demo && <DemoTag />}

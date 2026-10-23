@@ -33,14 +33,13 @@ function StepSign({ current }: { current: Step }) {
               <span
                 className={clsx(
                   "grid size-7 place-items-center rounded-[4px] text-sm font-bold",
-                  active ? "sign bg-white text-[#0b3d91]" : done ? "bg-[#00704a] text-white" : "border-2 border-white/40 text-white/70",
+                  active ? "bg-[#7fc8ff] text-[#071426]" : done ? "border-[1.5px] border-[#4fcf8e] text-[#4fcf8e]" : "border border-white/30 text-white/70",
                 )}
-                style={active ? { outlineColor: "#0b3d91" } : undefined}
                 aria-current={active ? "step" : undefined}
               >
                 {done ? <Check className="size-4" strokeWidth={3} /> : i + 1}
               </span>
-              {i < STEPS.length - 1 && <span className={clsx("my-1 w-1.5 flex-1 rounded-full", done ? "bg-[#00704a]" : "bg-white/25")} style={{ minHeight: 28 }} />}
+              {i < STEPS.length - 1 && <span className={clsx("my-1 w-px flex-1", done ? "bg-[#4fcf8e]" : "bg-white/25")} style={{ minHeight: 28 }} />}
             </div>
             <div className="pb-6">
               <p className={clsx("font-bold", !active && !done && "text-rail-ink-2")}>{s.label}</p>

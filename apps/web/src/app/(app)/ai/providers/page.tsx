@@ -318,14 +318,14 @@ function ProviderSettings({ p, onClose }: { p: AiProvider; onClose: () => void }
           </div>
         </form>
         <div className="min-w-0">
-          <h3 className="mb-1 text-xs font-bold tracking-wide text-ink-2 uppercase">This month, since {u ? dateTime(u.since) : "…"}</h3>
+          <h3 className="mb-1 text-sm font-semibold text-ink-3">This month, since {u ? dateTime(u.since) : "…"}</h3>
           {u?.budget_problem && <Notice tone="warn" className="my-2" title="Budget reached">{u.budget_problem}. Agents on this provider stop until the month ends or the limit is raised.</Notice>}
           <p className="mb-3 tabular text-ink-2">{u ? `${tokens(u.tokens)} tokens · ${money(u.cost_usd)}` : "…"}</p>
           {u && u.items.length > 0 ? (
             <table className="w-full text-left">
               <caption className="sr-only">Recent model calls</caption>
               <thead>
-                <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+                <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                   <th className="py-2 pr-3 font-bold">When</th>
                   <th className="py-2 pr-3 font-bold">Run</th>
                   <th className="py-2 pr-3 font-bold">Model</th>
@@ -368,7 +368,7 @@ function PricePanel({ prices }: { prices: Kinds["prices"] }) {
       <table className="text-left">
         <caption className="sr-only">Built-in prices</caption>
         <thead>
-          <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+          <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
             <th className="py-2 pr-6 font-bold">Model</th>
             <th className="py-2 pr-6 text-right font-bold">Input / M tokens</th>
             <th className="py-2 text-right font-bold">Output / M tokens</th>

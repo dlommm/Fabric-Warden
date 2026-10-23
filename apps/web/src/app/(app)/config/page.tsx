@@ -28,7 +28,7 @@ function DiffView({ diff }: { diff: ConfigDiff }) {
     <div className="flex flex-col gap-4">
       {sections.map(([section, parts]) => (
         <section key={section} aria-label={LABEL[section] ?? section}>
-          <h3 className="mb-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">{LABEL[section] ?? section}</h3>
+          <h3 className="mb-1.5 text-sm font-semibold text-ink-3">{LABEL[section] ?? section}</h3>
           <ul className="flex flex-col rounded-[3px] border border-rule">
             {parts.added.map((e) => (
               <li key={`a${e.id}`} className="flex items-baseline gap-2 border-b border-rule bg-ok-soft px-3 py-1.5 last:border-b-0">
@@ -118,7 +118,7 @@ export default function ConfigPage() {
             </Panel>
           );
         })}
-        <div className={clsx("grid gap-[var(--gap)]", selected && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] 2xl:items-start")}>
+        <div className={clsx("grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)]", selected && "2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] 2xl:items-start")}>
           <Panel title="Snapshots" bodyClassName="p-0">
             {snaps.isLoading ? (
               <div className="p-4"><Skeleton className="h-32" /></div>
@@ -133,7 +133,7 @@ export default function ConfigPage() {
                       <span className="text-sm text-ink-3">{s.site} · {s.trigger === "manual" ? "captured by hand" : "after a sync"} · <span className="font-mono text-xs">{s.hash}</span></span>
                     </span>
                     <span className="min-w-0 flex-1"><ChangeChips changes={s.changes} /></span>
-                    {s.is_baseline && <span className="sign inline-flex h-6 items-center rounded-[3px] bg-accent px-2 text-xs font-bold text-accent-ink">Baseline</span>}
+                    {s.is_baseline && <span className="frame inline-flex h-6 items-center rounded-[3px] bg-accent px-2 text-xs font-bold text-accent-ink">Baseline</span>}
                     {s.is_demo && <DemoTag />}
                     <span className="flex gap-1">
                       {s.change_total > 0 && <Button size="sm" variant={selected === s.id ? "secondary" : "ghost"} aria-pressed={selected === s.id} onClick={() => setSelected(selected === s.id ? null : s.id)}>Changes</Button>}

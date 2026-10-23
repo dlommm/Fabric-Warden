@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { BellOff, CircleCheck, Clock, Pencil, Plus, Siren, Trash2, TriangleAlert, Wrench } from "lucide-react";
+import { BellOff, CircleCheck, Clock, OctagonAlert, Pencil, Plus, Siren, Trash2, TriangleAlert, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
@@ -93,7 +93,7 @@ export default function AlertsPage() {
               )}
             >
               {t.label}
-              {badge > 0 && <span className="tabular inline-flex h-5 min-w-5 items-center justify-center rounded-[3px] bg-crit px-1.5 text-xs font-bold text-white">{badge}</span>}
+              {badge > 0 && <span className="tabular inline-flex h-5 min-w-5 items-center justify-center rounded-[3px] bg-crit px-1.5 font-mono text-xs font-semibold text-ground">{badge}</span>}
             </button>
           );
         })}
@@ -140,20 +140,24 @@ function ActiveTab({ data, loading, error }: { data?: { items: AlertItem[]; coun
           <p className="text-ink-2">{pending.length ? `${pending.length} breach${pending.length > 1 ? "es are" : " is"} waiting out the hold time below.` : "Every rule is within its threshold."}</p>
         </section>
       ) : (
-        <section aria-labelledby="firing-h" className="sign rounded-[var(--radius)] bg-warn text-warn-ink" style={{ outlineColor: "#14171a" }}>
+        <section aria-labelledby="firing-h" className="attention-plate" data-tone={firing.some((a) => a.severity === "critical") ? "crit" : undefined}>
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 pt-4 pb-2">
-            <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
+            {firing.some((a) => a.severity === "critical") ? (
+              <OctagonAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
+            ) : (
+              <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
+            )}
             <h2 id="firing-h" className="text-lg font-bold">
               {firing.length} alert{firing.length > 1 ? "s" : ""} firing
             </h2>
             {data.counts.unacknowledged < firing.length && <span className="font-semibold">{firing.length - data.counts.unacknowledged} acknowledged</span>}
             {loud.length < firing.length && <span className="font-semibold">{firing.length - loud.length} silenced by maintenance</span>}
           </div>
-          <ul className="mx-2 mb-2 rounded-[3px] bg-surface text-ink">
+          <ul className="mx-2 mb-2 overflow-hidden rounded-[3px] border border-rule bg-surface text-ink">
             {firing.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-3 py-2.5 last:border-b-0">
                 <span className="sm:w-24"><SeverityLabel s={a.severity} /></span>
-                <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 flex-[1_1_14rem] flex-col">
                   <span className="flex flex-wrap items-center gap-x-2">
                     <EntityLink a={a} />
                     <span className="text-ink-2">{a.rule}</span>
@@ -187,7 +191,7 @@ function ActiveTab({ data, loading, error }: { data?: { items: AlertItem[]; coun
             {pending.map((a) => (
               <li key={a.id} className="flex min-h-[var(--row-h)] flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-4 py-2 last:border-b-0">
                 <StateLabel tone="muted"><span className="text-ink-2">Pending</span></StateLabel>
-                <span className="min-w-0 flex-1"><EntityLink a={a} /> <span className="text-ink-2">{a.rule}: {a.unit === "bool" ? "reported down" : formatValue(a.unit, a.value)}</span></span>
+                <span className="min-w-0 flex-[1_1_14rem]"><EntityLink a={a} /> <span className="text-ink-2">{a.rule}: {a.unit === "bool" ? "reported down" : formatValue(a.unit, a.value)}</span></span>
                 <span className="inline-flex items-center gap-1.5 text-sm text-ink-3"><Clock className="size-3.5" aria-hidden />since {ago(a.pending_since)}</span>
               </li>
             ))}
@@ -587,7 +591,7 @@ function MaintenanceTab() {
             {list.data.items.map((w) => (
               <li key={w.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-4 py-3 last:border-b-0">
                 <span className="w-24"><StateLabel tone={stateTone[w.state]}>{w.state === "active" ? "Active" : w.state === "scheduled" ? "Scheduled" : "Ended"}</StateLabel></span>
-                <span className="flex min-w-0 flex-1 flex-col">
+                <span className="flex min-w-0 flex-[1_1_14rem] flex-col">
                   <span className="font-bold">{w.name}</span>
                   <span className="text-sm text-ink-2">
                     {dateTime(w.starts_at)} to {dateTime(w.ends_at)} · {w.entity_ids.length ? w.entity_ids.map((id) => names.get(id) ?? "removed device").join(", ") : "everything"}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, TriangleAlert } from "lucide-react";
+import { ChevronLeft, GitPullRequest, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -59,6 +59,7 @@ export default function ChangePage() {
     <>
       <BackLink />
       <PageHeader
+        icon={<GitPullRequest />}
         title={c.title}
         description={c.reason || undefined}
         meta={
@@ -70,15 +71,15 @@ export default function ChangePage() {
           </span>
         }
       />
-      <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-[var(--gap)]">
           {attention && (
-            <section aria-labelledby="risk-h" className="sign rounded-[var(--radius)] bg-warn text-warn-ink" style={{ outlineColor: "#14171a" }}>
+            <section aria-labelledby="risk-h" className="attention-plate">
               <div className="flex items-baseline gap-3 px-5 pt-4 pb-2">
                 <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
                 <h2 id="risk-h" className="text-lg font-bold">{c.protected ? "Protected path: read this before approving" : "High risk"}</h2>
               </div>
-              <ul className="mx-2 mb-2 rounded-[3px] bg-surface px-4 py-3 text-ink">
+              <ul className="mx-2 mb-2 overflow-hidden rounded-[5px] bg-surface shadow-[0_1px_2px_rgb(4_18_48/0.22)] px-4 py-3 text-ink">
                 {c.risk_reasons.map((r) => <li key={r} className="py-0.5">{r}</li>)}
               </ul>
             </section>
@@ -87,7 +88,7 @@ export default function ChangePage() {
             <table className="w-full text-left">
               <caption className="sr-only">Before and after</caption>
               <thead>
-                <tr className="text-xs font-bold tracking-wide text-ink-2 uppercase">
+                <tr className="text-sm font-semibold text-ink-3">
                   <th className="pb-2 font-bold">Field</th>
                   <th className="pb-2 font-bold">Now</th>
                   <th className="pb-2 font-bold">After</th>

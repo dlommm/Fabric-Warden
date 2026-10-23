@@ -22,7 +22,7 @@ export function UsageBar({ used, usable, pct }: { used: number; usable: number; 
     <span className="inline-flex items-center gap-2.5">
       <span className="h-2 w-24 shrink-0 rounded-[2px] bg-surface-3" aria-hidden>
         <span
-          className={clsx("block h-full rounded-[2px]", tone === "crit" ? "bg-crit" : tone === "warn" ? "bg-warn ring-1 ring-ink/40" : "bg-[#00704a]")}
+          className={clsx("block h-full rounded-[2px]", tone === "crit" ? "bg-crit" : tone === "warn" ? "bg-warn-line" : "bg-ok")}
           style={{ width: `${Math.min(100, Math.max(pct, used > 0 ? 2 : 0))}%` }}
         />
       </span>
@@ -123,14 +123,14 @@ export function FindingsPlate({
   return (
     <div className="flex flex-col gap-[var(--gap)]">
       {severe.length > 0 && (
-        <section aria-labelledby="findings-h" className="sign rounded-[var(--radius)] bg-warn text-warn-ink" style={{ outlineColor: "#14171a" }}>
+        <section aria-labelledby="findings-h" className="attention-plate">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-5 pt-4 pb-2">
             <TriangleAlert className="size-5 translate-y-0.5 self-start" aria-hidden strokeWidth={2.5} />
             <h2 id="findings-h" className="text-lg font-bold">
               {heading(severe.length)}
             </h2>
           </div>
-          <ul className="mx-2 mb-2 rounded-[3px] bg-surface text-ink">
+          <ul className="mx-2 mb-2 overflow-hidden rounded-[3px] border border-rule bg-surface text-ink">
             {severe.map((f) => (
               <FindingRow key={f.key} f={f} hover="hover:bg-warn-soft" />
             ))}
@@ -138,7 +138,7 @@ export function FindingsPlate({
         </section>
       )}
       {notes.length > 0 && (
-        <section aria-labelledby="notes-h" className="rounded-[var(--radius)] border border-rule bg-surface">
+        <section aria-labelledby="notes-h" className="plate">
           <div className="flex min-h-11 flex-wrap items-center justify-between gap-3 border-b border-rule px-4 py-2">
             <h2 id="notes-h" className="text-md font-bold">
               {notes.length} note{notes.length > 1 ? "s" : ""}
@@ -180,11 +180,11 @@ const CELL_STYLE: Record<CellKind, string> = {
   free: "border border-rule-strong bg-surface font-normal text-ink-3",
   dhcp: "border border-dashed border-accent/50 bg-accent-soft/60 font-normal text-ink-3",
   reserved: "border-2 border-accent bg-surface font-bold text-ink",
-  observed: "bg-[#00704a] font-bold text-white",
+  observed: "bg-ok-soft font-bold text-ok ring-1 ring-ok/60 ring-inset",
   gateway: "bg-ink font-bold text-surface",
   network: "bg-surface-3 font-normal text-ink-3",
   broadcast: "bg-surface-3 font-normal text-ink-3",
-  conflict: "bg-surface font-bold text-ink ring-[3px] ring-[#c8102e] ring-inset",
+  conflict: "bg-surface font-bold text-ink ring-2 ring-crit ring-inset",
 };
 
 export const CELL_LABEL: Record<CellKind, string> = {
@@ -204,7 +204,7 @@ export function cellKind(c: AddressCell): CellKind {
   return c.conflict ? "conflict" : c.state;
 }
 
-/** Documented-and-in-use bays keep the reservation's sign border on top of the green. */
+/** Documented-and-in-use bays keep the reservation's inset frame on top of the green. */
 function documentedInUse(c: AddressCell) {
   return c.state === "observed" && c.reservation && !c.conflict;
 }
@@ -299,7 +299,7 @@ export function AddressMap({
                     className={clsx(
                       "tabular relative flex size-[30px] items-center justify-center rounded-[3px] font-mono text-[11px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:size-9",
                       CELL_STYLE[kind],
-                      documentedInUse(c) && "sign",
+                      documentedInUse(c) && "frame",
                       isSel && "outline-[2.5px] outline-offset-2 outline-accent",
                     )}
                   >
@@ -324,7 +324,7 @@ export function AddressMap({
         ))}
         {cells.some(documentedInUse) && (
           <li className="inline-flex items-center gap-1.5">
-            <span aria-hidden className="sign block size-4 rounded-[2px] bg-[#00704a] text-white" />
+            <span aria-hidden className="block size-4 rounded-[2px] bg-ok-soft ring-1 ring-ok/60 ring-inset" />
             Inner border: matches a reservation
           </li>
         )}

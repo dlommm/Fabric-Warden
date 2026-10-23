@@ -1,59 +1,101 @@
 @import "tailwindcss";
 
 /*
- * Fabric Warden tokens. The world is wayfinding signage: sign-blue rail,
- * route green for healthy paths, sign yellow for attention, flat panels with
- * inset borders. No gradients, glass or shadows.
+ * Fabric Warden tokens: "Live Schematic". The estate is an engineering
+ * drawing. Dark is a cyanotype: Prussian-ink ground under a construction
+ * grid, drawing sheets one plane lighter with a paper edge and a soft offset
+ * shadow, linework in pale blueprint white. Light is drafting paper on a
+ * grey table, inked in blue-black. The rail is the drawing's dark edge strip
+ * in both themes. State colours (ok, warn, crit) appear only where they carry
+ * meaning and always beside a shape or a word.
  */
 :root {
-  --ground: #eef1f3;
-  --surface: #ffffff;
-  --surface-2: #f5f7f8;
-  --surface-3: #e6eaed;
-  --ink: #14171a;
-  --ink-2: #434c55;
-  --ink-3: #626c76;
-  --rule: #d3d9de;
-  --rule-strong: #b5bec6;
+  --ground: #e3e8ed;
+  --surface: #fbfcfd;
+  --surface-2: #f2f5f8;
+  --surface-3: #ffffff;
+  --ink: #0f2340;
+  --ink-2: #3b506e;
+  --ink-3: #55698a;
+  --rule: rgb(15 35 64 / 0.14);
+  --rule-strong: rgb(15 35 64 / 0.28);
 
-  --rail: #0b3d91;
-  --rail-2: #0a3580;
-  --rail-ink: #ffffff;
-  --rail-ink-2: #c9d6ef;
+  --rail: #0f2340;
+  --rail-2: #0b1b33;
+  --rail-ink: #e8f1ff;
+  --rail-ink-2: #a9c1e2;
+  --rail-rule: rgb(207 227 255 / 0.13);
 
-  --accent: #0b3d91;
-  --accent-hover: #082f72;
+  --accent: #1f5fbf;
+  --accent-hover: #174a96;
   --accent-ink: #ffffff;
-  --accent-soft: #e4ebf7;
+  --accent-soft: #e3ecf9;
 
-  --ok: #00704a;
-  --ok-soft: #e1f1e9;
-  --warn: #ffd200;
-  --warn-ink: #14171a;
-  --warn-text: #7a5a00;
-  --warn-soft: #fff6cc;
-  --crit: #c8102e;
-  --crit-soft: #fbe6e9;
-  --muted-state: #626c76;
+  --ok: #0b7a4b;
+  --ok-soft: #e0f2e9;
+  --warn: #f2c14e;
+  --warn-ink: #0f2340;
+  --warn-text: #8a6100;
+  --warn-soft: #fbf1d3;
+  --serious: #b04a00;
+  --crit: #c01f2f;
+  --crit-soft: #fbe5e7;
+  --muted-state: #55698a;
+  /* Demo data is stamped in brown. */
+  --demo: #8a5a2b;
 
-  --focus: #0b3d91;
-  --selection: #ffe680;
+  --focus: #1f5fbf;
+  --selection: rgb(31 95 191 / 0.22);
 
-  /* Chart series, fixed order (validated for colour-vision deficiency in both
-     themes). Status colours are never series colours. */
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #e87ba4;
-  --series-6: #6250d6;
+  /* Drawing ink: linework, construction lines and the traffic trace. */
+  --line: #0f2340;
+  --construct: rgb(31 95 191 / 0.32);
+  --trace: #1f5fbf;
+  --grid-minor: rgb(31 95 191 / 0.05);
+  --grid-major: rgb(31 95 191 / 0.09);
+
+  /* Chart series, fixed order, validated for colour-vision deficiency on the
+     sheet of each theme. Status colours are never series colours. */
+  --series-1: #1f6fd1;
+  --series-2: #c4581c;
+  --series-3: #008f7e;
+  --series-4: #7b55d6;
+  --series-5: #8a7408;
+  --series-6: #c23d7c;
 
   --row-h: 40px;
   --row-pad: 12px;
-  --gap: 16px;
-  --radius: 4px;
+  --gap: 18px;
+  --radius: 3px;
   /* One rack unit in the elevation drawing. */
   --u-h: 28px;
+
+  /* Depth: ground, sheet, raised sheet, floating callout. Shadows carry an
+     offset and a long soft fall, tinted toward the ink. */
+  --shadow-tint: 15 35 64;
+  --edge-hi: inset 0 1px 0 #ffffff;
+  --warn-line: #b08400;
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgb(var(--shadow-tint) / 0.08), 0 14px 28px -18px rgb(var(--shadow-tint) / 0.32);
+  --elev-2: 0 2px 4px rgb(var(--shadow-tint) / 0.09), 0 22px 40px -22px rgb(var(--shadow-tint) / 0.42);
+  --elev-3: 0 4px 10px rgb(var(--shadow-tint) / 0.12), 0 30px 60px -24px rgb(var(--shadow-tint) / 0.5);
+  --elev-4: 0 8px 20px rgb(var(--shadow-tint) / 0.16), 0 44px 88px -28px rgb(var(--shadow-tint) / 0.6);
+  --plate-fill: var(--surface);
+  --plate-raised-fill: var(--surface-3);
+  --header-fill: rgb(251 252 253 / 0.86);
+  --scrim: rgb(9 22 42 / 0.5);
+
+  /* Motion. Strong ease-out for entrances, ease-in-out for on-screen moves. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-slow: 260ms;
+  --dur-draw: 900ms;
+
+  --r-control: 3px;
+  --r-plate: 4px;
+  --r-float: 6px;
 
   color-scheme: light;
 }
@@ -65,75 +107,109 @@
   --u-h: 24px;
 }
 
+/* The cyanotype. Kept in one block and applied twice: by system preference
+   and by explicit choice. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --ground: #0d1217;
-    --surface: #131a21;
-    --surface-2: #19222b;
-    --surface-3: #212c37;
-    --ink: #e8edf1;
-    --ink-2: #b2bdc7;
-    --ink-3: #8e9aa6;
-    --rule: #26313c;
-    --rule-strong: #364350;
-    --rail: #0a2c66;
-    --rail-2: #092557;
-    --rail-ink-2: #aebfdf;
-    --accent: #6d9be8;
-    --accent-hover: #8cb1ef;
-    --accent-ink: #0d1217;
-    --accent-soft: #17294a;
-    --ok: #3fbf8a;
-    --ok-soft: #0f2b21;
-    --warn-text: #ffd84d;
-    --warn-soft: #2c2608;
-    --crit: #ff6b7f;
-    --crit-soft: #33141a;
-    --muted-state: #8e9aa6;
-    --focus: #8cb1ef;
-    --selection: #4a3f0a;
-    --series-1: #3987e5;
-    --series-2: #d95926;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #d55181;
-    --series-6: #9085e9;
+    --ground: #071426;
+    --surface: #0d2342;
+    --surface-2: #10284b;
+    --surface-3: #13305a;
+    --ink: #e8f1ff;
+    --ink-2: #a9c1e2;
+    --ink-3: #86a3cc;
+    --rule: rgb(207 227 255 / 0.13);
+    --rule-strong: rgb(207 227 255 / 0.24);
+    --rail: #050f1d;
+    --rail-2: #050f1d;
+    --accent: #7fc8ff;
+    --accent-hover: #a9dbff;
+    --accent-ink: #071426;
+    --accent-soft: rgb(127 200 255 / 0.13);
+    --ok: #4fcf8e;
+    --ok-soft: rgb(79 207 142 / 0.13);
+    --warn-ink: #071426;
+    --warn-text: #f2c14e;
+    --warn-soft: rgb(242 193 78 / 0.12);
+    --serious: #ff9a4d;
+    --crit: #ff7a72;
+    --crit-soft: rgb(255 122 114 / 0.13);
+    --muted-state: #86a3cc;
+    --demo: #d9b48a;
+    --focus: #7fc8ff;
+    --selection: rgb(127 200 255 / 0.32);
+    --line: #cfe3ff;
+    --construct: rgb(127 200 255 / 0.28);
+    --trace: #8fd0ff;
+    --grid-minor: rgb(127 200 255 / 0.045);
+    --grid-major: rgb(127 200 255 / 0.08);
+    --series-1: #2f8ee0;
+    --series-2: #cc7630;
+    --series-3: #2a9d8f;
+    --series-4: #9470e6;
+    --series-5: #a8902a;
+    --series-6: #d9558f;
+    --shadow-tint: 0 0 0;
+    --edge-hi: inset 0 1px 0 rgb(232 241 255 / 0.06);
+    --warn-line: #f2c14e;
+    --elev-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 32px -20px rgb(0 0 0 / 0.75);
+    --elev-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 24px 48px -24px rgb(0 0 0 / 0.85);
+    --elev-3: 0 4px 10px rgb(0 0 0 / 0.45), 0 32px 64px -24px rgb(0 0 0 / 0.95);
+    --elev-4: 0 8px 22px rgb(0 0 0 / 0.5), 0 48px 96px -28px rgb(0 0 0 / 1);
+    --header-fill: rgb(5 15 29 / 0.86);
+    --scrim: rgb(2 8 18 / 0.66);
     color-scheme: dark;
   }
 }
 
 :root[data-theme="dark"] {
-  --ground: #0d1217;
-  --surface: #131a21;
-  --surface-2: #19222b;
-  --surface-3: #212c37;
-  --ink: #e8edf1;
-  --ink-2: #b2bdc7;
-  --ink-3: #8e9aa6;
-  --rule: #26313c;
-  --rule-strong: #364350;
-  --rail: #0a2c66;
-  --rail-2: #092557;
-  --rail-ink-2: #aebfdf;
-  --accent: #6d9be8;
-  --accent-hover: #8cb1ef;
-  --accent-ink: #0d1217;
-  --accent-soft: #17294a;
-  --ok: #3fbf8a;
-  --ok-soft: #0f2b21;
-  --warn-text: #ffd84d;
-  --warn-soft: #2c2608;
-  --crit: #ff6b7f;
-  --crit-soft: #33141a;
-  --muted-state: #8e9aa6;
-  --focus: #8cb1ef;
-  --selection: #4a3f0a;
-  --series-1: #3987e5;
-  --series-2: #d95926;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #d55181;
-  --series-6: #9085e9;
+  --ground: #071426;
+  --surface: #0d2342;
+  --surface-2: #10284b;
+  --surface-3: #13305a;
+  --ink: #e8f1ff;
+  --ink-2: #a9c1e2;
+  --ink-3: #86a3cc;
+  --rule: rgb(207 227 255 / 0.13);
+  --rule-strong: rgb(207 227 255 / 0.24);
+  --rail: #050f1d;
+  --rail-2: #050f1d;
+  --accent: #7fc8ff;
+  --accent-hover: #a9dbff;
+  --accent-ink: #071426;
+  --accent-soft: rgb(127 200 255 / 0.13);
+  --ok: #4fcf8e;
+  --ok-soft: rgb(79 207 142 / 0.13);
+  --warn-ink: #071426;
+  --warn-text: #f2c14e;
+  --warn-soft: rgb(242 193 78 / 0.12);
+  --serious: #ff9a4d;
+  --crit: #ff7a72;
+  --crit-soft: rgb(255 122 114 / 0.13);
+  --muted-state: #86a3cc;
+  --demo: #d9b48a;
+  --focus: #7fc8ff;
+  --selection: rgb(127 200 255 / 0.32);
+  --line: #cfe3ff;
+  --construct: rgb(127 200 255 / 0.28);
+  --trace: #8fd0ff;
+  --grid-minor: rgb(127 200 255 / 0.045);
+  --grid-major: rgb(127 200 255 / 0.08);
+  --series-1: #2f8ee0;
+  --series-2: #cc7630;
+  --series-3: #2a9d8f;
+  --series-4: #9470e6;
+  --series-5: #a8902a;
+  --series-6: #d9558f;
+  --shadow-tint: 0 0 0;
+  --edge-hi: inset 0 1px 0 rgb(232 241 255 / 0.06);
+  --warn-line: #f2c14e;
+  --elev-1: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 32px -20px rgb(0 0 0 / 0.75);
+  --elev-2: 0 2px 4px rgb(0 0 0 / 0.35), 0 24px 48px -24px rgb(0 0 0 / 0.85);
+  --elev-3: 0 4px 10px rgb(0 0 0 / 0.45), 0 32px 64px -24px rgb(0 0 0 / 0.95);
+  --elev-4: 0 8px 22px rgb(0 0 0 / 0.5), 0 48px 96px -28px rgb(0 0 0 / 1);
+  --header-fill: rgb(5 15 29 / 0.86);
+  --scrim: rgb(2 8 18 / 0.66);
   color-scheme: dark;
 }
 
@@ -151,6 +227,7 @@
   --color-rail-2: var(--rail-2);
   --color-rail-ink: var(--rail-ink);
   --color-rail-ink-2: var(--rail-ink-2);
+  --color-rail-rule: var(--rail-rule);
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
@@ -161,8 +238,14 @@
   --color-warn-ink: var(--warn-ink);
   --color-warn-text: var(--warn-text);
   --color-warn-soft: var(--warn-soft);
+  --color-warn-line: var(--warn-line);
+  --color-serious: var(--serious);
   --color-crit: var(--crit);
   --color-crit-soft: var(--crit-soft);
+  --color-demo: var(--demo);
+  --color-line: var(--line);
+  --color-construct: var(--construct);
+  --color-trace: var(--trace);
   --font-sans: var(--font-ui), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-data), ui-monospace, monospace;
   --text-xs: 0.75rem;
@@ -177,22 +260,47 @@
   --text-lg--line-height: 1.625rem;
   --text-xl: 1.4375rem;
   --text-xl--line-height: 1.875rem;
-  --radius-sign: var(--radius);
+  --text-2xl: 1.875rem;
+  --text-2xl--line-height: 2.125rem;
+  --text-3xl: 2.25rem;
+  --text-3xl--line-height: 2.5rem;
+  --radius-control: var(--r-control);
+  --radius-plate: var(--r-plate);
+  --radius-float: var(--r-float);
+  --shadow-elev-1: var(--elev-1);
+  --shadow-elev-2: var(--elev-2);
+  --shadow-elev-3: var(--elev-3);
+  --shadow-elev-4: var(--elev-4);
 }
 
 @layer base {
 html {
-  background: var(--ground);
+  background-color: var(--ground);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+/* The drawing table: a construction grid, fine every 24px, stronger every
+   120px, fixed to the viewport so sheets slide over it. */
 body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--text-base--line-height);
-  font-feature-settings: "ss01";
+  background-color: var(--ground);
+  background-image:
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+  background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px;
+  background-attachment: fixed;
+}
+
+h1,
+h2,
+h3 {
+  text-wrap: balance;
 }
 
 ::selection {
@@ -221,16 +329,321 @@ textarea {
   caret-color: var(--accent);
 }
 
+::placeholder {
+  color: var(--ink-3);
+}
+
 .tabular {
   font-variant-numeric: tabular-nums;
 }
 }
 
-/* The sign border: a flat panel with a thin inset rule, used on zone patches,
-   state plates and the active rail item. */
-.sign {
-  outline: 1.5px solid currentColor;
+/* Component classes live in the components layer, so utilities (sticky, padding, borders) can still override them. */
+@layer components {
+/* An inset frame: a thin rule drawn just inside the edge, used on zone
+   patches, the selected tab of a group and drawn marks. */
+.frame {
+  outline: 1px solid currentColor;
   outline-offset: -3px;
+}
+
+/*
+ * Depth, four planes:
+ *   ground          the drawing table and its grid
+ *   .plate          a drawing sheet: paper edge, soft fall shadow
+ *   .plate-raised   a sheet that leads a page or that the user acts on
+ *   .float/.dialog  callouts, menus and dialogs above the sheets
+ * .marks adds the sheet's registration corners.
+ */
+.plate {
+  position: relative;
+  background: var(--plate-fill);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-plate);
+  box-shadow: var(--edge-hi), var(--elev-1);
+}
+
+.plate-raised {
+  position: relative;
+  background: var(--plate-raised-fill);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-plate);
+  box-shadow: var(--edge-hi), var(--elev-2);
+}
+
+.plate-quiet {
+  background: var(--surface-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-plate);
+}
+
+.marks::before,
+.marks::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: var(--construct);
+  border-style: solid;
+  pointer-events: none;
+}
+.marks::before {
+  top: 6px;
+  left: 6px;
+  border-width: 1px 0 0 1px;
+}
+.marks::after {
+  bottom: 6px;
+  right: 6px;
+  border-width: 0 1px 1px 0;
+}
+
+.lift {
+  transition:
+    box-shadow var(--dur) var(--ease-out),
+    border-color var(--dur) var(--ease-out),
+    transform var(--dur) var(--ease-out);
+}
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    border-color: var(--rule-strong);
+    box-shadow: var(--edge-hi), var(--elev-2);
+    transform: translateY(-1px);
+  }
+}
+
+.float {
+  background: var(--surface-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-float);
+  box-shadow: var(--edge-hi), var(--elev-3);
+}
+
+.dialog {
+  background: var(--surface-3);
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--r-float);
+  box-shadow: var(--edge-hi), var(--elev-4);
+}
+
+/* The attention callout: a raised sheet drawn with a dashed amber outline,
+   the way a drawing marks what must be looked at. */
+.attention-plate {
+  position: relative;
+  color: var(--warn-text);
+  background: var(--plate-raised-fill);
+  border: 1.5px dashed var(--warn-line);
+  border-radius: var(--r-plate);
+  box-shadow: var(--edge-hi), var(--elev-2);
+}
+
+/* A critical item inside takes the plate to the critical red. */
+.attention-plate[data-tone="crit"] {
+  color: var(--crit);
+  border-color: var(--crit);
+}
+
+/* The rail: the drawing's dark edge strip, the same in both themes. */
+.rail-plate {
+  background: var(--rail);
+  box-shadow:
+    inset -1px 0 0 var(--rail-rule),
+    10px 0 30px -18px rgb(0 0 0 / 0.7);
+}
+
+/* Anything drawn on the rail uses the cyanotype's ink, whatever the theme. */
+.on-rail {
+  --surface: #0d2342;
+  --surface-2: #10284b;
+  --surface-3: #13305a;
+  --ink: #e8f1ff;
+  --ink-2: #a9c1e2;
+  --ink-3: #86a3cc;
+  --rule: rgb(207 227 255 / 0.13);
+  --rule-strong: rgb(207 227 255 / 0.24);
+  --accent: #7fc8ff;
+  --accent-soft: rgb(127 200 255 / 0.13);
+  --ok: #4fcf8e;
+  --warn-text: #f2c14e;
+  --warn-line: #f2c14e;
+  --crit: #ff7a72;
+  --line: #cfe3ff;
+  --construct: rgb(127 200 255 / 0.28);
+  color: var(--ink);
+}
+
+/* The bus: a navigation group drawn as a vertical line with a tap per item.
+   The current page's tap is filled. */
+.bus {
+  position: relative;
+}
+.bus::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 6px;
+  bottom: 14px;
+  width: 1px;
+  background: rgb(127 200 255 / 0.24);
+}
+.tap {
+  position: relative;
+}
+.tap::before {
+  content: "";
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid rgb(127 200 255 / 0.34);
+  background: var(--rail);
+  position: relative;
+  z-index: 1;
+  transition:
+    background-color var(--dur) ease,
+    border-color var(--dur) ease,
+    box-shadow var(--dur) ease;
+}
+.tap:hover::before {
+  border-color: #7fc8ff;
+}
+.tap[aria-current="page"]::before {
+  background: #7fc8ff;
+  border-color: #7fc8ff;
+  box-shadow: 0 0 0 3px rgb(127 200 255 / 0.18);
+}
+
+@keyframes fw-slide-in {
+  from {
+    transform: translateX(-24px);
+    opacity: 0;
+  }
+}
+
+/* A node tap beside a panel title: the panel's place on the drawing. */
+.junction {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent);
+  box-sizing: border-box;
+}
+
+/* The schematic. Links ink themselves in once; traffic is a dotted trace
+   that moves at a speed set from measured throughput. */
+.ink-draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: fw-ink var(--dur-draw) var(--ease-out) forwards;
+}
+.traffic {
+  fill: none;
+  stroke: var(--trace);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-dasharray: 1.5 15;
+  animation: fw-flow linear infinite;
+}
+[data-live="paused"] .traffic {
+  animation-play-state: paused;
+}
+@keyframes fw-ink {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes fw-flow {
+  to {
+    stroke-dashoffset: -33;
+  }
+}
+
+}
+
+/* Motion vocabulary. */
+@keyframes fw-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.97);
+  }
+}
+@keyframes fw-dialog-in {
+  from {
+    opacity: 0;
+    /* Tailwind positions with the separate translate property, so this
+       transform composes with it rather than replacing it. */
+    transform: translateY(8px) scale(0.97);
+  }
+}
+@keyframes fw-callout-in {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+}
+@keyframes fw-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fw-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@keyframes fw-route-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes fw-route-draw-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes fw-shimmer {
+  from {
+    background-position: 150% 0;
+  }
+  to {
+    background-position: -50% 0;
+  }
+}
+/* A live marker: only on things that are genuinely in progress. */
+@keyframes fw-beacon {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent);
+  }
+  70%,
+  100% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, currentColor 0%, transparent);
+  }
+}
+
+.anim-pop {
+  animation: fw-pop-in var(--dur) var(--ease-out);
+  transform-origin: top;
+}
+.anim-dialog {
+  animation: fw-dialog-in var(--dur-slow) var(--ease-out);
+}
+.anim-callout {
+  animation: fw-callout-in var(--dur-slow) var(--ease-out) both;
+}
+.anim-scrim {
+  animation: fw-fade-in var(--dur) var(--ease-out);
+}
+.anim-rise {
+  animation: fw-rise var(--dur-slow) var(--ease-out) both;
+}
+.anim-page {
+  animation: fw-fade-in 150ms ease-out both;
+}
+.beacon {
+  animation: fw-beacon 1.8s var(--ease-out) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -238,6 +651,13 @@ textarea {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+  .ink-draw {
+    stroke-dashoffset: 0;
+  }
+  .traffic {
+    animation: none !important;
   }
 }

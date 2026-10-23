@@ -32,17 +32,27 @@ export function SearchInput({ value, onChange, placeholder, label }: { value: st
 
 export function Segmented<T extends string>({ value, options, onChange, label }: { value: T; options: { value: T; label: string; count?: number }[]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex h-9 rounded-[4px] border border-rule-strong bg-surface-2 p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex h-9 overflow-hidden rounded-[var(--radius)] border border-rule-strong">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           role="radio"
           aria-checked={value === o.value}
+          tabIndex={value === o.value ? 0 : -1}
           onClick={() => onChange(o.value)}
+          onKeyDown={(e) => {
+            const d = e.key === "ArrowRight" || e.key === "ArrowDown" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 0;
+            if (!d) return;
+            e.preventDefault();
+            const i = options.findIndex((x) => x.value === value);
+            const n = (i + d + options.length) % options.length;
+            onChange(options[n].value);
+            (e.currentTarget.parentElement?.children[n] as HTMLElement | undefined)?.focus();
+          }}
           className={clsx(
-            "inline-flex items-center gap-1.5 rounded-[3px] px-3 text-sm font-semibold transition-colors duration-150",
-            value === o.value ? "bg-surface text-ink shadow-[0_1px_2px_rgb(0_0_0/0.12)]" : "text-ink-2 hover:text-ink",
+            "inline-flex items-center gap-1.5 px-3 text-sm font-semibold transition-[background-color,color,box-shadow] duration-[var(--dur)] ease-[var(--ease-out)] not-first:border-l not-first:border-rule",
+            value === o.value ? "bg-accent-soft text-ink shadow-[inset_0_-2px_0_var(--accent)]" : "text-ink-2 hover:text-ink",
           )}
         >
           {o.label}

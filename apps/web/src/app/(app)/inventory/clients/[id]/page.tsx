@@ -1,11 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Plus, X } from "lucide-react";
+import { ChevronLeft, Laptop, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { type Hop, RouteSign, pathHops } from "@/components/route-sign";
+import { type Hop, RouteTrace, pathHops } from "@/components/route-trace";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { EmptyState, KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
@@ -60,6 +60,7 @@ export default function ClientPage() {
     <>
       <BackLink />
       <PageHeader
+        icon={<Laptop />}
         title={title}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -85,7 +86,7 @@ export default function ClientPage() {
 
       <div className="flex flex-col gap-[var(--gap)]">
         <Panel title="Route from the internet" id="route">
-          <RouteSign hops={route(c)} label={`Path from the internet to ${title}`} footer={routeFooter(c)} />
+          <RouteTrace hops={route(c)} label={`Path from the internet to ${title}`} footer={routeFooter(c)} />
         </Panel>
 
         <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-2">
@@ -115,7 +116,7 @@ export default function ClientPage() {
               <table className="w-full text-left">
                 <caption className="sr-only">Addresses this client has used</caption>
                 <thead>
-                  <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+                  <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                     <th scope="col" className="h-9 px-4">Address</th>
                     <th scope="col" className="px-4">Last seen</th>
                     <th scope="col" className="px-4 text-right">Stints</th>

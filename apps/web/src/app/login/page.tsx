@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { AuthFrame } from "@/components/auth/auth-frame";
+import { RouteTrace } from "@/components/route-trace";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/field";
 import { Notice } from "@/components/ui/layout-bits";
@@ -54,19 +55,19 @@ export default function LoginPage() {
   return (
     <AuthFrame
       aside={
-        <div className="mt-auto hidden lg:block">
-          <ul className="flex max-w-[22rem] flex-col gap-2.5" aria-label="How Fabric Warden works">
-            {[
-              ["Read-only by default", "Nothing on your controller changes without an explicit, audited request."],
-              ["Evidence on every fact", "Each record shows its source, how fresh it is, and whether it's demo data."],
-              ["Runs without the cloud", "Self-hosted. No subscriptions, no phone-home."],
-            ].map(([t, d]) => (
-              <li key={t} className="sign rounded-[4px] bg-white/8 px-4 py-3" style={{ outlineColor: "rgb(255 255 255 / 0.55)" }}>
-                <p className="font-bold">{t}</p>
-                <p className="mt-0.5 text-sm text-rail-ink-2">{d}</p>
-              </li>
-            ))}
-          </ul>
+        <div className="my-auto hidden max-w-[24rem] lg:block">
+          {/* The product's own route: where your data comes from and where it goes. */}
+          <RouteTrace
+            vertical
+            bare
+            label="How data reaches you"
+            hops={[
+              { key: "unifi", label: "Your UniFi console", sub: "official API, read-only by default", tone: "muted" },
+              { key: "warden", label: "Fabric Warden", sub: "on your own server, no cloud" },
+              { key: "you", label: "You and your team", sub: "evidence, history, approvals" },
+            ]}
+            footer="Every fact shows its source and age. Nothing on your controller changes without an approved, audited request."
+          />
         </div>
       }
     >

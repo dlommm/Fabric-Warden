@@ -37,11 +37,11 @@ export function RunState({ status, className }: { status: AiRunStatus; className
   return <StateLabel tone={tone} className={className}>{word}</StateLabel>;
 }
 
-/** The AI plate: an outlined accent plate, never a fill, so it never reads as a state or as demo brown. */
+/** The AI stamp: an outlined accent tag, never a fill, so it never reads as a state or as demo brown. */
 export function AiTag({ className }: { className?: string }) {
   return (
     <span
-      className={clsx("inline-flex h-5 shrink-0 items-center gap-1 rounded-[3px] border-2 border-accent bg-surface px-1.5 text-[11px] font-bold tracking-wide whitespace-nowrap text-accent uppercase", className)}
+      className={clsx("inline-flex h-5 shrink-0 items-center gap-1 rounded-[2px] border border-accent px-1.5 text-xs font-semibold whitespace-nowrap text-accent", className)}
       title="Written by a language model from the tool results below. Check the evidence before acting on it."
     >
       <Bot className="size-3" aria-hidden strokeWidth={2.5} />
@@ -110,7 +110,7 @@ export function AutonomyPicker({
               tabIndex={on ? 0 : -1}
               className={clsx(
                 "h-8 rounded-[3px] px-3 text-sm font-semibold transition-colors duration-150 disabled:cursor-not-allowed",
-                on ? "sign bg-accent text-accent-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-3 disabled:hover:bg-transparent",
+                on ? "frame bg-accent text-accent-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink disabled:text-ink-3 disabled:hover:bg-transparent",
               )}
             >
               {AUTONOMY_WORD[l]}
@@ -119,6 +119,115 @@ export function AutonomyPicker({
         })}
       </div>
       <p id={`${id}-d`} className="max-w-[48ch] text-sm text-ink-3">
+        {AUTONOMY_HELP[value]}
+      </p>
+    </div>
+  );
+}
+
+/** What each autonomy level lets an agent do, in a few words, for the ladder stops. */
+const AUTONOMY_SHORT: Record<AiAutonomy, string> = {
+  off: "Cannot run",
+  explain: "Reads, answers",
+  propose: "Suggests changes",
+  act_with_approval: "Applies on approval",
+};
+
+/**
+ * The autonomy ladder: the four built levels as stops on one route line, so
+ * the current level, everything it includes and the agent's ceiling read at a
+ * glance. A radio group (arrow keys move it); stops above the ceiling are
+ * dashed and disabled with the reason. Read-only when `onChange` is absent.
+ */
+export function AutonomyLadder({
+  value,
+  max,
+  onChange,
+  disabled,
+  id,
+}: {
+  value: AiAutonomy;
+  max: AiAutonomy;
+  onChange?: (v: AiAutonomy) => void;
+  disabled?: boolean;
+  id: string;
+}) {
+  const levels: AiAutonomy[] = ["off", "explain", "propose", "act_with_approval"];
+  const at = levels.indexOf(value);
+  const ceiling = levels.indexOf(max);
+  const allowed = levels.slice(0, ceiling + 1);
+  const readOnly = !onChange;
+  return (
+    <div className="flex flex-col gap-2">
+      <div
+        role="radiogroup"
+        aria-labelledby={`${id}-l`}
+        aria-describedby={`${id}-d`}
+        aria-readonly={readOnly || undefined}
+        className="relative grid grid-cols-4"
+      >
+        {/* The route: solid up to the current level, dashed beyond the ceiling. */}
+        <span aria-hidden className="absolute top-[11px] right-[12.5%] left-[12.5%] h-1 rounded-full bg-rule" />
+        <span
+          aria-hidden
+          className="absolute top-[11px] left-[12.5%] h-1 rounded-full bg-accent transition-[width] duration-[var(--dur-slow)] ease-[var(--ease-out)]"
+          style={{ width: `${(at / 4) * 100}%` }}
+        />
+        {ceiling < 3 && (
+          <span
+            aria-hidden
+            className="absolute top-[11px] right-[12.5%] h-1 border-t-2 border-dashed border-ink-3/60 bg-surface"
+            style={{ left: `${12.5 + (ceiling / 4) * 100}%` }}
+          />
+        )}
+        {levels.map((l, i) => {
+          const on = l === value;
+          const ok = allowed.includes(l) && !disabled && !readOnly;
+          const above = i > ceiling;
+          const passed = i < at;
+          return (
+            <button
+              key={l}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              aria-disabled={!ok || undefined}
+              disabled={!ok && !on}
+              title={above ? `This agent can be at most “${AUTONOMY_WORD[max]}”` : undefined}
+              onClick={() => ok && onChange?.(l)}
+              onKeyDown={(e) => {
+                if (readOnly) return;
+                const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+                const i2 = allowed.indexOf(value);
+                if (d && i2 >= 0) {
+                  e.preventDefault();
+                  const n = allowed[(i2 + d + allowed.length) % allowed.length];
+                  onChange?.(n);
+                  (e.currentTarget.parentElement?.querySelectorAll("button")[levels.indexOf(n)] as HTMLElement | undefined)?.focus();
+                }
+              }}
+              tabIndex={on ? 0 : -1}
+              className={clsx("group relative z-10 flex flex-col items-center gap-1.5 rounded-[6px] px-1 pb-1 text-center", ok && "cursor-pointer", !ok && !on && "cursor-not-allowed")}
+            >
+              <span
+                aria-hidden
+                className={clsx(
+                  "grid size-[26px] place-items-center rounded-[5px] transition-[background-color,box-shadow,transform] duration-[var(--dur)] ease-[var(--ease-out)]",
+                  on && "frame scale-110 bg-accent text-accent-ink shadow-[0_2px_8px_-2px_color-mix(in_srgb,var(--accent)_70%,transparent)]",
+                  !on && passed && "bg-surface ring-2 ring-accent ring-inset",
+                  !on && !passed && !above && "bg-surface ring-2 ring-rule-strong ring-inset group-hover:ring-ink-3",
+                  !on && above && "border-2 border-dashed border-ink-3/60 bg-surface-2",
+                )}
+              >
+                {on && <span className="size-2 rounded-[1px] bg-current" />}
+              </span>
+              <span className={clsx("text-xs leading-tight font-bold", on ? "text-ink" : above ? "text-ink-3" : "text-ink-2")}>{AUTONOMY_WORD[l]}</span>
+              <span className={clsx("hidden text-[11px] leading-tight sm:block", on ? "text-ink-2" : "text-ink-3")}>{above ? "Beyond this agent" : AUTONOMY_SHORT[l]}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p id={`${id}-d`} className="text-sm text-ink-3">
         {AUTONOMY_HELP[value]}
       </p>
     </div>
@@ -194,7 +303,7 @@ export function Transcript({ items }: { items: AiTranscriptEntry[] }) {
           <li key={i} className="relative pb-4 pl-5 last:pb-0">
             <span aria-hidden className={clsx("absolute top-1.5 -left-[5px] size-2 rounded-[1px]", bad ? "bg-crit" : e.kind === "finish" ? "bg-ok" : e.kind === "model" ? "bg-accent" : "bg-ink")} />
             <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="text-xs font-bold tracking-wide text-ink-2 uppercase">
+              <span className="text-sm font-semibold text-ink-3">
                 {ENTRY_WORD[e.kind]}
                 {e.turn ? ` · turn ${e.turn}` : ""}
               </span>
@@ -271,7 +380,7 @@ export function RunProgress({ run }: { run: AiRun }) {
           : `Model turn ${turns}: calling ${last.tool_calls?.map((c) => c.name).join(", ") || "tools"}…`;
   const mayStop = run.requested_by === me.username || can("ai:manage");
   return (
-    <div role="status" aria-live="polite" className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[var(--radius)] border border-rule bg-surface px-4 py-3">
+    <div role="status" aria-live="polite" className="plate-raised flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
       <span aria-hidden className="size-2 animate-pulse rounded-[1px] bg-accent motion-reduce:animate-none" />
       <span className="font-semibold">{doing}</span>
       <span className="tabular text-sm text-ink-3">

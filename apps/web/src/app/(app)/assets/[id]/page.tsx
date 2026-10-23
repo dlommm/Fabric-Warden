@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2 } from "lucide-react";
+import { Package, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -164,6 +164,7 @@ function AssetEditor({ asset }: { asset?: Asset }) {
   return (
     <>
       <PageHeader
+        icon={<Package />}
         title={asset ? asset.name : "Add an asset"}
         description={asset ? [ASSET_KIND_WORD[asset.kind], [asset.vendor, asset.model].filter(Boolean).join(" ")].filter(Boolean).join(" · ") : "Hardware, a spare part, a licence or a subscription."}
         meta={

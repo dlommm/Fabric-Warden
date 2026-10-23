@@ -4,12 +4,12 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { ChartLine, Table2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import { LineChart, RankedList, ReadingLine, SeriesTable } from "@/components/charts";
+import { LineChart, PCT_LIMIT, RankedList, ReadingSign, SeriesTable } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Panel, Skeleton } from "@/components/ui/layout-bits";
-import { post } from "@/lib/api";
-import { RANGES } from "@/lib/metrics";
-import type { QueryResult, RangeKey, Widget } from "@/lib/types";
+import { get, post } from "@/lib/api";
+import { RANGES, formatValue } from "@/lib/metrics";
+import type { DeviceSummary, QueryResult, RangeKey, Widget } from "@/lib/types";
 
 const ENTITY_WORD: Record<string, [string, string]> = {
   device: ["device", "devices"],
@@ -25,20 +25,27 @@ export function entityWord(type: string, n: number): string {
   return n === 1 ? w[0] : w[1];
 }
 
-export function useMetric(q: { metric: string; entity_ids?: string[]; range: RangeKey; limit?: number }, enabled = true) {
-  return useQuery({
+type MetricQuery = { metric: string; entity_ids?: string[]; range: RangeKey; limit?: number };
+
+/** Query options for one metric; shared so a page can read the same cached results its widgets load. */
+export function metricQuery(q: MetricQuery, enabled = true) {
+  return {
     queryKey: ["metrics", q.metric, q.entity_ids ?? [], q.range, q.limit ?? 5],
     queryFn: () => post<QueryResult>("/api/metrics/query", { entity_ids: [], limit: 5, ...q }),
     enabled,
     refetchInterval: 60_000,
     placeholderData: keepPreviousData,
-  });
+  };
+}
+
+export function useMetric(q: MetricQuery, enabled = true) {
+  return useQuery(metricQuery(q, enabled));
 }
 
 /** Presets as one radio row above everything they scope. */
 export function RangePicker({ value, onChange, label = "Time range" }: { value: RangeKey; onChange: (r: RangeKey) => void; label?: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-[var(--radius)] border border-rule-strong bg-surface p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-[var(--radius)] border border-rule bg-surface-3/70 p-0.5 shadow-[inset_0_1px_2px_rgb(var(--shadow-tint)/0.08)]">
       {RANGES.map((r) => {
         const on = r.key === value;
         return (
@@ -60,8 +67,8 @@ export function RangePicker({ value, onChange, label = "Time range" }: { value: 
             }}
             tabIndex={on ? 0 : -1}
             className={clsx(
-              "h-8 min-w-11 rounded-[3px] px-2.5 text-sm font-semibold tabular transition-colors duration-150",
-              on ? "bg-accent text-accent-ink" : "text-ink-2 hover:bg-surface-3 hover:text-ink",
+              "h-8 min-w-11 rounded-[4px] px-2.5 text-sm font-semibold tabular transition-[background-color,color,box-shadow] duration-[var(--dur)] ease-[var(--ease-out)]",
+              on ? "bg-accent text-accent-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.2),0_1px_3px_rgb(var(--shadow-tint)/0.25)]" : "text-ink-2 hover:bg-surface hover:text-ink",
             )}
           >
             {r.label}
@@ -122,7 +129,23 @@ export function MetricWidget({
           {r.series.length === 0 ? (
             <NoHistory unit={r.metric.label} />
           ) : widget.kind === "line" ? (
-            table ? <SeriesTable result={r} caption={title} /> : <LineChart result={r} height={height} ariaLabel={`${title}, ${RANGES.find((x) => x.key === range)?.long}`} />
+            table ? (
+              <SeriesTable result={r} caption={title} />
+            ) : (
+              <>
+                <NowLine result={r} range={range} />
+                <LineChart
+                  result={r}
+                  height={height}
+                  ariaLabel={`${title}, ${RANGES.find((x) => x.key === range)?.long}`}
+                  threshold={
+                    r.metric.unit === "pct" && r.metric.higher_is_worse && PCT_LIMIT[r.metric.id] != null
+                      ? { value: PCT_LIMIT[r.metric.id], label: `Default alert at ${PCT_LIMIT[r.metric.id]}%` }
+                      : undefined
+                  }
+                />
+              </>
+            )
           ) : (
             <RankedList result={r} />
           )}
@@ -138,10 +161,29 @@ export function MetricWidget({
   );
 }
 
+/** For one series: the latest value and the range it moved through, above the chart. */
+function NowLine({ result, range }: { result: QueryResult; range: RangeKey }) {
+  const s = result.series.length === 1 ? result.series[0] : null;
+  if (!s || s.last_value == null || result.metric.unit === "bool") return null;
+  const unit = result.metric.unit;
+  const { min, max } = s.summary;
+  return (
+    <p className="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm text-ink-3">
+      <span className="tabular text-xl font-bold text-ink">{formatValue(unit, s.last_value)}</span>
+      <span>{s.stale ? "last reported" : "now"}</span>
+      {min != null && max != null && (
+        <span>
+          · {RANGES.find((x) => x.key === range)?.label} range {formatValue(unit, min)} to {formatValue(unit, max)}
+        </span>
+      )}
+    </p>
+  );
+}
+
 export function NoHistory({ unit }: { unit: string }) {
   return (
     <div className="flex flex-1 flex-col justify-center gap-1 py-6 text-center">
-      <p className="font-bold">No {unit.toLowerCase()} history in this range</p>
+      <p className="font-bold">No {unit} history in this range</p>
       <p className="mx-auto max-w-[44ch] text-sm text-ink-3">
         History starts when a metrics module is enabled and builds one sample per sync. Try a shorter range, or check that the controller is syncing.
       </p>
@@ -151,10 +193,14 @@ export function NoHistory({ unit }: { unit: string }) {
 
 function ReadingRow({ widget, range, label, controls }: { widget: Widget; range: RangeKey; label: string; controls?: ReactNode }) {
   const q = useMetric({ metric: widget.metric, entity_ids: widget.entity_ids, range, limit: widget.limit });
-  return <ReadingLine title={widget.title || label} result={q.data} controls={controls} />;
+  // The offline count is per site; the inventory says which devices those are (the same cached list the Overview reads).
+  const offline = widget.metric === "site.devices_offline";
+  const devices = useQuery({ queryKey: ["devices", "all"], queryFn: () => get<{ items: DeviceSummary[] }>("/api/inventory/devices"), enabled: offline });
+  const offenders = offline ? devices.data?.items.filter((d) => d.state !== "ONLINE").map((d) => d.name) : undefined;
+  return <ReadingSign title={widget.title || label} result={q.data} controls={controls} offenders={offenders} />;
 }
 
-/** Consecutive reading widgets share one ruled panel, a line per reading, like a sign's list of destinations. */
+/** Consecutive reading widgets form one row of distance signs across the dashboard. */
 export function ReadingsPanel({
   widgets,
   range,
@@ -167,7 +213,7 @@ export function ReadingsPanel({
   controlsOf?: (w: Widget) => ReactNode;
 }) {
   return (
-    <section aria-label="Readings" className="rounded-[var(--radius)] border border-rule bg-surface md:col-span-6">
+    <section aria-label="Readings" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] items-start gap-[var(--gap)] md:col-span-6">
       {widgets.map((w) => (
         <ReadingRow key={w.id} widget={w} range={range} label={labelOf(w)} controls={controlsOf?.(w)} />
       ))}

@@ -1,11 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, OctagonAlert } from "lucide-react";
+import { Bot, ClipboardCheck, FileSearch, Gauge, GitPullRequest, Grid3x3, MessageSquareText, OctagonAlert, ShieldCheck, Siren, Wifi } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AUTONOMY_WORD, AutonomyPicker, money, RunLink, RunState, RunTrigger, SubjectSelect, tokens } from "@/components/ai";
+import { clsx } from "clsx";
+import { AUTONOMY_WORD, AutonomyLadder, money, RunLink, RunState, RunTrigger, SubjectSelect, tokens } from "@/components/ai";
 import { NotesPanel, SchedulesPanel } from "@/components/ai-schedules";
 import { Button } from "@/components/ui/button";
 import { Confirm } from "@/components/ui/confirm";
@@ -16,7 +17,48 @@ import { type Column, DataTable } from "@/components/ui/table";
 import { ApiError, get, post, put } from "@/lib/api";
 import { ago, dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AiAgent, AiAgentsResponse, AiProvider, AiRun } from "@/lib/types";
+import type { AiAgent, AiAgentsResponse, AiAutonomy, AiProvider, AiRun } from "@/lib/types";
+
+// Each agent's specialism: its own icon on a sign-blue plate, and its domain
+// in words. Identity never borrows green, yellow or red, which mean state.
+const DOMAINS: Record<string, { word: string }> = {
+  monitoring: { word: "Monitoring" },
+  wifi: { word: "Wi-Fi" },
+  security: { word: "Security" },
+  capacity: { word: "Capacity" },
+  change: { word: "Change" },
+  general: { word: "Whole network" },
+};
+const IDENTITY: Record<string, { icon: typeof Bot; domain: keyof typeof DOMAINS }> = {
+  "alert-explainer": { icon: Siren, domain: "monitoring" },
+  "client-slowness": { icon: Gauge, domain: "monitoring" },
+  "firewall-review": { icon: ShieldCheck, domain: "security" },
+  "wifi-rf": { icon: Wifi, domain: "wifi" },
+  "capacity-planner": { icon: Grid3x3, domain: "capacity" },
+  "security-review": { icon: ClipboardCheck, domain: "security" },
+  "soc-case-summary": { icon: FileSearch, domain: "security" },
+  "change-impact": { icon: GitPullRequest, domain: "change" },
+  "ask-network": { icon: MessageSquareText, domain: "general" },
+};
+const identity = (key: string) => IDENTITY[key] ?? { icon: Bot, domain: "general" as const };
+
+/** The agent's mark: its symbol drawn in a frame; a switched-off agent's frame goes dashed. */
+function AgentBadge({ agentKey, off }: { agentKey: string; off?: boolean }) {
+  const { icon: Icon } = identity(agentKey);
+  return (
+    <span
+      aria-hidden
+      className={clsx(
+        "grid size-11 shrink-0 place-items-center rounded-[3px] border-[1.5px]",
+        off ? "border-dashed border-construct text-ink-3" : "border-line text-accent",
+      )}
+    >
+      <Icon className="size-5" strokeWidth={1.75} />
+    </span>
+  );
+}
+
+const LEVELS: AiAutonomy[] = ["off", "explain", "propose", "act_with_approval"];
 
 export default function AgentCenterPage() {
   const { can, moduleEnabled, modules } = useSession();
@@ -101,20 +143,27 @@ export default function AgentCenterPage() {
             Agents need a model: Ollama or LM Studio on your network, Anthropic Claude, or the offline demo model.
           </Notice>
         )}
-        <Panel title="Agents" bodyClassName="p-0">
+        {agents.data && <ControlPlate agents={agents.data.items} stopped={!!ks?.engaged} runs={runs.data?.items} />}
+        <section aria-labelledby="agents-h" className="flex flex-col gap-3">
+          <h2 id="agents-h" className="flex items-center gap-2.5 text-md font-bold">
+            <span className="junction" aria-hidden />
+            Agents
+          </h2>
           {agents.data ? (
-            <ul>
+            <ul className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-2">
               {agents.data.items.map((a) => (
-                <AgentRow key={a.key} a={a} providers={providers.data?.items ?? []} stopped={!!ks?.engaged} />
+                <AgentCard key={a.key} a={a} providers={providers.data?.items ?? []} stopped={!!ks?.engaged} />
               ))}
             </ul>
           ) : (
-            <p className="p-4 text-ink-3">Loading agents…</p>
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => <div key={i} className="plate h-64 animate-pulse" />)}
+            </div>
           )}
-          <p className="border-t border-rule px-4 py-3 text-sm text-ink-3">
+          <p className="text-sm text-ink-3">
             Autonomy built so far: Off, Explain, Propose and Act after approval (only the firewall review can reach it, and only a person&apos;s approval applies its change). “Autonomous within guardrails” is planned and cannot be chosen.
           </p>
-        </Panel>
+        </section>
         {agents.data && <SchedulesPanel agents={agents.data.items} />}
         {agents.data && <NotesPanel agents={agents.data.items} />}
         <Panel title={runs.data ? `Runs (${runs.data.total})` : "Runs"} bodyClassName="p-0">
@@ -135,11 +184,46 @@ export default function AgentCenterPage() {
   );
 }
 
-function AgentRow({ a, providers, stopped }: { a: AiAgent; providers: AiProvider[]; stopped: boolean }) {
+/**
+ * The control plate: whether agents may run at all, and how much autonomy the
+ * fleet holds right now, counted from each agent's own setting.
+ */
+function ControlPlate({ agents, stopped, runs }: { agents: AiAgent[]; stopped: boolean; runs?: AiRun[] }) {
+  const counts = LEVELS.map((l) => agents.filter((a) => (a.config.enabled ? a.config.autonomy : "off") === l).length);
+  const running = runs?.filter((r) => r.status === "running").length ?? 0;
+  return (
+    <section aria-label="Agent fleet" className="plate-raised flex flex-wrap items-center gap-x-8 gap-y-4 px-5 py-4">
+      <div className="flex items-center gap-3">
+        {stopped ? (
+          <StateLabel tone="crit" className="text-lg">All agents stopped</StateLabel>
+        ) : (
+          <StateLabel tone="ok" className="text-lg">Agents may run</StateLabel>
+        )}
+        {running > 0 && (
+          <span className="inline-flex items-center gap-2 text-sm font-semibold text-ink">
+            <span aria-hidden className="beacon size-2 rounded-full bg-accent text-accent" />
+            {running} running now
+          </span>
+        )}
+      </div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 sm:flex sm:flex-wrap">
+        {LEVELS.map((l, i) => (
+          <div key={l} className="flex items-baseline gap-2">
+            <dd className={clsx("tabular text-xl font-bold", counts[i] ? "text-ink" : "text-ink-3")}>{counts[i]}</dd>
+            <dt className="text-sm text-ink-2">{l === "off" ? "off" : `at ${AUTONOMY_WORD[l]}`}</dt>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function AgentCard({ a, providers, stopped }: { a: AiAgent; providers: AiProvider[]; stopped: boolean }) {
   const { can } = useSession();
   const manage = can("ai:manage");
   const qc = useQueryClient();
   const [open, setOpen] = useState<"run" | "settings" | null>(null);
+  const [showTools, setShowTools] = useState(false);
   const configure = useMutation({
     mutationFn: (body: Record<string, unknown>) => put(`/api/ai/agents/${a.key}`, body),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["ai", "agents"] }),
@@ -148,59 +232,94 @@ function AgentRow({ a, providers, stopped }: { a: AiAgent; providers: AiProvider
   const off = !c.enabled || c.autonomy === "off";
   const blocked = a.missing_modules.length > 0;
   const reads = a.tools.filter((t) => !t.proposes && !t.stores);
+  const { domain } = identity(a.key);
+  const runningNow = a.last_run?.status === "running";
   return (
-    <li className="border-b border-rule last:border-b-0">
-      <div className="grid gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-8">
-        <div className="min-w-0">
+    <li className={clsx("flex min-w-0 flex-col", off ? "plate-quiet" : "plate lift")}>
+      <div className="flex items-start gap-3.5 px-4 pt-4">
+        <AgentBadge agentKey={a.key} off={off} />
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h3 className="text-md font-bold">{a.name}</h3>
-            {off ? <StateLabel tone="muted">Switched off</StateLabel> : <StateLabel tone="ok">Available</StateLabel>}
-            {a.last_run && (
-              <span className="text-sm text-ink-3">
-                Last run <RunLink id={a.last_run.id} label={a.last_run.ref} /> {ago(a.last_run.started_at)}
+            {stopped && !off ? (
+              <StateLabel tone="crit">Stopped</StateLabel>
+            ) : blocked ? (
+              <StateLabel tone="warn">Needs a module</StateLabel>
+            ) : off ? (
+              <StateLabel tone="muted">Switched off</StateLabel>
+            ) : runningNow ? (
+              <span className="inline-flex items-center gap-2 font-semibold text-ink">
+                <span aria-hidden className="beacon size-2 rounded-full bg-accent text-accent" />
+                Running
               </span>
+            ) : (
+              <StateLabel tone="ok">Available</StateLabel>
             )}
           </div>
-          <p className="mt-1 max-w-[70ch] text-ink-2">{a.summary}</p>
-          <p className="mt-2 text-sm text-ink-3">
-            Reads with{" "}
-            {reads.map((t, i) => (
-              <span key={t.name}>
-                {i > 0 && ", "}
-                <code className="font-mono text-xs text-ink-2" title={t.description}>{t.name}</code>
-              </span>
-            ))}
-            {a.allowed_operations.length > 0 && (
+          <p className="mt-0.5 text-sm text-ink-3">
+            {DOMAINS[domain].word}
+            {a.last_run ? (
               <>
-                . At Propose or above it may also propose <code className="font-mono text-xs text-ink-2">{a.allowed_operations.join(", ")}</code>
+                {" · last run "}
+                <RunLink id={a.last_run.id} label={a.last_run.ref} /> {ago(a.last_run.started_at)}
+                {a.last_run.status !== "running" && (
+                  <>
+                    {" · "}
+                    <RunState status={a.last_run.status} className="text-sm" />
+                  </>
+                )}
               </>
+            ) : (
+              " · never run"
             )}
-            .
           </p>
-          {blocked && <p className="mt-2 text-sm font-semibold text-warn-text">Needs the {a.missing_modules.join(", ")} module{a.missing_modules.length > 1 ? "s" : ""} to run.</p>}
         </div>
-        <div className="flex flex-col gap-3">
-          {manage ? (
-            <div className="flex flex-col gap-1">
-              <span id={`aut-${a.key}-l`} className="text-sm font-semibold">Autonomy</span>
-              <AutonomyPicker id={`aut-${a.key}`} value={c.autonomy} max={a.max_autonomy} disabled={configure.isPending} onChange={(v) => configure.mutate({ autonomy: v })} />
-            </div>
-          ) : (
-            <span className="text-sm text-ink-2">Autonomy: <span className="font-semibold text-ink">{AUTONOMY_WORD[c.autonomy]}</span></span>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <Button aria-expanded={open === "run"} disabled={off || stopped || blocked} onClick={() => setOpen(open === "run" ? null : "run")}>Run…</Button>
-            {manage && (
-              <>
-                <Button variant="ghost" aria-expanded={open === "settings"} onClick={() => setOpen(open === "settings" ? null : "settings")}>Settings</Button>
-                <Button variant="ghost" loading={configure.isPending && "enabled" in (configure.variables ?? {})} onClick={() => configure.mutate({ enabled: !c.enabled })}>
-                  {c.enabled ? "Switch off" : "Switch on"}
-                </Button>
-              </>
-            )}
+      </div>
+      <p className="mt-3 px-4 text-ink-2">{a.summary}</p>
+      <div className="mt-3 px-4">
+        <button type="button" className="text-sm font-semibold text-accent hover:underline" aria-expanded={showTools} onClick={() => setShowTools((v) => !v)}>
+          Reads with {reads.length} tool{reads.length === 1 ? "" : "s"}
+          {a.allowed_operations.length > 0 && `, may propose ${a.allowed_operations.length}`}
+        </button>
+        {showTools && (
+          <div className="anim-pop mt-2 flex flex-wrap gap-1.5">
+            {reads.map((t) => (
+              <code key={t.name} title={t.description} className="rounded-[4px] border border-rule bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-ink-2">
+                {t.name}
+              </code>
+            ))}
+            {a.allowed_operations.map((o) => (
+              <code key={o} title="Can be proposed at Propose or above; a person approves it" className="rounded-[4px] border border-dashed border-ink-3 px-1.5 py-0.5 font-mono text-xs text-ink-2">
+                proposes {o}
+              </code>
+            ))}
           </div>
-          {configure.error && <p className="text-sm font-semibold text-crit">{(configure.error as Error).message}</p>}
-        </div>
+        )}
+        {blocked && <p className="mt-2 text-sm font-semibold text-warn-text">Needs the {a.missing_modules.join(", ")} module{a.missing_modules.length > 1 ? "s" : ""} to run.</p>}
+      </div>
+      <div className="mt-4 border-t border-rule px-4 pt-3 pb-1">
+        <p id={`aut-${a.key}-l`} className="mb-2 text-sm font-semibold text-ink-3">
+          Autonomy
+        </p>
+        <AutonomyLadder
+          id={`aut-${a.key}`}
+          value={c.autonomy}
+          max={a.max_autonomy}
+          disabled={configure.isPending}
+          onChange={manage ? (v) => configure.mutate({ autonomy: v }) : undefined}
+        />
+      </div>
+      <div className="mt-auto flex flex-wrap items-center gap-2 px-4 pt-3 pb-4">
+        <Button aria-expanded={open === "run"} disabled={off || stopped || blocked} onClick={() => setOpen(open === "run" ? null : "run")}>Run…</Button>
+        {manage && (
+          <>
+            <Button variant="ghost" aria-expanded={open === "settings"} onClick={() => setOpen(open === "settings" ? null : "settings")}>Settings</Button>
+            <Button variant="ghost" className="ml-auto" loading={configure.isPending && "enabled" in (configure.variables ?? {})} onClick={() => configure.mutate({ enabled: !c.enabled })}>
+              {c.enabled ? "Switch off" : "Switch on"}
+            </Button>
+          </>
+        )}
+        {configure.error && <p className="w-full text-sm font-semibold text-crit">{(configure.error as Error).message}</p>}
       </div>
       {open === "run" && <RunForm a={a} onClose={() => setOpen(null)} />}
       {open === "settings" && <AgentSettings a={a} providers={providers} onSave={(b) => configure.mutateAsync(b).then(() => setOpen(null))} saving={configure.isPending} />}
@@ -223,7 +342,7 @@ function RunForm({ a, onClose }: { a: AiAgent; onClose: () => void }) {
   const missing = a.subject.some((s) => s.required && !subject[s.key]) || (a.question_required && !question.trim());
   return (
     <form
-      className="mx-4 mb-4 grid gap-4 rounded-[var(--radius)] border border-rule bg-surface-2 p-4 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]"
+      className="anim-pop mx-4 mb-4 grid gap-4 rounded-[var(--r-plate)] border border-rule bg-surface-2 p-4 shadow-[inset_0_1px_2px_rgb(var(--shadow-tint)/0.06)] md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)] xl:grid-cols-1"
       onSubmit={(e) => {
         e.preventDefault();
         run.mutate();
@@ -237,8 +356,8 @@ function RunForm({ a, onClose }: { a: AiAgent; onClose: () => void }) {
       <Field label="Question" hint={a.question_required ? "Required: ask in your own words" : "Optional; the agent's own question is used when empty"}>
         {(p) => <Textarea {...p} className="min-h-16" maxLength={2000} value={question} placeholder={a.default_question} onChange={(e) => setQuestion(e.target.value)} />}
       </Field>
-      {run.error && <Notice tone="crit" className="md:col-span-2">{run.error instanceof ApiError ? run.error.message : "The run could not start."}</Notice>}
-      <div className="flex flex-wrap items-center gap-2 md:col-span-2">
+      {run.error && <Notice tone="crit" className="md:col-span-2 xl:col-span-1">{run.error instanceof ApiError ? run.error.message : "The run could not start."}</Notice>}
+      <div className="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-1">
         <Button type="submit" variant="primary" loading={run.isPending} disabled={missing}>Run agent</Button>
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <span className="text-sm text-ink-3">
@@ -261,7 +380,7 @@ function AgentSettings({ a, providers, onSave, saving }: { a: AiAgent; providers
   const provider = providers.find((p) => p.id === f.provider_id);
   return (
     <form
-      className="mx-4 mb-4 grid gap-4 rounded-[var(--radius)] border border-rule bg-surface-2 p-4 md:grid-cols-2 xl:grid-cols-5"
+      className="anim-pop mx-4 mb-4 grid gap-4 rounded-[var(--r-plate)] border border-rule bg-surface-2 p-4 shadow-[inset_0_1px_2px_rgb(var(--shadow-tint)/0.06)] md:grid-cols-2"
       onSubmit={(e) => {
         e.preventDefault();
         onSave({
@@ -294,7 +413,7 @@ function AgentSettings({ a, providers, onSave, saving }: { a: AiAgent; providers
       </Field>
       <Field label="Tool calls per run">{(p) => <Input {...p} inputMode="numeric" className="tabular" value={f.calls} onChange={(e) => setF({ ...f, calls: e.target.value.replace(/[^0-9]/g, "") })} />}</Field>
       <Field label="Model turns per run">{(p) => <Input {...p} inputMode="numeric" className="tabular" value={f.turns} onChange={(e) => setF({ ...f, turns: e.target.value.replace(/[^0-9]/g, "") })} />}</Field>
-      <div className="flex flex-wrap items-center gap-2 md:col-span-2 xl:col-span-5">
+      <div className="flex flex-wrap items-center gap-2 md:col-span-2">
         <Button type="submit" variant="primary" loading={saving}>Save agent settings</Button>
         {c.updated_by && <span className="text-sm text-ink-3">Last changed by {c.updated_by}{c.updated_at ? ` ${ago(c.updated_at)}` : ""}</span>}
       </div>

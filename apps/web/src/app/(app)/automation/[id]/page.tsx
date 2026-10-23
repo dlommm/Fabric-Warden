@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft, Trash2, Workflow } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ChangeRefLink, RuleEditor, RunOutcome, actionText, triggerText } from "@/components/automation";
@@ -79,6 +79,7 @@ export default function RulePage() {
     <>
       <BackLink />
       <PageHeader
+        icon={<Workflow />}
         title={r.name}
         description={r.description || `${triggerText(r, meta.data)}. ${actionText(r)}.`}
         meta={

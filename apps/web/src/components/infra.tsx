@@ -7,7 +7,7 @@ import { clsx } from "clsx";
 import { Archive, BatteryCharging, EthernetPort, PanelTop, Plug, Router, Rows3, Server, Square, SquareDashed } from "lucide-react";
 import { useState } from "react";
 import { UsageBar, usageTone } from "@/components/ipam";
-import { type Hop, RouteSign } from "@/components/route-sign";
+import { type Hop, RouteTrace } from "@/components/route-trace";
 import { Button } from "@/components/ui/button";
 import { Confirm } from "@/components/ui/confirm";
 import { Notice } from "@/components/ui/layout-bits";
@@ -160,7 +160,7 @@ export function TraceStrip({ trace, from }: { trace: Trace; from?: "a" | "b" }) 
   });
   return (
     <div className="mt-3">
-      <RouteSign
+      <RouteTrace
         vertical
         hops={hops}
         label="Cable path"

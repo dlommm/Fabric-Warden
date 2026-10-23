@@ -102,7 +102,7 @@ function MfaPanel() {
         <form onSubmit={(e) => { e.preventDefault(); activate.mutate(); }} className="flex max-w-md flex-col gap-4">
           <p className="text-base text-ink-2">Add this key to your authenticator app (1Password, Aegis, Google Authenticator…), then enter the 6-digit code it shows.</p>
           <div className="rounded-[4px] border border-rule bg-surface-2 p-3">
-            <p className="text-xs font-bold tracking-wide text-ink-3 uppercase">Setup key</p>
+            <p className="text-sm font-semibold text-ink-3">Setup key</p>
             <p className="mt-1 flex items-center gap-2 font-mono text-md tracking-wider break-all">
               {enrol.secret.match(/.{1,4}/g)?.join(" ")}
               <button type="button" className="rounded p-1 text-ink-3 hover:bg-surface-3 hover:text-ink" onClick={() => navigator.clipboard?.writeText(enrol.secret)} aria-label="Copy setup key">

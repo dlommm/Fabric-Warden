@@ -51,10 +51,10 @@ export function CommandPalette() {
 
   const pages: Result[] = useMemo(
     () =>
-      NAV.flatMap((g) => g.items)
+      NAV.flatMap((g) => g.items.map((i) => ({ ...i, section: g.section })))
         .filter((i) => (!i.permission || can(i.permission)) && (!i.module || moduleEnabled(i.module)))
-        .filter((i) => !term || i.label.toLowerCase().includes(term.toLowerCase()))
-        .map((i) => ({ kind: "page" as const, id: i.href, title: i.label, subtitle: "Go to page", href: i.href })),
+        .filter((i) => !term || i.label.toLowerCase().includes(term.toLowerCase()) || i.section.toLowerCase().includes(term.toLowerCase()))
+        .map((i) => ({ kind: "page" as const, id: i.href, title: i.label, subtitle: `${i.section} › ${i.label}`, href: i.href })),
     [term, can, moduleEnabled],
   );
   const results = [...(search.data?.results ?? []), ...pages];
@@ -68,15 +68,15 @@ export function CommandPalette() {
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (!o) setQ(""); }}>
-      <Dialog.Trigger className="flex h-9 w-full min-w-0 max-w-md flex-1 items-center gap-2 rounded-[4px] border border-rule-strong bg-surface-2 px-3 text-base text-ink-3 hover:border-ink-3">
+      <Dialog.Trigger className="flex h-9 w-full min-w-0 max-w-md flex-1 items-center gap-2 rounded-[var(--radius)] border border-rule-strong bg-surface-2 px-3 text-base text-ink-3 shadow-[inset_0_1px_2px_rgb(var(--shadow-tint)/0.06)] transition-colors duration-[var(--dur)] hover:border-ink-3 hover:text-ink-2">
         <Search className="size-4" aria-hidden />
         <span className="truncate">Search devices, clients, IPs, MACs…</span>
-        <kbd className="ml-auto hidden rounded-[3px] border border-rule-strong px-1.5 font-mono text-xs sm:inline">Ctrl K</kbd>
+        <kbd className="ml-auto hidden rounded-[3px] border border-rule-strong bg-surface px-1.5 font-mono text-xs whitespace-nowrap shadow-[0_1px_0_var(--rule-strong)] sm:inline">Ctrl K</kbd>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/35" />
+        <Dialog.Overlay className="anim-scrim fixed inset-0 z-50 bg-[var(--scrim)] backdrop-blur-[2px]" />
         <Dialog.Content
-          className="fixed top-[12vh] left-1/2 z-50 w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-[6px] border border-rule-strong bg-surface shadow-[0_16px_48px_rgb(0_0_0/0.22)]"
+          className="fixed top-[12vh] left-1/2 z-50 w-[min(640px,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden dialog anim-pop"
           aria-describedby={undefined}
         >
           <Dialog.Title className="sr-only">Search</Dialog.Title>
@@ -114,7 +114,7 @@ export function CommandPalette() {
                   aria-selected={i === cursor}
                   onMouseEnter={() => setCursor(i)}
                   onClick={() => go(r)}
-                  className={clsx("flex cursor-pointer items-center gap-3 rounded-[4px] px-3 py-2", i === cursor && "bg-accent-soft")}
+                  className={clsx("flex cursor-pointer items-center gap-3 rounded-[6px] px-3 py-2 transition-colors duration-[var(--dur-fast)]", i === cursor && "bg-accent-soft shadow-[inset_2px_0_0_var(--accent)]")}
                 >
                   <Icon className="size-4 shrink-0 text-ink-3" aria-hidden />
                   <span className="min-w-0 flex-1">

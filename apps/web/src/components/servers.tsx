@@ -58,14 +58,14 @@ export function PctBar({ pct, label, size, reason }: { pct: number | null | unde
     );
   const tone = usageTone(pct);
   return (
-    <span className="inline-flex items-center gap-2.5 whitespace-nowrap">
+    <span className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1">
       <span className={clsx("h-2 shrink-0 rounded-[2px] bg-surface-3", size === "sm" ? "w-14" : "w-20")} aria-hidden>
-        <span className={clsx("block h-full rounded-[2px]", tone === "crit" ? "bg-crit" : tone === "warn" ? "bg-warn ring-1 ring-ink/40" : "bg-[#00704a]")} style={{ width: `${Math.min(100, Math.max(pct, pct > 0 ? 2 : 0))}%` }} />
+        <span className={clsx("block h-full rounded-[2px]", tone === "crit" ? "bg-crit" : tone === "warn" ? "bg-warn-line" : "bg-ok")} style={{ width: `${Math.min(100, Math.max(pct, pct > 0 ? 2 : 0))}%` }} />
       </span>
       <span className={clsx("tabular text-sm", tone === "ok" ? "text-ink-2" : tone === "warn" ? "font-bold text-warn-text" : "font-bold text-crit")}>
         {pct.toFixed(pct > 0 && pct < 10 ? 1 : 0)}%
       </span>
-      {label && <span className="text-xs text-ink-3 tabular">{label}</span>}
+      {label && <span className="text-xs whitespace-nowrap text-ink-3 tabular">{label}</span>}
     </span>
   );
 }

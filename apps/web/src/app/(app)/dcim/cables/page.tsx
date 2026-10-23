@@ -13,7 +13,7 @@ import { Field, Input, Select } from "@/components/ui/field";
 import { EmptyState, ModuleOff, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { DemoTag, StateLabel } from "@/components/ui/signs";
 import { type Column, DataTable } from "@/components/ui/table";
-import { ApiError, del, get, post } from "@/lib/api";
+import { ApiError, del, get, patch, post } from "@/lib/api";
 import { useSession } from "@/lib/session";
 import type { CableEndView, CableRow, DeviceDetail, DeviceSummary, InfraFinding, RackItem, Trace } from "@/lib/types";
 
@@ -129,6 +129,7 @@ function Cables() {
       <div className="flex flex-col gap-[var(--gap)]">
         {adding && <CableForm onDone={() => setAdding(false)} />}
         {labels && <LabelSheet onClose={() => setLabels(false)} />}
+        <Suggestions editable={editable} />
         {findings.data && !!all?.length && (
           <FindingsPlate
             label="Cabling findings"
@@ -137,7 +138,7 @@ function Cables() {
             heading={(n) => `${n} cabling difference${n > 1 ? "s" : ""} from the network`}
           />
         )}
-        <div className={clsx("grid gap-[var(--gap)]", tracing && "2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start")}>
+        <div className={clsx("grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)]", tracing && "2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start")}>
           <Panel bodyClassName="p-0" className="order-2 2xl:order-1">
             <div className="flex flex-wrap items-end gap-3 border-b border-rule px-4 py-3">
               <Field label="Search" className="w-full sm:w-72">
@@ -176,12 +177,122 @@ function Cables() {
   );
 }
 
+interface Suggestion {
+  key: string;
+  title: string;
+  device: { id: string; name: string; model: string };
+  uplink: { id: string; name: string; model: string };
+  is_demo: boolean;
+}
+
+/**
+ * Cables the observed uplinks imply but nobody has documented. The controller names the uplink device but
+ * not the port on either side, so an accepted suggestion becomes a planned cable with both ports to confirm.
+ */
+function Suggestions({ editable }: { editable: boolean }) {
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["dcim", "cable-suggestions"], queryFn: () => get<{ items: Suggestion[] }>("/api/cabling/suggestions") });
+  const accept = useMutation({
+    mutationFn: (keys: string[]) => post<{ items: CableRow[] }>("/api/cabling/suggestions/accept", { keys }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ["dcim"] }),
+  });
+  const items = q.data?.items ?? [];
+  if (!items.length) return null;
+  return (
+    <Panel
+      title={`Suggested from observed uplinks (${items.length})`}
+      bodyClassName="p-0"
+      actions={
+        editable && items.length > 1 ? (
+          <Button size="sm" loading={accept.isPending && accept.variables?.length === items.length} onClick={() => accept.mutate(items.map((i) => i.key))}>
+            Document all as planned
+          </Button>
+        ) : undefined
+      }
+    >
+      <p className="border-b border-rule px-4 py-2.5 text-sm text-ink-2">
+        Each device reports which device it uplinks to, but not the port on either side. Documenting one adds a planned cable with the next label; confirm its ports when you trace it.
+      </p>
+      {accept.error && <Notice tone="crit" className="m-3">{(accept.error as Error).message}</Notice>}
+      <ul>
+        {items.map((s) => (
+          <li key={s.key} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-4 py-2.5 last:border-b-0">
+            <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2">
+              <span className="font-semibold">{s.device.name}</span>
+              <span className="text-sm text-ink-3">{s.device.model}</span>
+              <span aria-hidden className="text-ink-3">→</span>
+              <span className="font-semibold">{s.uplink.name}</span>
+              <span className="text-sm text-ink-3">{s.uplink.model}</span>
+              <span className="sr-only">uplink, no cable documented</span>
+              {s.is_demo && <DemoTag />}
+            </span>
+            {editable && (
+              <Button size="sm" variant="ghost" icon={<Plus />} loading={accept.isPending && accept.variables?.length === 1 && accept.variables[0] === s.key} onClick={() => accept.mutate([s.key])}>
+                Document as planned cable
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+/** Confirm the ports of a planned cable accepted from an observed uplink, then it traces like any other. */
+function ConfirmPorts({ cable }: { cable: CableRow }) {
+  const qc = useQueryClient();
+  const ends = (["a", "b"] as const).filter((n) => cable[n]?.kind === "device_port" && cable[n]?.port_idx == null);
+  const ports = useQuery({
+    queryKey: ["dcim", "confirm-ports", cable.id],
+    queryFn: () => Promise.all(ends.map((n) => get<DeviceDetail>(`/api/inventory/devices/${cable[n]!.device_id}`))),
+  });
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  const save = useMutation({
+    mutationFn: () =>
+      patch(`/api/cabling/cables/${cable.id}`, Object.fromEntries(ends.map((n) => [n, { kind: "device_port", device_id: cable[n]!.device_id, port_idx: Number(picked[n]) }]))),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["dcim"] }),
+  });
+  return (
+    <form
+      className="mt-2 flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <p className="text-sm text-ink-2">The controller reports which device this uplinks to, not the ports. Pick the port on each end to trace it.</p>
+      {ends.map((n, i) => (
+        <Field key={n} label={`${n.toUpperCase()} end: ${cable[n]!.name}`}>
+          {(p) => (
+            <Select {...p} value={picked[n] ?? ""} disabled={!ports.data} onChange={(e) => setPicked({ ...picked, [n]: e.target.value })}>
+              <option value="">Choose a port</option>
+              {ports.data?.[i].ports.map((pt) => (
+                <option key={pt.idx} value={pt.idx}>
+                  Port {pt.idx} · {pt.connector} · {pt.state === "UP" ? "link up" : "link down"}
+                </option>
+              ))}
+            </Select>
+          )}
+        </Field>
+      ))}
+      {save.error && <Notice tone="crit">{(save.error as Error).message}</Notice>}
+      <span>
+        <Button type="submit" size="sm" variant="primary" loading={save.isPending} disabled={ends.some((n) => !picked[n])}>
+          Confirm ports
+        </Button>
+      </span>
+    </form>
+  );
+}
+
 function TracePanel({ cable, onClose, editable }: { cable: CableRow; onClose: () => void; editable: boolean }) {
   const qc = useQueryClient();
   const [confirm, setConfirm] = useState(false);
   const a = cable.a;
-  const query =
-    a?.kind === "device_port"
+  const unconfirmed = [cable.a, cable.b].some((e) => e?.kind === "device_port" && e.port_idx == null);
+  const query = unconfirmed
+    ? null
+    : a?.kind === "device_port"
       ? `device_id=${a.device_id}&port_idx=${a.port_idx}`
       : a?.kind === "panel_port"
         ? `item_id=${a.item_id}&port_idx=${a.port_idx}&side=${a.side}`
@@ -208,8 +319,14 @@ function TracePanel({ cable, onClose, editable }: { cable: CableRow; onClose: ()
         {cable.color ? ` · ${cable.color}` : ""}
       </p>
       {cable.description && <p className="mt-1 text-sm text-ink-2">{cable.description}</p>}
-      <p className="mt-4 text-xs font-bold tracking-wide text-ink-2 uppercase">Full path</p>
-      {!query ? (
+      <p className="mt-4 text-sm font-semibold text-ink-2">Full path</p>
+      {unconfirmed ? (
+        editable ? (
+          <ConfirmPorts cable={cable} />
+        ) : (
+          <p className="mt-2 text-sm text-ink-3">This planned cable&apos;s ports aren&apos;t confirmed yet, so it can&apos;t be traced.</p>
+        )
+      ) : !query ? (
         <p className="mt-2 text-sm text-ink-3">This cable starts outside the racks; trace it from its other end.</p>
       ) : trace.data ? (
         <TraceStrip trace={trace.data} />
@@ -271,7 +388,7 @@ function EndPicker({ legend, value, onChange, devices, items }: { legend: string
   const panel = panels.find((p) => p.id === value.item_id);
   return (
     <fieldset className="flex min-w-0 flex-col gap-3 rounded-[var(--radius)] border border-rule p-3">
-      <legend className="px-1 text-xs font-bold tracking-wide text-ink-2 uppercase">{legend}</legend>
+      <legend className="px-1 text-sm font-semibold text-ink-3">{legend}</legend>
       <Field label="Ends on">
         {(p) => (
           <Select {...p} value={value.kind} onChange={(e) => onChange({ ...emptyEnd(), kind: e.target.value as EndDraft["kind"] })}>

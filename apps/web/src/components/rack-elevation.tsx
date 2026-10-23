@@ -84,7 +84,7 @@ export function RackElevation({
         : null;
     return (
       <div role="group" aria-label={`${face === "front" ? "Front" : "Rear"} of ${rack.name}`} className={clsx("min-w-0 flex-1", shown !== face && "hidden md:block")}>
-        <p className="mb-2 text-center text-xs font-bold tracking-wide text-ink-2 uppercase">{face === "front" ? "Front" : "Rear"}</p>
+        <p className="mb-2 text-center text-sm font-semibold text-ink-3">{face === "front" ? "Front" : "Rear"}</p>
         <div className="flex">
           <ol aria-hidden className="w-7 shrink-0 pr-1.5 text-right font-mono text-[11px] leading-[var(--u-h)] text-ink-3 tabular">
             {rack.units.map((u) => (
@@ -172,7 +172,7 @@ export function RackElevation({
                     "group absolute inset-x-1 flex items-center gap-2 overflow-hidden rounded-[3px] px-2 text-left transition-colors duration-100",
                     editable && "cursor-grab active:cursor-grabbing",
                     drag?.id === item.id && "opacity-40",
-                    st === "attention" && "sign bg-warn text-warn-ink",
+                    st === "attention" && "frame bg-warn text-warn-ink",
                     st === "failed" && "border border-rule-strong bg-surface text-ink ring-[3px] ring-crit ring-inset",
                     st === "planned" && "border-2 border-dashed border-accent bg-accent-soft text-ink",
                     (st === "ok" || st === "plain") && "border border-rule-strong bg-surface text-ink hover:bg-surface-2",
@@ -241,7 +241,7 @@ export function ElevationLegend() {
   return (
     <ul className="flex flex-wrap gap-x-5 gap-y-2" aria-label="Elevation legend">
       <li className={row}><span className="inline-flex size-4 items-center justify-center rounded-[3px] border border-rule-strong bg-surface"><CircleCheck className="size-3 text-ok" aria-hidden /></span>Linked device online</li>
-      <li className={row}><span className="sign inline-block size-4 rounded-[3px] bg-warn text-warn-ink" />Linked device needs attention</li>
+      <li className={row}><span className="frame inline-block size-4 rounded-[3px] bg-warn text-warn-ink" />Linked device needs attention</li>
       <li className={row}><span className="inline-block size-4 rounded-[3px] bg-surface ring-[3px] ring-crit ring-inset" />Missing, offline or overlapping</li>
       <li className={row}><span className="inline-block size-4 rounded-[3px] border-2 border-dashed border-accent bg-accent-soft" />Planned</li>
       <li className={row}><span className="inline-block size-4 rounded-[3px] bg-surface-3" />Back of a full-depth item</li>

@@ -54,7 +54,7 @@ export default function WanPage() {
         <Skeleton className="h-64 w-full" />
       ) : (
         <div className="flex flex-col gap-[var(--gap)]">
-          <div className="grid gap-[var(--gap)] lg:grid-cols-2">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] lg:grid-cols-2">
             <Panel title="Gateway">
               {d.gateways.length === 0 ? (
                 <p className="text-ink-3">No gateway reported by the controller.</p>
@@ -129,7 +129,7 @@ export default function WanPage() {
               <table className="w-full text-left">
                 <caption className="sr-only">Probe targets</caption>
                 <thead>
-                  <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+                  <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                     <th scope="col" className="h-9 px-4">Target</th>
                     <th scope="col" className="px-4 text-right">Latency</th>
                     <th scope="col" className="px-4">Loss</th>

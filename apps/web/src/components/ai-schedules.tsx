@@ -224,11 +224,11 @@ export function NotesPanel({ agents }: { agents: AiAgent[] }) {
       </p>
       {pending.length > 0 && (
         <>
-          <h3 className="mt-3 border-y border-rule bg-surface-2 px-4 py-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">Waiting for review ({pending.length})</h3>
+          <h3 className="mt-3 border-y border-rule bg-surface-2 px-4 py-1.5 text-sm font-semibold text-ink-3">Waiting for review ({pending.length})</h3>
           <ul aria-label="Notes waiting for review">{pending.map(row)}</ul>
         </>
       )}
-      <h3 className="mt-3 border-y border-rule bg-surface-2 px-4 py-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">In use ({active.length})</h3>
+      <h3 className="mt-3 border-y border-rule bg-surface-2 px-4 py-1.5 text-sm font-semibold text-ink-3">In use ({active.length})</h3>
       {active.length ? (
         <ul aria-label="Notes in use">{active.map(row)}</ul>
       ) : (

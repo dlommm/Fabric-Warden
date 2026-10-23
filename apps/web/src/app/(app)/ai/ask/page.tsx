@@ -142,7 +142,7 @@ export default function AskPage() {
             <ul aria-label="Earlier questions">
               {history.data.items.map((h) => (
                 <li key={h.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-rule px-4 py-2 last:border-b-0">
-                  <button type="button" className="min-w-0 flex-1 text-left font-semibold text-accent hover:underline" onClick={() => setRunId(h.id)}>
+                  <button type="button" className="min-w-0 flex-[1_1_14rem] text-left font-semibold text-accent hover:underline" onClick={() => setRunId(h.id)}>
                     {h.question}
                   </button>
                   <RunState status={h.status} />

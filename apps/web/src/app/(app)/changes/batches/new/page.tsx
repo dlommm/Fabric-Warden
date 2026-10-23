@@ -78,7 +78,7 @@ export default function NewBatchPage() {
         description="Proposing reads every target live from the controller and works out each one's risk. Targets the change engine refuses are listed as skipped. Nothing is changed until the batch is approved and applied."
       />
       <form
-        className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]"
+        className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]"
         onSubmit={(e) => {
           e.preventDefault();
           m.mutate();
@@ -101,7 +101,7 @@ export default function NewBatchPage() {
                   <legend className="sr-only">{group}</legend>
                   <div className="flex min-h-9 items-center justify-between gap-3 bg-surface-2 px-4">
                     <span className="flex items-center gap-3">
-                      <span className="text-xs font-bold tracking-wide text-ink-2 uppercase" aria-hidden>{group}</span>
+                      <span className="text-sm font-semibold text-ink-3" aria-hidden>{group}</span>
                       {demoGroup && <DemoTag />}
                     </span>
                     {ready.length > 1 && (

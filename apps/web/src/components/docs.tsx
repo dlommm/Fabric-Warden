@@ -39,7 +39,7 @@ export function DocTree({ current }: { current?: string }) {
               aria-current={p.slug === current ? "page" : undefined}
               className={clsx(
                 "flex min-h-8 items-center gap-2 rounded-[3px] px-2 text-sm",
-                p.slug === current ? "sign bg-accent font-bold text-accent-ink" : "text-ink hover:bg-surface-2",
+                p.slug === current ? "frame bg-accent font-bold text-accent-ink" : "text-ink hover:bg-surface-2",
               )}
             >
               <FileText className={clsx("size-3.5 shrink-0", p.slug === current ? "text-accent-ink" : "text-ink-3")} aria-hidden />

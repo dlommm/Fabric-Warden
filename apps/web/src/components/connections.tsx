@@ -32,7 +32,7 @@ function Split({ c }: { c: Counts }) {
 function List<T>({ title, rows, label }: { title: string; rows: (T & Counts)[]; label: (r: T) => ReactNode }) {
   return (
     <section aria-label={title} className="min-w-0">
-      <h3 className="mb-1 text-xs font-bold tracking-wide text-ink-2 uppercase">{title}</h3>
+      <h3 className="mb-1 text-sm font-semibold text-ink-3">{title}</h3>
       {rows.length === 0 ? (
         <p className="text-sm text-ink-3">None.</p>
       ) : (
@@ -76,7 +76,7 @@ export function ConnectionsPanel() {
             <List title="Destinations" rows={d.destinations} label={(r) => <Link href={`/investigate?q=${r.dst}`} className="font-mono text-xs font-semibold text-accent hover:underline">{r.dst}</Link>} />
             <List title="Ports" rows={d.ports} label={(r) => <span className="font-mono text-xs">{r.port}</span>} />
             <section aria-label="Rules" className="min-w-0">
-              <h3 className="mb-1 text-xs font-bold tracking-wide text-ink-2 uppercase">Rules that fire</h3>
+              <h3 className="mb-1 text-sm font-semibold text-ink-3">Rules that fire</h3>
               <ol>
                 {d.rules.slice(0, 8).map((r) => (
                   <li key={r.rule} className="flex items-baseline justify-between gap-3 border-b border-rule py-1 last:border-b-0">

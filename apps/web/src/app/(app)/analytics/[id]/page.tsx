@@ -1,10 +1,10 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, Pencil, Plus, Trash2, X } from "lucide-react";
+import { useIsFetching, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowDown, ArrowUp, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { MetricWidget, RangePicker, ReadingsPanel, entityWord } from "@/components/analytics";
 import { SERIES_COLORS } from "@/components/charts";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,27 @@ import { del, get, patch } from "@/lib/api";
 import { RANGES, isRange } from "@/lib/metrics";
 import { useSession } from "@/lib/session";
 import type { Dashboard, MetricCatalog, RangeKey, Widget, WidgetKind, WidgetSize } from "@/lib/types";
+
+/** When the widgets last finished loading, from the metric queries themselves; they refresh every minute. */
+function Freshness() {
+  const fetching = useIsFetching({ queryKey: ["metrics"] });
+  const [at, setAt] = useState<number | null>(null);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (fetching === 0) setAt(Date.now());
+  }, [fetching]);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 10_000);
+    return () => clearInterval(t);
+  }, []);
+  const secs = at ? Math.round((Date.now() - at) / 1000) : null;
+  return (
+    <span className="ml-auto inline-flex items-center gap-1.5 text-sm text-ink-2" role="status" aria-live="off">
+      <RefreshCw className={fetching ? "size-3.5 animate-spin text-accent" : "size-3.5 text-ink-3"} aria-hidden />
+      {fetching ? "Refreshing…" : secs == null ? "Loading…" : `Updated ${secs < 10 ? "just now" : `${secs < 60 ? `${Math.floor(secs / 10) * 10} s` : `${Math.floor(secs / 60)} min`} ago`} · every minute`}
+    </span>
+  );
+}
 
 const KIND_LABEL: Record<WidgetKind, string> = { line: "Line chart", stat: "Reading (one line, full width)", top: "Ranked list" };
 
@@ -152,9 +173,10 @@ export default function DashboardPage() {
       />
       {save.error && <Notice tone="crit" className="mb-4">{(save.error as Error).message}</Notice>}
 
-      <div className="mb-[var(--gap)] flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="plate mb-[var(--gap)] flex flex-wrap items-center gap-x-5 gap-y-2 px-3 py-2.5">
         <RangePicker value={range} onChange={setRange} />
-        <span className="text-sm text-ink-3">Refreshes every minute. Ranges over 2 days use 5-minute or hourly averages with peaks kept.</span>
+        <span className="text-sm text-ink-3">Ranges over 2 days use 5-minute or hourly averages with peaks kept.</span>
+        <Freshness />
       </div>
 
       {editing && (
@@ -203,7 +225,7 @@ export default function DashboardPage() {
             <button
               type="button"
               onClick={() => setAdding(true)}
-              className="flex min-h-32 items-center justify-center gap-2 rounded-[var(--radius)] border border-dashed border-rule-strong font-semibold text-ink-2 transition-colors duration-150 hover:border-ink-3 hover:bg-surface hover:text-ink md:col-span-3 xl:col-span-2"
+              className="flex min-h-32 items-center justify-center gap-2 rounded-[var(--r-plate)] border border-dashed border-rule-strong font-semibold text-ink-2 transition-colors duration-[var(--dur)] hover:border-accent hover:bg-accent-soft/40 hover:text-ink md:col-span-3 xl:col-span-2"
             >
               <Plus className="size-4" aria-hidden /> Add widget
             </button>

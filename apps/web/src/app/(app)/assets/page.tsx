@@ -144,7 +144,7 @@ export default function AssetsPage() {
             heading={(n) => `${n} lapsed date${n > 1 ? "s" : ""} or low stock`}
           />
         )}
-        <div className="grid gap-[var(--gap)] 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] 2xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:items-start">
           <Panel bodyClassName="p-0">
             <div className="flex flex-wrap items-end gap-3 border-b border-rule px-4 py-3">
               <Field label="Search" className="w-full sm:w-64">
@@ -211,7 +211,7 @@ function Calendar({ entries, loading }: { entries?: CalendarEntry[]; loading: bo
       ) : (
         groups.map((g) => (
           <section key={g.key} aria-label={g.label}>
-            <h3 className="border-b border-rule bg-surface-2 px-4 py-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">{g.label}</h3>
+            <h3 className="border-b border-rule bg-surface-2 px-4 py-1.5 text-sm font-semibold text-ink-3">{g.label}</h3>
             <ul>
               {g.items.map((e) => (
                 <li key={`${e.source}-${e.id}-${e.field}`} className="border-b border-rule last:border-b-0">

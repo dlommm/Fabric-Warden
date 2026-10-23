@@ -176,11 +176,11 @@ export function Markdown({ body, refs }: { body: string; refs: DocRef[] }) {
       const rows: string[][] = [];
       while (i < lines.length && /^\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
       blocks.push(
-        <div key={`t${b++}`} className="overflow-x-auto">
+        <div key={`t${b++}`} className="relative overflow-x-auto">
           <table className="border-collapse text-left">
             <thead>
               <tr className="border-b border-rule-strong">
-                {head.map((c, n) => <th key={n} scope="col" className="h-9 px-3 text-xs font-bold tracking-wide text-ink-2 uppercase">{inline(c, byRaw, `th${n}`)}</th>)}
+                {head.map((c, n) => <th key={n} scope="col" className="h-9 px-3 text-sm font-semibold text-ink-3">{inline(c, byRaw, `th${n}`)}</th>)}
               </tr>
             </thead>
             <tbody>

@@ -24,8 +24,8 @@ function Action({ a }: { a: string | null }) {
   if (!a) return <span className="inline-flex h-6 items-center rounded-[3px] border border-dashed border-ink-3 px-2 text-xs font-semibold text-ink-3">Default</span>;
   const block = a === "BLOCK" || a === "REJECT";
   return (
-    <span className={clsx("inline-flex h-6 items-center rounded-[3px] px-2 text-xs font-bold uppercase tracking-wide", block ? "sign bg-ink text-surface" : "border-2 border-ink bg-surface text-ink")}>
-      {a.toLowerCase()}
+    <span className={clsx("inline-flex h-6 items-center rounded-[2px] px-2 font-mono text-xs font-medium", block ? "border-2 border-line font-semibold text-ink" : "border border-rule-strong text-ink-2")}>
+      {a[0] + a.slice(1).toLowerCase()}
     </span>
   );
 }
@@ -42,12 +42,12 @@ function Matrix({ site }: { site: FwSite }) {
   const zones = site.zones.filter((z) => site.matrix.some((c) => c.source === z.name || c.destination === z.name));
   const cell = (s: string, d: string): FwMatrixCell | undefined => site.matrix.find((c) => c.source === s && c.destination === d);
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full min-w-[40rem] table-fixed border-separate border-spacing-1 text-left">
         <caption className="sr-only">First match-all policy per zone pair, source in rows, destination in columns</caption>
         <thead>
           <tr>
-            <th scope="col" className="w-28 px-2 text-xs font-bold tracking-wide text-ink-2 uppercase">From ↓ To →</th>
+            <th scope="col" className="w-28 px-2 text-sm font-semibold text-ink-3">From ↓ To →</th>
             {zones.map((z) => (
               <th key={z.id} scope="col" className="px-1"><ZonePatch name={z.name} /></th>
             ))}

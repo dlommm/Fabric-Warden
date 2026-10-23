@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft } from "lucide-react";
+import { Bot, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { AiAnswer, AiTag, AUTONOMY_WORD, money, RunProgress, RunState, RunTrigger, TRIGGER_WORD, Transcript } from "@/components/ai";
@@ -59,6 +59,7 @@ export default function RunPage() {
     <>
       <BackLink />
       <PageHeader
+        icon={<Bot />}
         title={`${r.agent_name}`}
         description={r.question}
         meta={
@@ -71,7 +72,7 @@ export default function RunPage() {
           </span>
         }
       />
-      <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="flex min-w-0 flex-col gap-[var(--gap)]">
           <RunProgress run={r} />
           {r.status !== "succeeded" && r.error && (
@@ -101,7 +102,7 @@ export default function RunPage() {
           <Panel title={`Tool calls (${r.tool_calls?.length ?? 0})`} bodyClassName="p-0">
             {r.tool_calls?.length ? (
               <ol aria-label="Tool calls made by the agent">
-                <li aria-hidden className="hidden h-9 grid-cols-[3.5rem_minmax(0,16rem)_minmax(0,1fr)] items-center border-b border-rule-strong px-[var(--row-pad)] text-xs font-bold tracking-wide text-ink-2 uppercase md:grid">
+                <li aria-hidden className="hidden h-9 grid-cols-[3.5rem_minmax(0,16rem)_minmax(0,1fr)] items-center border-b border-rule-strong px-[var(--row-pad)] text-sm font-semibold text-ink-3 md:grid">
                   <span>Turn</span>
                   <span>Tool</span>
                   <span>Result</span>

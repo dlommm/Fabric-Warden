@@ -115,7 +115,7 @@ function ControlRow({ c, manage }: { c: ComplianceControl; manage: boolean }) {
               </colgroup>
               <caption className="sr-only">Evidence for {c.title}</caption>
               <thead>
-                <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+                <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                   <th scope="col" className="h-8 pr-4">Looked at</th>
                   <th scope="col" className="h-8">Found</th>
                 </tr>

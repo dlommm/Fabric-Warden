@@ -58,6 +58,8 @@ export function LineChart({
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const descId = useId();
+  // useId output contains characters that break url(#…) references.
+  const washId = `wash-${descId.replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const unit = result.metric.unit;
   const slots = useMemo(() => colorSlots(result.series), [result.series]);
 
@@ -78,9 +80,21 @@ export function LineChart({
   const left = 14 + Math.max(...ticks.map((t) => tickText(t).length)) * 6.7;
   const w = Math.max(width - left - M.right, 10);
   const h = height - M.top - M.bottom;
-  const x = (t: number) => left + ((t - result.from) / (result.to - result.from)) * w;
-  const y = (v: number) => M.top + h - ((v - y0) / (y1 - y0 || 1)) * h;
   const span = result.to - result.from;
+  // History only exists since sampling began. When the record covers under a
+  // quarter of the range, the recorded span gets the plot and the time before
+  // it collapses to a fixed hatched gutter, so the reading is not a sliver.
+  const first = times[0];
+  const startsLate = first != null && first - result.from > span * 0.04;
+  const compressed = startsLate && result.to - first < span * 0.25;
+  const G = compressed ? Math.min(64, w * 0.14) : 0;
+  const x = (t: number) =>
+    compressed
+      ? t < first
+        ? left + ((t - result.from) / (first - result.from)) * G
+        : left + G + ((t - first) / Math.max(1, result.to - first)) * (w - G)
+      : left + ((t - result.from) / span) * w;
+  const y = (v: number) => M.top + h - ((v - y0) / (y1 - y0 || 1)) * h;
   const gap = result.step * 2.5;
 
   const paths = result.series.map((s) => {
@@ -97,15 +111,15 @@ export function LineChart({
     return d;
   });
 
-  const xTicks = timeTicks(result.from, result.to, Math.max(2, Math.min(7, Math.floor(w / 90))));
-  // History only exists since sampling began; say so instead of drawing an empty stretch.
-  const first = times[0];
-  const startsLate = first != null && first - result.from > span * 0.04;
+  const xTicks = compressed
+    ? timeTicks(first, result.to, Math.max(2, Math.min(6, Math.floor((w - G) / 90))))
+    : timeTicks(result.from, result.to, Math.max(2, Math.min(7, Math.floor(w / 90))));
 
   const pick = (e: PointerEvent<SVGSVGElement>) => {
     if (!times.length) return;
     const rect = e.currentTarget.getBoundingClientRect();
-    const t = result.from + ((e.clientX - rect.left - left) / w) * span;
+    const px = e.clientX - rect.left - left;
+    const t = compressed ? (px <= G ? first : first + ((px - G) / (w - G)) * (result.to - first)) : result.from + (px / w) * span;
     let best = 0;
     for (let i = 1; i < times.length; i++) if (Math.abs(times[i] - t) < Math.abs(times[best] - t)) best = i;
     setHover(best);
@@ -152,6 +166,16 @@ export function LineChart({
       </p>
       {width > 0 && (
         <svg width={width} height={height} className="block touch-pan-y select-none" onPointerMove={pick} onPointerLeave={() => setHover(null)} aria-hidden>
+          {/* A single series gets an area wash that fades toward the baseline, so the line stays the thing being read. */}
+          <defs>
+            <pattern id={`${washId}-pre`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <line x1="0" y1="0" x2="0" y2="6" stroke="var(--rule)" strokeWidth="1.5" />
+            </pattern>
+            <linearGradient id={washId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" stopColor={seriesVar(slots.get(result.series[0]?.id) ?? 0)} stopOpacity={0.22} />
+              <stop offset="100%" stopColor={seriesVar(slots.get(result.series[0]?.id) ?? 0)} stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
           {ticks.map((t) => (
             <g key={t}>
               <line x1={left} x2={left + w} y1={y(t)} y2={y(t)} stroke="var(--rule)" strokeWidth={1} shapeRendering="crispEdges" />
@@ -161,21 +185,32 @@ export function LineChart({
             </g>
           ))}
           {xTicks.map((t) => (
-            <text key={t} x={x(t)} y={height - 6} textAnchor="middle" className="fill-ink-3 font-mono text-[11px] tabular">
-              {timeLabel(t, span)}
+            // A label near the plot's right edge anchors inward so it is never clipped.
+            <text key={t} x={x(t)} y={height - 6} textAnchor={x(t) > left + w - 32 ? "end" : "middle"} className="fill-ink-3 font-mono text-[11px] tabular">
+              {timeLabel(t, compressed ? result.to - first : span)}
             </text>
           ))}
           {startsLate && (
             <g>
+              {/* Before the record begins: hatched, so the empty span reads as "not recorded", never as zero. */}
+              <rect x={left} y={M.top} width={Math.max(0, x(first) - left)} height={h} fill={`url(#${washId}-pre)`} />
               <line x1={x(first)} x2={x(first)} y1={M.top} y2={M.top + h} stroke="var(--rule-strong)" strokeWidth={1} shapeRendering="crispEdges" />
-              <text x={x(first) - 6} y={M.top + 10} textAnchor="end" className="fill-ink-3 text-[11px]">
-                Recording starts
-              </text>
+              {compressed ? (
+                <text x={x(first) + 6} y={M.top + (threshold && threshold.value >= y0 && threshold.value <= y1 ? 24 : 10)} textAnchor="start" className="fill-ink-3 text-[11px]">
+                  No record before {timeLabel(first, result.to - first)}
+                </text>
+              ) : (
+                <text x={x(first) - 6} y={M.top + 10} textAnchor="end" className="fill-ink-3 text-[11px]">
+                  Recording starts
+                </text>
+              )}
             </g>
           )}
           {threshold && threshold.value >= y0 && threshold.value <= y1 && (
             <g>
-              <line x1={left} x2={left + w} y1={y(threshold.value)} y2={y(threshold.value)} stroke="var(--crit)" strokeWidth={1} shapeRendering="crispEdges" />
+              {/* Reference band: the region past the threshold, faint so the line stays readable. */}
+              <rect x={left} y={M.top} width={w} height={Math.max(0, y(threshold.value) - M.top)} fill="var(--crit)" opacity={0.05} />
+              <line x1={left} x2={left + w} y1={y(threshold.value)} y2={y(threshold.value)} stroke="var(--crit)" strokeWidth={1} strokeDasharray="4 3" shapeRendering="crispEdges" />
               <text x={left + w} y={y(threshold.value) - 4} textAnchor="end" className="fill-crit text-[11px] font-bold">
                 {threshold.label}
               </text>
@@ -184,9 +219,9 @@ export function LineChart({
           {single &&
             unit !== "bool" &&
             result.series[0].points.length > 1 &&
-            areaPaths(result.series[0], x, y, y0, gap).map((d, i) => <path key={i} d={d} fill={seriesVar(slots.get(result.series[0].id) ?? 0)} opacity={0.1} />)}
+            areaPaths(result.series[0], x, y, y0, gap).map((d, i) => <path key={i} d={d} fill={`url(#${washId})`} />)}
           {paths.map((d, i) => (
-            <path key={result.series[i].id} d={d} fill="none" stroke={seriesVar(slots.get(result.series[i].id) ?? i)} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+            <path key={result.series[i].id} d={d} pathLength={1} className="ink-draw" fill="none" stroke={seriesVar(slots.get(result.series[i].id) ?? i)} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           ))}
           {result.series.map((s) => {
             const p = s.points[s.points.length - 1];
@@ -206,7 +241,7 @@ export function LineChart({
       {ht != null && readout.length > 0 && (
         <div
           className={clsx(
-            "pointer-events-none absolute z-10 min-w-40 rounded-[3px] border border-rule-strong bg-surface px-3 py-2 text-sm shadow-[0_8px_24px_rgb(0_0_0/0.14)]",
+            "pointer-events-none absolute z-10 min-w-40 float px-3 py-2 text-sm",
             !tipBelow && "-translate-y-full",
           )}
           style={{ top: tipBelow ? tipY + 14 : tipY - 14, ...(tipLeft > width / 2 ? { right: width - tipLeft + 12 } : { left: tipLeft + 12 }) }}
@@ -283,7 +318,7 @@ export function SeriesTable({ result, caption, maxRows = 48 }: { result: QueryRe
       <table className="w-full text-left text-sm whitespace-nowrap">
         <caption className="sr-only">{caption}</caption>
         <thead className="sticky top-0 bg-surface-2">
-          <tr className="text-xs font-bold tracking-wide text-ink-2 uppercase">
+          <tr className="text-sm font-semibold text-ink-3">
             <th scope="col" className="px-3 py-2">Time</th>
             {result.series.map((s) => (
               <th key={s.id} scope="col" className="px-3 py-2 text-right normal-case">{s.label}</th>
@@ -313,60 +348,82 @@ export function SeriesTable({ result, caption, maxRows = 48 }: { result: QueryRe
 }
 
 /** Thresholds of the built-in alert rules, so ranked percentages carry the same state the alerts would. */
-const PCT_LIMIT: Record<string, number> = { "device.cpu_pct": 90, "device.mem_pct": 90, "radio.tx_retries_pct": 15, "wan.loss_pct": 20 };
+/** The built-in default alert rule thresholds (monitoring.py); rules can be edited, so charts call them "default". */
+export const PCT_LIMIT: Record<string, number> = { "device.cpu_pct": 90, "device.mem_pct": 90, "radio.tx_retries_pct": 15, "wan.loss_pct": 20 };
 
 function pctTone(metric: string, v: number): Tone {
   const limit = PCT_LIMIT[metric] ?? 95;
   return v >= limit ? "crit" : v >= limit * 0.8 ? "warn" : "ok";
 }
 
-const BAR_FILL: Record<Tone, string> = { ok: "bg-[#00704a]", warn: "bg-warn ring-1 ring-ink/40", crit: "bg-crit", muted: "bg-ink-3", info: "bg-accent" };
+const BAR_FILL: Record<Tone, string> = { ok: "bg-ok", warn: "bg-warn-line", crit: "bg-crit", muted: "bg-ink-3", info: "bg-accent" };
 const RANGE_WORD = (unit: MetricUnit, lo: number, hi: number) =>
   lo === hi ? "steady across this range" : `between ${formatValue(unit, lo)} and ${formatValue(unit, hi)} in this range`;
 
 /**
- * One reading on a sign line: what it is, the value (as a state when the value
- * is itself a state), and what the range did. Several readings share one ruled panel.
+ * One reading on a line: what it is, the value (as a state when the value
+ * is itself a state), and what the range did. Consecutive readings form one ruled row. 
  */
-export function ReadingLine({ title, result, controls }: { title: string; result?: QueryResult; controls?: ReactNode }) {
-  let value: ReactNode = <span className="text-ink-3">…</span>;
-  let note = "";
-  if (result) {
-    const unit = result.metric.unit;
-    const live = result.series.filter((s) => !s.stale && s.last_value != null);
-    const one = result.series.length === 1 ? result.series[0] : null;
-    if (!live.length) {
-      value = <StateLabel tone="muted">No data</StateLabel>;
-    } else if (unit === "bool") {
-      const down = live.filter((s) => (s.last_value ?? 0) < 0.5);
-      value = one ? (
-        <StateLabel tone={down.length ? "crit" : "ok"}>{down.length ? "Down" : "Up"}</StateLabel>
-      ) : (
-        <StateLabel tone={down.length ? "crit" : "ok"}>{down.length ? `${down.length} down` : `All ${live.length} up`}</StateLabel>
-      );
-      note = down.length > 1 || (!one && down.length) ? down.map((s) => s.label).join(", ") : one ? one.label + (one.summary.min != null && one.summary.min < 0.5 && !down.length ? ", was down in this range" : "") : "";
-    } else {
-      const sum = unit === "count";
-      const now = sum ? live.reduce((a, s) => a + (s.last_value ?? 0), 0) : Math.max(...live.map((s) => s.last_value ?? 0));
-      if (result.metric.alarm) {
-        const word = result.metric.label.toLowerCase().replace(/^devices /, "");
-        value = now > 0 ? <StateLabel tone="crit">{formatValue(unit, now)} {word}</StateLabel> : <StateLabel tone="ok">None {word}</StateLabel>;
-      } else if (unit === "pct" && result.metric.higher_is_worse) {
-        const tone = pctTone(result.metric.id, now);
-        value = tone === "ok" ? <span className="font-bold tabular">{formatValue(unit, now)}</span> : <StateLabel tone={tone}>{formatValue(unit, now)}</StateLabel>;
-      } else {
-        value = <span className="font-bold tabular">{formatValue(unit, now)}</span>;
-      }
-      if (one && one.summary.min != null && one.summary.max != null) note = RANGE_WORD(unit, one.summary.min, one.summary.max);
-      else if (!one) note = sum ? `total of ${live.length}` : `highest of ${live.length}`;
-    }
+/**
+ * What a reading says: an optional neutral figure (shown on the sign), a state
+ * label when the value is a state, and a short note on the range.
+ */
+function readingParts(result?: QueryResult): { figure?: string; state?: ReactNode; note: string } {
+  if (!result) return { state: <span className="text-ink-3">…</span>, note: "" };
+  const unit = result.metric.unit;
+  const live = result.series.filter((s) => !s.stale && s.last_value != null);
+  const one = result.series.length === 1 ? result.series[0] : null;
+  if (!live.length) return { state: <StateLabel tone="muted">No data</StateLabel>, note: "" };
+  if (unit === "bool") {
+    const down = live.filter((s) => (s.last_value ?? 0) < 0.5);
+    const state = one ? (
+      <StateLabel tone={down.length ? "crit" : "ok"}>{down.length ? "Down" : "Up"}</StateLabel>
+    ) : (
+      <StateLabel tone={down.length ? "crit" : "ok"}>{down.length ? `${down.length} down` : `All ${live.length} up`}</StateLabel>
+    );
+    const note = down.length > 1 || (!one && down.length) ? down.map((s) => s.label).join(", ") : one ? one.label + (one.summary.min != null && one.summary.min < 0.5 && !down.length ? ", was down in this range" : "") : "";
+    return { state, note };
   }
+  const sum = unit === "count";
+  const now = sum ? live.reduce((a, s) => a + (s.last_value ?? 0), 0) : Math.max(...live.map((s) => s.last_value ?? 0));
+  const note = one && one.summary.min != null && one.summary.max != null ? RANGE_WORD(unit, one.summary.min, one.summary.max) : !one ? (sum ? `total of ${live.length}` : `highest of ${live.length}`) : "";
+  if (result.metric.alarm) {
+    // The count is the figure like any other; beneath it, the state in words.
+    const word = result.metric.label.toLowerCase().replace(/^devices /, "");
+    return {
+      figure: formatValue(unit, now),
+      state: now > 0 ? <StateLabel tone="crit">{`${word[0].toUpperCase()}${word.slice(1)} now`}</StateLabel> : <StateLabel tone="ok">None {word}</StateLabel>,
+      note,
+    };
+  }
+  if (unit === "pct" && result.metric.higher_is_worse) {
+    const tone = pctTone(result.metric.id, now);
+    if (tone !== "ok") return { state: <StateLabel tone={tone}>{formatValue(unit, now)}</StateLabel>, note };
+  }
+  return { figure: formatValue(unit, now), note };
+}
+
+/**
+ * A reading on a sheet: the reading's name on its title strip with the figure
+ * on the right; a reading that is a state shows it beneath in words, never as
+ * a colour alone.
+ */
+export function ReadingSign({ title, result, controls, offenders }: { title: string; result?: QueryResult; controls?: ReactNode; offenders?: string[] }) {
+  const parts = readingParts(result);
+  const { figure, state } = parts;
+  // An alarm count names what it counts when the page knows (e.g. which devices are offline).
+  const note = offenders?.length && result?.metric.alarm && figure && figure !== "0" ? offenders.join(", ") : parts.note;
   return (
-    <div className="flex min-h-[var(--row-h)] flex-wrap items-baseline gap-x-4 gap-y-0.5 border-b border-rule px-4 py-2.5 last:border-b-0">
-      <h3 className="min-w-40 text-md font-bold">{title}</h3>
-      <span className="text-md">{value}</span>
-      <span className="text-sm text-ink-3">{note}</span>
-      {controls && <span className="ml-auto self-center">{controls}</span>}
+    <div className="plate marks flex min-w-0 flex-col">
+      <h3 className="flex h-11 items-center gap-2 border-b border-rule px-3">
+        <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink-2">{title}</span>
+        {figure && <span className="tabular shrink-0 font-mono text-xl leading-none font-medium">{figure}</span>}
+      </h3>
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-3 py-2 text-sm">
+        {state && <span className="text-base">{state}</span>}
+        {note && <span className="text-ink-3">{note}</span>}
+        {controls && <span className="ml-auto">{controls}</span>}
+      </div>
     </div>
   );
 }
@@ -395,7 +452,7 @@ export function RankedList({ result }: { result: QueryResult }) {
                 <span className="font-semibold">{s.label}</span>
               )}
             </span>
-            <span className="h-2 w-24 rounded-[2px] bg-surface-3" aria-hidden>
+            <span className="h-2 w-24 rounded-[2px] bg-surface-3 shadow-[inset_0_1px_1px_rgb(var(--shadow-tint)/0.12)]" aria-hidden>
               <span className={clsx("block h-2 rounded-[2px]", BAR_FILL[tone])} style={{ width: `${pct}%` }} />
             </span>
             <span className="text-right whitespace-nowrap">

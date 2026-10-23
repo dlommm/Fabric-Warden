@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
-import { Atkinson_Hyperlegible_Mono, Atkinson_Hyperlegible_Next } from "next/font/google";
+import { Archivo, Azeret_Mono } from "next/font/google";
 import { Providers } from "@/lib/session";
 import "./globals.css";
 
-const ui = Atkinson_Hyperlegible_Next({ variable: "--font-ui", subsets: ["latin"], display: "swap" });
-const data = Atkinson_Hyperlegible_Mono({ variable: "--font-data", subsets: ["latin"], display: "swap" });
+// Archivo at normal width for all reading and headings; Azeret Mono is for
+// measurements, addresses and times.
+const ui = Archivo({ variable: "--font-ui", subsets: ["latin"], display: "swap" });
+const data = Azeret_Mono({ variable: "--font-data", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
   title: { default: "Fabric Warden", template: "%s · Fabric Warden" },

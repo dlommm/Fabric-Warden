@@ -76,7 +76,7 @@ export function DataTable<T extends { id: string }>({
                   scope="col"
                   aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined}
                   className={clsx(
-                    "h-9 px-[var(--row-pad)] text-xs font-bold tracking-wide whitespace-nowrap text-ink-2 uppercase",
+                    "h-9 px-[var(--row-pad)] text-sm font-semibold whitespace-nowrap text-ink-3",
                     c.align === "right" && "text-right",
                     c.className,
                   )}
@@ -85,7 +85,7 @@ export function DataTable<T extends { id: string }>({
                     <button
                       type="button"
                       onClick={() => toggle(c.key)}
-                      className={clsx("inline-flex items-center gap-1 uppercase hover:text-ink", active && "text-ink")}
+                      className={clsx("inline-flex items-center gap-1 hover:text-ink", active && "text-ink")}
                     >
                       {c.header}
                       <Icon className={clsx("size-3.5", !active && "opacity-40")} aria-hidden />
@@ -120,8 +120,8 @@ export function DataTable<T extends { id: string }>({
                     router.push(link);
                   } : undefined}
                   className={clsx(
-                    "border-b border-rule transition-colors duration-100 last:border-b-0",
-                    link && "cursor-pointer hover:bg-surface-2",
+                    "border-b border-rule transition-colors duration-[var(--dur-fast)] last:border-b-0",
+                    link && "cursor-pointer hover:bg-accent-soft",
                     rowClassName?.(row),
                   )}
                 >

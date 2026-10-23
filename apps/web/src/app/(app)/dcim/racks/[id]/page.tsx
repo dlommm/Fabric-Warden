@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ArrowDown, ArrowLeftRight, ArrowUp, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeftRight, ArrowUp, Pencil, Plus, Rows3, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useMemo, useState } from "react";
@@ -86,6 +86,7 @@ function RackView() {
   return (
     <>
       <PageHeader
+        icon={<Rows3 />}
         title={rack.name}
         description={[rack.location ?? "No location", `${rack.u_height} U`, rack.depth_mm ? `${rack.depth_mm} mm deep` : null, `${rack.width_in}-inch`].filter(Boolean).join(" · ")}
         meta={
@@ -114,7 +115,7 @@ function RackView() {
           </Notice>
         )}
         {moveError && <Notice tone="warn" title="That move was not made">{moveError}</Notice>}
-        <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_24rem] xl:items-start">
           <Panel
             title="Elevation"
             actions={editable && <span className="hidden text-sm text-ink-3 md:inline">Drag an item to move it, or focus it and press Alt + ↑ / ↓</span>}
@@ -310,7 +311,7 @@ function PanelPorts({ itemId }: { itemId: string }) {
                 title={label}
                 className={clsx(
                   "flex h-7 w-full items-center justify-center rounded-[3px] font-mono text-xs tabular",
-                  both && "sign bg-[#00704a] font-bold text-white",
+                  both && "bg-ok-soft font-bold text-ok ring-1 ring-ok/60 ring-inset",
                   one && "border-2 border-accent bg-surface font-bold text-ink",
                   !both && !one && "border border-rule-strong bg-surface text-ink-3",
                   row.port === port && "ring-2 ring-ink ring-offset-1 ring-offset-surface",

@@ -138,8 +138,8 @@ export function ProposeChange({
     <Dialog.Root open={open} onOpenChange={(o) => { setOpen(o); if (!o) m.reset(); }}>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-[6px] border border-rule-strong bg-surface p-5 shadow-[0_16px_48px_rgb(0_0_0/0.22)]">
+        <Dialog.Overlay className="anim-scrim fixed inset-0 z-50 bg-[var(--scrim)] backdrop-blur-[2px]" />
+        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 dialog anim-dialog p-6">
           <Dialog.Title className="text-lg font-bold">{title}</Dialog.Title>
           <Dialog.Description asChild>
             <div className="mt-2 text-ink-2">
@@ -367,7 +367,7 @@ export function ImpactPanel({ url, queryKey }: { url: string; queryKey: unknown[
 function ImpactList({ title, children, footer }: { title: string; children: ReactNode; footer?: string }) {
   return (
     <div className="min-w-0">
-      <h3 className="mb-1 border-b border-rule pb-1 text-xs font-bold tracking-wide text-ink-2 uppercase">{title}</h3>
+      <h3 className="mb-1 border-b border-rule pb-1 text-sm font-semibold text-ink-3">{title}</h3>
       <ul className="max-h-72 overflow-auto">{children}</ul>
       {footer && <p className="mt-1 text-sm text-ink-3">{footer}</p>}
     </div>
@@ -385,7 +385,7 @@ export function EvidenceTimeline({ items }: { items: ChangeEvidence[] }) {
           <li key={i} className="relative pb-4 pl-5 last:pb-0">
             <span aria-hidden className={clsx("absolute top-1.5 -left-[5px] size-2 rounded-[1px]", bad ? "bg-crit" : e.kind === "succeeded" ? "bg-ok" : "bg-ink")} />
             <div className="flex flex-wrap items-baseline gap-x-3">
-              <span className="text-xs font-bold tracking-wide text-ink-2 uppercase">{KIND_WORD[e.kind] ?? e.kind}</span>
+              <span className="text-sm font-semibold text-ink-3">{KIND_WORD[e.kind] ?? e.kind}</span>
               <time className="font-mono text-xs text-ink-3" dateTime={e.at}>{dateTime(e.at)}</time>
             </div>
             <p className={clsx("mt-0.5", bad ? "font-semibold text-crit" : "text-ink")}>{e.text}</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { BookmarkPlus, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { BookmarkPlus, ChevronLeft, ChevronRight, Grid3x3, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, Suspense, useEffect, useState } from "react";
@@ -98,6 +98,7 @@ function Prefix() {
     <>
       <BackLink />
       <PageHeader
+        icon={<Grid3x3 />}
         title={p.cidr}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -238,7 +239,7 @@ function Readout({ cell, editable, onReserve, onEdit }: { cell: AddressCell | nu
         </div>
         {cell.holders && cell.holders.length > 0 && (
           <div>
-            <p className="text-xs font-bold tracking-wide text-ink-2 uppercase">Reported by the controller</p>
+            <p className="text-sm font-semibold text-ink-3">Reported by the controller</p>
             <ul className="mt-1.5 flex flex-col gap-1">
               {cell.holders.map((h) => (
                 <li key={h.id} className="flex flex-wrap items-baseline gap-x-2">
@@ -252,7 +253,7 @@ function Readout({ cell, editable, onReserve, onEdit }: { cell: AddressCell | nu
         )}
         {cell.reservation && (
           <div>
-            <p className="text-xs font-bold tracking-wide text-ink-2 uppercase">Reservation</p>
+            <p className="text-sm font-semibold text-ink-3">Reservation</p>
             <p className="mt-1.5 font-bold">{cell.reservation.hostname || "Unnamed"} <span className="font-normal text-ink-3">{KIND_WORD[cell.reservation.kind as Reservation["kind"]] ?? cell.reservation.kind}</span></p>
             {cell.reservation.mac && <p className="font-mono text-xs text-ink-2">{cell.reservation.mac}</p>}
             {cell.conflict && (

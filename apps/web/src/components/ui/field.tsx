@@ -3,7 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes, useId } from "react";
 
 export const inputClass =
-  "w-full rounded-[var(--radius)] border border-rule-strong bg-surface px-3 text-base text-ink placeholder:text-ink-3 transition-colors duration-150 hover:border-ink-3 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/30 disabled:bg-surface-2 disabled:text-ink-3 aria-[invalid=true]:border-crit";
+  "w-full rounded-[var(--radius)] border border-rule-strong bg-ground px-3 text-base text-ink placeholder:text-ink-3 transition-[border-color,box-shadow] duration-[var(--dur)] ease-[var(--ease-out)] hover:border-ink-3 focus-visible:border-accent focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-accent/25 disabled:bg-surface-2 disabled:text-ink-3 aria-[invalid=true]:border-crit aria-[invalid=true]:focus-visible:ring-crit/25";
 
 export function Field({
   label,

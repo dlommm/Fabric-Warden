@@ -1,11 +1,18 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-/** Subscribes to the server event stream and refreshes affected queries. */
-export function useLiveEvents(enabled: boolean) {
+export type LiveStatus = "off" | "connecting" | "live";
+
+/**
+ * Subscribes to the server event stream and refreshes affected queries.
+ * Returns the stream's real connection state, so the shell never claims to be
+ * live when it is not.
+ */
+export function useLiveEvents(enabled: boolean): LiveStatus {
   const qc = useQueryClient();
+  const [status, setStatus] = useState<LiveStatus>("off");
   useEffect(() => {
     if (!enabled || typeof EventSource === "undefined") return;
     let timer: ReturnType<typeof setTimeout> | null = null;
@@ -16,6 +23,9 @@ export function useLiveEvents(enabled: boolean) {
       timer = null;
     };
     const es = new EventSource("/api/events/stream", { withCredentials: true });
+    setStatus("connecting");
+    es.onopen = () => setStatus("live");
+    es.onerror = () => setStatus(es.readyState === EventSource.CLOSED ? "off" : "connecting");
     const onEvent = (ev: MessageEvent) => {
       const type = (ev.type === "message" ? JSON.parse(ev.data).type : ev.type) as string;
       if (type.startsWith("inventory.") || type.startsWith("controller.")) ["summary", "devices", "device", "clients", "networks", "controllers", "events"].forEach((k) => keys.add(k));
@@ -31,7 +41,9 @@ export function useLiveEvents(enabled: boolean) {
     return () => {
       types.forEach((t) => es.removeEventListener(t, onEvent));
       es.close();
+      setStatus("off");
       if (timer) clearTimeout(timer);
     };
   }, [enabled, qc]);
+  return status;
 }

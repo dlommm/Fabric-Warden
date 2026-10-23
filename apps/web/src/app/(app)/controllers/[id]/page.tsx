@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { Ban, Check, ChevronLeft, CircleCheck, CircleDashed, Lock, RefreshCw, Trash2 } from "lucide-react";
+import { Ban, Check, ChevronLeft, CircleCheck, CircleDashed, Lock, RefreshCw, Server, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -43,6 +43,7 @@ export default function ControllerPage() {
         <ChevronLeft className="size-4" aria-hidden /> Controllers
       </Link>
       <PageHeader
+        icon={<Server />}
         title={c.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -90,7 +91,7 @@ export default function ControllerPage() {
             ]}
           />
           <p className="mt-4 text-sm text-ink-3">
-            Writes stay disabled until the Change Approval & Recovery engine ships. Even then, every change will need an explicit, audited approval.
+            Every write goes through the change engine: it is proposed, approved by a person and audited, and it is applied only while an owner allows changes on this controller.
           </p>
         </Panel>
         {can("controllers:manage") && <EditPanel c={c} />}
@@ -125,7 +126,9 @@ export default function ControllerPage() {
         {c.capabilities.not_exposed && (
           <div className="border-t border-rule px-4 py-4">
             <h3 className="font-bold">Not exposed by the official API at any known version</h3>
-            <p className="mt-1 text-sm text-ink-3">These need other collectors (syslog, SNMPv3, restricted SSH) planned for later modules. Fabric Warden won&apos;t pretend to have them.</p>
+            <p className="mt-1 text-sm text-ink-3">
+              Fabric Warden never shows these as if the controller reported them. Some come from other sources here: port error and traffic counters from Port counters (SNMP), IDS events from Logs (syslog), and history from what Fabric Warden records on each sync.
+            </p>
             <ul className="mt-3 grid grid-cols-1 gap-x-6 gap-y-1.5 sm:grid-cols-2">
               {c.capabilities.not_exposed.map((n) => (
                 <li key={n.id} className="flex items-center gap-2 text-base text-ink-2">
@@ -143,7 +146,7 @@ export default function ControllerPage() {
 function CapList({ title, items, className }: { title: string; items: [string, Capability][]; className?: string }) {
   return (
     <div className={className}>
-      <h3 className="border-b border-rule px-4 py-2 text-xs font-bold tracking-wide text-ink-2 uppercase">{title}</h3>
+      <h3 className="border-b border-rule px-4 py-2 text-sm font-semibold text-ink-3">{title}</h3>
       <ul>
         {items.map(([id, cap]) => {
           const ok = cap.status === "supported";

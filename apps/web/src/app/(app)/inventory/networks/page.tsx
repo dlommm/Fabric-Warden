@@ -78,7 +78,7 @@ export default function NetworksPage() {
             <span className="tabular w-16 text-right">{n.active_clients}{n.dhcp_pool_size ? ` / ${n.dhcp_pool_size}` : ""}</span>
             {pct != null && (
               <span className="h-2 w-24 rounded-[2px] bg-surface-3" aria-hidden>
-                <span className={clsx("block h-full rounded-[2px]", pct > 0.8 ? "bg-crit" : pct > 0.6 ? "bg-warn" : "bg-[#00704a]")} style={{ width: `${Math.max(pct * 100, 2)}%` }} />
+                <span className={clsx("block h-full rounded-[2px]", pct > 0.8 ? "bg-crit" : pct > 0.6 ? "bg-warn-line" : "bg-ok")} style={{ width: `${Math.max(pct * 100, 2)}%` }} />
               </span>
             )}
           </span>
@@ -155,9 +155,10 @@ export default function NetworksPage() {
                   </span>
                 ))}
               </div>
-              <table className="w-full text-left">
+              <div className="relative overflow-x-auto">
+                <table className="w-full min-w-[40rem] text-left">
                 <thead>
-                  <tr className="border-b border-rule text-xs font-bold tracking-wide text-ink-2 uppercase">
+                  <tr className="border-b border-rule text-sm font-semibold text-ink-3">
                     <th scope="col" className="h-9 px-4">Policy</th>
                     <th scope="col" className="px-4">From → to</th>
                     <th scope="col" className="px-4">Action</th>
@@ -188,6 +189,7 @@ export default function NetworksPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </>
           ) : (
             <EmptyState title="No firewall data">

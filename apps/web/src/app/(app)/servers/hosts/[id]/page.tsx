@@ -1,11 +1,11 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, HardDrive } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { ReactNode } from "react";
-import { type Hop, RouteSign, pathHops } from "@/components/route-sign";
+import { type Hop, RouteTrace, pathHops } from "@/components/route-trace";
 import { CONN_KIND, ConnState, HOST_KIND, HostIcon, HostState, NetworkMatch, PctBar, WORKLOAD_KIND, WorkloadAddresses, WorkloadIcon, WorkloadState } from "@/components/servers";
 import { KeyValue, Notice, PageHeader, Panel, Skeleton } from "@/components/ui/layout-bits";
 import { DemoTag, ProvenanceLine, StateLabel } from "@/components/ui/signs";
@@ -125,6 +125,7 @@ export default function HostPage() {
         <ChevronLeft className="size-4" aria-hidden /> Servers
       </Link>
       <PageHeader
+        icon={<HardDrive />}
         title={h.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3">
@@ -138,10 +139,10 @@ export default function HostPage() {
       <div className="flex flex-col gap-[var(--gap)]">
         {client.data && (
           <Panel title="Route from the internet">
-            <RouteSign hops={hostRoute(client.data, h)} label={`Path from the internet to ${h.name}`} footer={`${h.name} is the network client ${client.data.alias || client.data.name}, attached to ${client.data.path[0]?.name ?? "an unreported device"}.`} />
+            <RouteTrace hops={hostRoute(client.data, h)} label={`Path from the internet to ${h.name}`} footer={`${h.name} is the network client ${client.data.alias || client.data.name}, attached to ${client.data.path[0]?.name ?? "an unreported device"}.`} />
           </Panel>
         )}
-        <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
           <Panel title="Resources and identity">
             <KeyValue items={facts} />
           </Panel>

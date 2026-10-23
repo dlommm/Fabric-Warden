@@ -1,5 +1,5 @@
-// The world's vocabulary: state plates, zone patches, demo tags and the
-// provenance line. Colour never carries meaning alone; every plate has an
+// The drawing's vocabulary: state labels, zone patches, demo tags and the
+// provenance line. Colour never carries meaning alone; every label has an
 // icon and a word.
 import { clsx } from "clsx";
 import { CircleCheck, CircleDashed, Info, OctagonAlert, TriangleAlert } from "lucide-react";
@@ -51,8 +51,8 @@ export function DeviceState({ state }: { state: string }) {
   return <StateLabel tone={deviceTone(state)}>{label}</StateLabel>;
 }
 
-// Sign colours are fixed in both themes, as real signs are; each carries
-// white text at >= 4.5:1. Brown is reserved for the demo tag.
+// Zone colours are fixed in both themes so a zone is recognisable anywhere;
+// each carries white text at >= 4.5:1. Brown is reserved for the demo tag.
 const ZONE_COLORS = ["#00704a", "#0b3d91", "#14171a", "#5a3d8a", "#8a6400", "#c8102e", "#0f6e7a", "#3d5266"];
 const ZONE_FIXED: Record<string, number> = { internal: 0, external: 1, gateway: 2, vpn: 3, hotspot: 4, dmz: 5 };
 
@@ -82,7 +82,7 @@ export function ZonePatch({ name, size = "sm" }: { name: string; size?: "sm" | "
   return (
     <span
       className={clsx(
-        "sign inline-flex items-center rounded-[3px] font-bold text-white",
+        "frame inline-flex items-center rounded-[3px] font-bold text-white",
         size === "sm" ? "h-6 px-2.5 text-xs" : "h-8 px-3.5 text-sm",
       )}
       style={{ backgroundColor: zoneColor(name) }}
@@ -92,12 +92,11 @@ export function ZonePatch({ name, size = "sm" }: { name: string; size?: "sm" | "
   );
 }
 
-/** Demo data is labelled like a brown tourist sign: real-looking, not a real route. */
+/** Demo data is stamped in brown on the drawing: real-looking, not your network. */
 export function DemoTag({ className }: { className?: string }) {
   return (
     <span
-      className={clsx("sign inline-flex h-5 shrink-0 items-center rounded-[3px] px-2 text-[11px] font-bold tracking-wide whitespace-nowrap text-white uppercase", className)}
-      style={{ backgroundColor: "#6b3e1e" }}
+      className={clsx("inline-flex h-5 shrink-0 items-center rounded-[2px] border border-demo/60 px-1.5 font-mono text-[11px] font-medium whitespace-nowrap text-demo", className)}
       title="Synthetic data from the built-in simulator. Not your network."
     >
       Demo data

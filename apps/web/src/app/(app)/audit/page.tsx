@@ -93,11 +93,11 @@ export default function AuditPage() {
         {q.error && <Notice tone="crit" className="m-4">{(q.error as Error).message}</Notice>}
         {!q.isLoading && records.length === 0 && <EmptyState title="No matching records" />}
         {records.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-left">
               <caption className="sr-only">Audit records</caption>
               <thead>
-                <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+                <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                   <th scope="col" className="h-9 w-8 px-2"><span className="sr-only">Expand</span></th>
                   <th scope="col" className="px-[var(--row-pad)]">#</th>
                   <th scope="col" className="px-[var(--row-pad)]">When</th>

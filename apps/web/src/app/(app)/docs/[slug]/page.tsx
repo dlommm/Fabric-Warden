@@ -45,7 +45,7 @@ function DocView() {
   };
 
   return (
-    <div className="grid gap-[var(--gap)] lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
       <DocTree current={slug} />
       <div className="min-w-0">
         {q.error ? (
@@ -111,7 +111,7 @@ function ReadView({ page }: { page: DocPage }) {
     return [...seen.values()];
   }, [refs]);
   return (
-    <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_17rem] xl:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_17rem] xl:items-start">
       <Panel>
         {page.body.trim() ? <Markdown body={withoutTitle(page.body, page.title)} refs={refs} /> : <p className="text-ink-3">This page is empty.</p>}
       </Panel>
@@ -134,13 +134,13 @@ function ReadView({ page }: { page: DocPage }) {
           <Panel title="Linked pages" bodyClassName="p-0">
             {page.children.length > 0 && (
               <>
-                <p className="border-b border-rule bg-surface-2 px-4 py-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">Sub-pages</p>
+                <p className="border-b border-rule bg-surface-2 px-4 py-1.5 text-sm font-semibold text-ink-3">Sub-pages</p>
                 <ul>{page.children.map((c) => <li key={c.id} className="border-b border-rule last:border-b-0"><Link href={`/docs/${c.slug}`} className="block px-4 py-2 font-semibold hover:bg-surface-2">{c.title}</Link></li>)}</ul>
               </>
             )}
             {page.backlinks.length > 0 && (
               <>
-                <p className="border-y border-rule bg-surface-2 px-4 py-1.5 text-xs font-bold tracking-wide text-ink-2 uppercase">Mentioned by</p>
+                <p className="border-y border-rule bg-surface-2 px-4 py-1.5 text-sm font-semibold text-ink-3">Mentioned by</p>
                 <ul>{page.backlinks.map((c) => <li key={c.id} className="border-b border-rule last:border-b-0"><Link href={`/docs/${c.slug}`} className="block px-4 py-2 font-semibold hover:bg-surface-2">{c.title}</Link></li>)}</ul>
               </>
             )}
@@ -237,7 +237,7 @@ function Editor({ page, onSaved }: { page: DocPage; onSaved: () => void }) {
           <Field label="Tags" hint="Comma separated">{(p) => <Input {...p} value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} />}</Field>
         </div>
       </Panel>
-      <div className={clsx("grid gap-[var(--gap)]", preview && "xl:grid-cols-2")}>
+      <div className={clsx("grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)]", preview && "xl:grid-cols-2")}>
         <Panel
           title="Markdown"
           actions={<Button size="sm" variant="ghost" aria-pressed={preview} onClick={() => setPreview((v) => !v)}>{preview ? "Hide preview" : "Show preview"}</Button>}
@@ -294,7 +294,7 @@ function HistoryView({ page, editable, onReverted }: { page: DocPage; editable: 
     },
   });
   return (
-    <div className="grid gap-[var(--gap)] xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[22rem_minmax(0,1fr)] xl:items-start">
       <Panel title="Versions" bodyClassName="p-0">
         {revert.error && <Notice tone="crit" className="m-3">{(revert.error as Error).message}</Notice>}
         {!versions.data ? (
@@ -303,7 +303,7 @@ function HistoryView({ page, editable, onReverted }: { page: DocPage; editable: 
           <table className="w-full border-collapse text-left">
             <caption className="sr-only">Versions; choose two to compare</caption>
             <thead>
-              <tr className="border-b border-rule-strong text-xs font-bold tracking-wide text-ink-2 uppercase">
+              <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                 <th scope="col" className="h-9 w-10 px-2 text-center">From</th>
                 <th scope="col" className="w-10 px-2 text-center">To</th>
                 <th scope="col" className="px-2">Version</th>

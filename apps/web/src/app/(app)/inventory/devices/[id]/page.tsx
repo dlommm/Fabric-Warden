@@ -1,15 +1,15 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { ChevronLeft, Pencil, Plus, RotateCw, TriangleAlert, X, Zap } from "lucide-react";
+import { ChevronLeft, CircleDashed, Network, Pencil, Plus, RotateCw, Router, TriangleAlert, Wifi, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { type FormEvent, useState } from "react";
-import { MetricWidget, RangePicker } from "@/components/analytics";
-import { ProposeChange, useCanPropose } from "@/components/changes";
+import { type FormEvent, type ReactNode, useState } from "react";
+import { MetricWidget, RangePicker, metricQuery } from "@/components/analytics";
+import { ChangeState, ProposeChange, useCanPropose } from "@/components/changes";
 import { DevicePhysical } from "@/components/device-physical";
-import { type Hop, RouteSign } from "@/components/route-sign";
+import { type Hop, RouteTrace } from "@/components/route-trace";
 import { DevicePortCounters, perMinute, useDeviceSnmp } from "@/components/snmp";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
@@ -19,7 +19,7 @@ import { ApiError, get, patch } from "@/lib/api";
 import { describeEvent } from "@/lib/events";
 import { ROLE_LABEL, ago, bps, dateTime, deviceRole, speed, uptime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AlertItem, AssetRecord, DeviceDetail, DeviceSummary, Port, RangeKey, SnmpInterface, Widget } from "@/lib/types";
+import type { AlertItem, AssetRecord, ChangeRequest, DeviceDetail, DeviceSummary, Port, RangeKey, SnmpInterface, Widget } from "@/lib/types";
 
 export default function DevicePage() {
   const { id } = useParams<{ id: string }>();
@@ -59,6 +59,7 @@ export default function DevicePage() {
     <>
       <BackLink />
       <PageHeader
+        icon={role === "gateway" ? <Router /> : role === "accessPoint" ? <Wifi /> : <Network />}
         title={d.name}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -88,43 +89,37 @@ export default function DevicePage() {
       />
 
       <div className="flex flex-col gap-[var(--gap)]">
-        <Panel title="Route from the internet" id="route">
-          <RouteSign
-            hops={upstream(d, all.data?.items ?? [])}
-            label={`Path from the internet to ${d.name}`}
-            footer={hopsFooter(d, all.data?.items ?? [])}
-          />
-        </Panel>
-
-        <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <Panel title="Details" id="details">
-            <KeyValue
-              items={[
-                ["IP address", <span key="ip" className="font-mono">{d.ip_address ?? "—"}</span>],
-                ["MAC address", <span key="mac" className="font-mono">{d.mac_address}</span>],
-                ["Firmware", <span key="fw" className="font-mono">{d.firmware_version ?? "—"}{d.firmware_updatable && <span className="ml-2 font-sans text-sm font-bold text-accent">update available</span>}</span>],
-                ["Uptime", uptime(d.uptime_sec)],
-                ["CPU", d.cpu_pct != null ? `${d.cpu_pct.toFixed(1)}%` : "—"],
-                ["Memory", stats.memoryUtilizationPct != null ? `${stats.memoryUtilizationPct.toFixed(1)}%` : "—"],
-                ["Load (1/5/15 min)", stats.loadAverage1Min != null ? <span key="l" className="tabular">{stats.loadAverage1Min} / {stats.loadAverage5Min} / {stats.loadAverage15Min}</span> : "—"],
-                ["Uplink rate", stats.uplink ? <span key="u" className="tabular">↑ {bps(stats.uplink.txRateBps)} · ↓ {bps(stats.uplink.rxRateBps)}</span> : "—"],
-                ["Statistics observed", d.stats_observed_at ? `${ago(d.stats_observed_at)} (latest only; the API keeps no history)` : "Not available while the device is not online"],
-                ["First seen", dateTime(d.provenance.first_seen_at)],
-              ]}
-            />
-          </Panel>
-          <div className="flex flex-col gap-[var(--gap)]">
-            <AssetPanel d={d} />
-            <MetadataPanel d={d} />
-          </div>
-        </div>
-
-        <DeviceHistory d={d} />
-
-        <DevicePhysical deviceId={d.id} name={d.name} />
+        <section aria-label="Title block" className="plate marks grid grid-cols-[repeat(auto-fit,minmax(11rem,1fr))] overflow-hidden">
+          {(
+            [
+              ["Model", <span key="m" className="font-mono text-sm">{d.model}</span>],
+              ["Firmware", <span key="f" className="font-mono text-sm">{d.firmware_version ?? "—"}{d.firmware_updatable && <span className="ml-2 font-sans text-xs font-semibold text-accent">update available</span>}</span>],
+              ["Address", <span key="a" className="font-mono text-sm">{d.ip_address ?? "—"}</span>],
+              ["MAC", <span key="c" className="font-mono text-sm">{d.mac_address}</span>],
+              ["Up for", uptime(d.uptime_sec)],
+              ["Source", d.provenance.source],
+              ["Observed", ago(d.provenance.observed_at)],
+            ] as [string, ReactNode][]
+          ).map(([k, v]) => (
+            <div key={k} className="min-w-0 px-4 py-2.5 shadow-[1px_0_0_var(--rule),0_1px_0_var(--rule)]">
+              <span className="block text-xs text-ink-3">{k}</span>
+              <span className="block break-words">{v}</span>
+            </div>
+          ))}
+        </section>
 
         {d.ports.length > 0 && (
-          <Panel title={`Ports (${d.ports.filter((p) => p.state === "UP").length} of ${d.ports.length} up)`} id="ports">
+          <Panel
+            title="Front panel"
+            id="ports"
+            variant="raised"
+            actions={
+              <span className="font-mono text-xs text-ink-3">
+                {d.ports.filter((p) => p.state === "UP").length} of {d.ports.length} up
+                {d.ports.some((p) => p.poe) && ` · PoE on ${d.ports.filter((p) => p.poe?.state === "UP").length}`}
+              </span>
+            }
+          >
             <PortStrip ports={d.ports} counters={snmp.byPort} />
             {canPropose && d.state === "ONLINE" && d.ports.some((p) => p.poe?.enabled) && <PoeCycle d={d} />}
             {snmp.error ? (
@@ -147,11 +142,43 @@ export default function DevicePage() {
           </Panel>
         )}
 
+        <Panel title="Route from the internet" id="route">
+          <RouteTrace
+            hops={upstream(d, all.data?.items ?? [])}
+            label={`Path from the internet to ${d.name}`}
+            footer={hopsFooter(d, all.data?.items ?? [])}
+          />
+        </Panel>
+
+        <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <Panel title="Health" id="details">
+            <KeyValue
+              items={[
+                ["CPU", d.cpu_pct != null ? `${d.cpu_pct.toFixed(1)}%` : "—"],
+                ["Memory", stats.memoryUtilizationPct != null ? `${stats.memoryUtilizationPct.toFixed(1)}%` : "—"],
+                ["Load (1/5/15 min)", stats.loadAverage1Min != null ? <span key="l" className="tabular">{stats.loadAverage1Min} / {stats.loadAverage5Min} / {stats.loadAverage15Min}</span> : "—"],
+                ["Uplink rate", stats.uplink ? <span key="u" className="tabular">↑ {bps(stats.uplink.txRateBps)} · ↓ {bps(stats.uplink.rxRateBps)}</span> : "—"],
+                ["Statistics observed", d.stats_observed_at ? `${ago(d.stats_observed_at)} (latest only; the API keeps no history)` : "Not available while the device is not online"],
+                ["First seen", dateTime(d.provenance.first_seen_at)],
+              ]}
+            />
+          </Panel>
+          <div className="flex flex-col gap-[var(--gap)]">
+            <AssetPanel d={d} />
+            <MetadataPanel d={d} />
+          </div>
+        </div>
+
+        <DeviceHistory d={d} />
+
+        <DevicePhysical deviceId={d.id} name={d.name} />
+
+
         {d.radios.length > 0 && (
           <Panel title="Radios" id="radios" bodyClassName="overflow-x-auto p-0">
             <table className="w-full text-left whitespace-nowrap">
               <thead>
-                <tr className="border-b border-rule text-xs font-bold tracking-wide text-ink-2 uppercase">
+                <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
                   <th scope="col" className="h-9 px-4">Band</th>
                   <th scope="col" className="px-4">Standard</th>
                   <th scope="col" className="px-4 text-right">Channel</th>
@@ -176,7 +203,7 @@ export default function DevicePage() {
           </Panel>
         )}
 
-        <div className="grid grid-cols-1 gap-[var(--gap)] xl:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-[var(--gap)] xl:grid-cols-2">
           <Panel title={`Connected here (${d.clients.length + d.downstream.length})`} id="connected" bodyClassName="p-0">
             {d.clients.length + d.downstream.length === 0 ? (
               <EmptyState title="Nothing reports this device as its uplink" />
@@ -199,7 +226,8 @@ export default function DevicePage() {
               </ul>
             )}
           </Panel>
-          <Panel title="History" id="history" bodyClassName="p-0">
+          <DeviceRevisions id={d.id} />
+          <Panel title="Events" id="history" bodyClassName="p-0">
             {d.history.length === 0 ? (
               <EmptyState title="No recorded changes" />
             ) : (
@@ -216,6 +244,55 @@ export default function DevicePage() {
         </div>
       </div>
     </>
+  );
+}
+
+/** Changes made through the change engine whose target is this device. */
+function DeviceRevisions({ id }: { id: string }) {
+  const { moduleEnabled } = useSession();
+  const on = moduleEnabled("change-engine");
+  const q = useQuery({
+    queryKey: ["changes", "device", id],
+    queryFn: async () => {
+      const [open, hist] = await Promise.all([get<{ items: ChangeRequest[] }>("/api/changes?view=open"), get<{ items: ChangeRequest[] }>("/api/changes?view=history")]);
+      return [...open.items, ...hist.items].filter((c) => c.target.id === id);
+    },
+    enabled: on,
+  });
+  if (!on) return null;
+  return (
+    <Panel title="Revisions touching this device" id="revisions" bodyClassName="p-0">
+      {!q.data ? (
+        <div className="p-4"><Skeleton className="h-20 w-full" /></div>
+      ) : q.data.length === 0 ? (
+        <EmptyState title="No changes made to this device here">Restarts and port changes proposed through Fabric Warden are listed here with their outcome.</EmptyState>
+      ) : (
+        <div className="relative overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-left">
+            <thead>
+              <tr className="border-b border-rule-strong text-sm font-semibold text-ink-3">
+                <th scope="col" className="h-9 px-4">Ref</th>
+                <th scope="col" className="px-2">When</th>
+                <th scope="col" className="px-2">Change</th>
+                <th scope="col" className="px-2">By</th>
+                <th scope="col" className="px-4">State</th>
+              </tr>
+            </thead>
+            <tbody>
+              {q.data.map((c) => (
+                <tr key={c.id} className="border-b border-rule last:border-b-0 hover:bg-accent-soft">
+                  <td className="h-[var(--row-h)] px-4 font-mono text-xs"><Link href={`/changes/${c.id}`} className="text-accent hover:underline">{c.ref}</Link></td>
+                  <td className="px-2 text-sm whitespace-nowrap text-ink-3">{ago(c.finished_at ?? c.applied_at ?? c.proposed_at)}</td>
+                  <td className="px-2 py-2 font-semibold">{c.title}</td>
+                  <td className="px-2 text-sm">{c.applied_by ?? c.proposed_by}</td>
+                  <td className="px-4 whitespace-nowrap"><ChangeState status={c.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
   );
 }
 
@@ -269,7 +346,8 @@ function PortStrip({ ports, counters }: { ports: Port[]; counters: Map<number, S
   const anyErrors = ports.some((p) => (counters.get(p.idx)?.errors_per_min ?? 0) > 0);
   return (
     <div>
-      <ul className="flex flex-wrap gap-1.5" aria-label="Port states">
+      {/* The faceplate: ports drawn inside the device's outline, in their real order. */}
+      <ul className="flex flex-wrap gap-1.5 rounded-[3px] border-[1.5px] border-line p-3" aria-label="Port states">
         {ports.map((p) => {
           const up = p.state === "UP";
           const sfp = p.connector !== "RJ45";
@@ -281,24 +359,31 @@ function PortStrip({ ports, counters }: { ports: Port[]; counters: Map<number, S
               title={portLabel(p, c)}
               aria-label={portLabel(p, c)}
               className={clsx(
-                "relative flex h-12 flex-col items-center justify-between rounded-[3px] py-1 text-[11px] leading-none font-bold",
+                "relative flex h-12 flex-col items-center justify-between rounded-[2px] py-1 font-mono text-[10.5px] leading-none font-medium",
                 sfp ? "w-14" : "w-11",
-                errors ? "sign bg-warn text-warn-ink" : up ? "bg-[#00704a] text-white" : "border border-dashed border-rule-strong text-ink-3",
+                errors
+                  ? "border-[1.5px] border-dashed border-warn-line bg-warn-soft text-warn-text"
+                  : up
+                    ? sfp
+                      ? "border-[1.5px] border-line bg-line/25 text-ink"
+                      : "border-[1.5px] border-accent bg-accent-soft text-ink"
+                    : "border border-dashed border-construct text-ink-3",
               )}
-              style={errors ? { outlineColor: "#14171a" } : undefined}
+              
             >
               <span className="flex items-center gap-0.5 tabular">{errors && <TriangleAlert className="size-3" aria-hidden strokeWidth={2.75} />}{p.idx}</span>
               <span className="tabular">{up ? speed(p.speed_mbps) : sfp ? p.connector.replace("PLUS", "+") : "—"}</span>
-              {p.poe?.state === "UP" && <Zap className="absolute -top-1.5 -right-1.5 size-4 rounded-full bg-warn p-0.5 text-black" aria-hidden />}
+              {p.poe?.state === "UP" && <Zap className="absolute -top-1.5 -right-1.5 size-4 rounded-full border border-ok bg-surface p-0.5 text-ok" aria-hidden />}
             </li>
           );
         })}
       </ul>
       <p className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-ink-3">
-        <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] bg-[#00704a]" /> Link up (speed)</span>
-        <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] border border-dashed border-rule-strong" /> Down</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] border-[1.5px] border-accent bg-accent-soft" /> Link up (speed)</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] border-[1.5px] border-line bg-line/25" /> SFP up</span>
+        <span className="inline-flex items-center gap-1.5"><span className="size-3 rounded-[2px] border border-dashed border-construct" /> No link</span>
         {anyErrors && <span className="inline-flex items-center gap-1.5"><TriangleAlert className="size-3.5 rounded-[2px] bg-warn p-0.5 text-black" aria-hidden /> Logging errors (SNMP)</span>}
-        <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 rounded-full bg-warn p-0.5 text-black" /> PoE delivering</span>
+        <span className="inline-flex items-center gap-1.5"><Zap className="size-3.5 rounded-full border border-ok p-0.5 text-ok" /> PoE delivering</span>
         <span>Wider ports are SFP cages.</span>
       </p>
     </div>
@@ -488,6 +573,11 @@ function dateOnly(v?: string) {
 
 const METRIC_MODULES = ["analytics-studio", "monitoring", "wan", "snmp"];
 
+/** "CPU, Memory or Load": a short list in words. */
+function listWords(items: string[]): string {
+  return items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+}
+
 /** Metric history for this device, when a module that records it is enabled. */
 function DeviceHistory({ d }: { d: DeviceDetail }) {
   const { moduleEnabled } = useSession();
@@ -499,28 +589,46 @@ function DeviceHistory({ d }: { d: DeviceDetail }) {
     enabled: moduleEnabled("monitoring"),
     refetchInterval: 60_000,
   });
-  if (!on) return null;
-  const firing = alerts.data?.items.filter((a) => a.state === "firing") ?? [];
   const w = (id: string, metric: string, title: string, entity_ids = [d.id], size: Widget["size"] = "third"): Widget => ({ id, metric, title, kind: "line", entity_ids, size, limit: 6 });
   const widgets: Widget[] = [w("cpu", "device.cpu_pct", "CPU"), w("mem", "device.mem_pct", "Memory"), w("load", "device.load_1m", "Load (1 min)")];
   if (d.uplink) widgets.push(w("rx", "device.uplink_rx_bps", "Uplink receive", [d.id], "half"), w("tx", "device.uplink_tx_bps", "Uplink transmit", [d.id], "half"));
   if (d.radios.length) widgets.push(w("retries", "radio.tx_retries_pct", "Wi-Fi retries per radio", d.radios.map((r) => r.id), "half"), w("clients", "device.clients", "Attached clients", [d.id], "half"));
+  // The same cached queries the widgets load: when none has any series in range, one notice replaces a grid of empty charts.
+  const results = useQueries({ queries: widgets.map((x) => metricQuery({ metric: x.metric, entity_ids: x.entity_ids, range, limit: x.limit }, on)) });
+  const isEmpty = (i: number) => !!results[i]?.data && results[i].data!.series.length === 0;
+  const empty = widgets.filter((_, i) => isEmpty(i));
+  const shown = widgets.filter((_, i) => !isEmpty(i));
+  if (!on) return null;
+  const firing = alerts.data?.items.filter((a) => a.state === "firing") ?? [];
   return (
-    <section aria-labelledby="history-h" className="flex flex-col gap-[var(--gap)]">
+    <section aria-labelledby="metric-history-h" className="flex flex-col gap-[var(--gap)]">
       {firing.map((a) => (
         <Notice key={a.id} tone={a.severity === "critical" ? "crit" : "warn"} title={`${a.rule} is firing`} action={<Link href="/alerts" className="font-semibold text-accent hover:underline">Open alerts</Link>}>
           {a.summary} · since {ago(a.fired_at)}{a.acknowledged_by ? ` · acknowledged by ${a.acknowledged_by}` : ""}
         </Notice>
       ))}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="history-h" className="text-md font-bold">Metric history</h2>
+        <h2 id="metric-history-h" className="text-md font-bold">Metric history</h2>
         <RangePicker value={range} onChange={setRange} />
       </div>
-      <div className="grid grid-cols-1 gap-[var(--gap)] md:grid-cols-6">
-        {widgets.map((x) => (
-          <MetricWidget key={x.id} widget={x} range={range} label={x.title} height={160} />
-        ))}
-      </div>
+      {shown.length > 0 && (
+        <div className="grid grid-cols-1 gap-[var(--gap)] md:grid-cols-6">
+          {shown.map((x) => (
+            <MetricWidget key={x.id} widget={x} range={range} label={x.title} height={160} />
+          ))}
+        </div>
+      )}
+      {empty.length > 0 && (
+        <div className="plate-quiet flex gap-3 px-4 py-3 text-sm">
+          <CircleDashed className="mt-0.5 size-4 shrink-0 text-ink-3" aria-hidden />
+          <p className="text-ink-2">
+            <b className="text-ink">No {listWords(empty.map((x) => x.title))} history in this range.</b>{" "}
+            {d.state !== "ONLINE"
+              ? `${d.name} is ${d.state === "CONNECTION_INTERRUPTED" ? "interrupted" : d.state.toLowerCase().replaceAll("_", " ")}; nothing is sampled while it is not online.`
+              : "History builds one sample per sync from the moment a metrics module is enabled; try a shorter range."}
+          </p>
+        </div>
+      )}
     </section>
   );
 }

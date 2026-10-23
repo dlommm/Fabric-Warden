@@ -86,7 +86,7 @@ function Investigate() {
       ) : !r ? (
         <Skeleton className="h-80" />
       ) : (
-        <div className="grid gap-[var(--gap)] xl:grid-cols-[18rem_minmax(0,1fr)] xl:items-start">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[18rem_minmax(0,1fr)] xl:items-start">
           <Panel title="Matches" bodyClassName="p-0" className="xl:sticky xl:top-4">
             {r.entities.length === 0 ? (
               <p className="px-4 py-3 text-sm text-ink-3">No inventory object matches {r.kind === "ip" ? "this address" : r.kind === "mac" ? "this MAC" : "this name"}. Log lines that mention it are still shown.</p>

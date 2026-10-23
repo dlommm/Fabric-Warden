@@ -29,7 +29,7 @@ function Pct({ pct }: { pct: number | null | undefined }) {
   return tone === "ok" ? <span className="tabular text-ink-2">{text}</span> : <StateLabel tone={tone}>{text}</StateLabel>;
 }
 
-/** One sign line per source: what it carries now, if the other feed fails, and with planned items added. */
+/** One line per source: what it carries now, if the other feed fails, and with planned items added. */
 function LoadLine({ l }: { l: PowerLoad }) {
   const bits: ReactNode[] = [
     <span key="n">Now <b className="text-ink tabular">{w(l.load_w)}</b></span>,
@@ -136,13 +136,13 @@ export default function PowerPage() {
             {t.children.length === 0 ? (
               <p className="px-4 py-3 text-ink-3">Nothing connected yet.</p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="relative overflow-x-auto">
                 <table className="w-full border-collapse text-left">
                   <caption className="sr-only">Loads on {t.name}</caption>
                   <thead>
                     <tr className="border-b border-rule-strong">
                       {["Connected", "Outlet", "Draw", "Load", "On failover", ""].map((h, i) => (
-                        <th key={i} scope="col" className={clsx("h-9 px-[var(--row-pad)] text-xs font-bold tracking-wide whitespace-nowrap text-ink-2 uppercase", i >= 1 && i <= 2 && "text-right", i >= 2 && i <= 4 && "hidden md:table-cell")}>
+                        <th key={i} scope="col" className={clsx("h-9 px-[var(--row-pad)] text-sm font-semibold whitespace-nowrap text-ink-3", i >= 1 && i <= 2 && "text-right", i >= 2 && i <= 4 && "hidden md:table-cell")}>
                           {h || <span className="sr-only">Actions</span>}
                         </th>
                       ))}
@@ -238,7 +238,7 @@ function PoePanel({ data, loading }: { data?: { items: PoeSwitch[]; note: string
                       title={`Port ${p.idx}: ${up ? "delivering power" : "not delivering"}${p.standard ? ` · ${p.standard}${p.type ? ` type ${p.type}` : ""}` : ""}`}
                       className={clsx(
                         "flex h-6 min-w-6 items-center justify-center rounded-[3px] px-1 font-mono text-[11px] tabular",
-                        up ? "sign bg-[#00704a] font-bold text-white" : "border border-rule-strong bg-surface text-ink-3",
+                        up ? "bg-ok-soft font-bold text-ok ring-1 ring-ok/60 ring-inset" : "border border-rule-strong bg-surface text-ink-3",
                       )}
                     >
                       <span className="sr-only">Port </span>

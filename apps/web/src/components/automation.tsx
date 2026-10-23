@@ -116,7 +116,7 @@ export function RuleEditor({ initial, saving, error, onSave, saveLabel }: { init
   return (
     <div className="flex flex-col gap-[var(--gap)]">
       <form
-        className="grid gap-[var(--gap)] lg:grid-cols-2"
+        className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] lg:grid-cols-2"
         onSubmit={(e) => {
           e.preventDefault();
           onSave(r);

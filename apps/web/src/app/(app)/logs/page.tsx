@@ -134,7 +134,7 @@ export default function LogsPage() {
             </p>
           )
         )}
-        <div className="grid gap-[var(--gap)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-[var(--gap)] xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <Panel title={s ? `Last 24 hours · ${s.total.toLocaleString()} events` : "Last 24 hours"}>
             {s ? <Volume s={s} /> : <Skeleton className="h-20" />}
             {s && (
@@ -195,7 +195,7 @@ export default function LogsPage() {
                     {r.app && <span className="text-ink-3"> {r.app}</span>}
                   </span>
                   <span className="col-span-2 break-words text-ink md:col-span-1">
-                    <span className="mr-2 font-sans text-[11px] font-semibold text-ink-3 uppercase">{r.category}</span>
+                    <span className="mr-2 font-sans text-xs font-semibold text-ink-3">{r.category}</span>
                     {r.message}
                     {r.repeat > 1 && <span className="ml-2 font-sans text-[11px] font-bold text-ink-2" title={`First at ${dateTime(r.first)}`}>× {r.repeat}</span>}
                     {r.is_demo && <DemoTag className="ml-2 align-middle" />}
