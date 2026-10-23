@@ -1,6 +1,10 @@
 # Fabric Warden CI: backend tests and lint, web typecheck/lint/build, browser E2E.
-# No secrets are used. Every test runs against SQLite and the built-in simulators;
-# nothing contacts a real controller, device or AI endpoint.
+# On main, once those pass, release-please keeps a release pull request open with the
+# next version (from Conventional Commit messages) and changelog; merging it tags
+# vX.Y.Z, creates the GitHub release and publishes the Docker image as :X.Y.Z and :latest.
+# Tests use no secrets: every test runs against SQLite and the built-in simulators;
+# nothing contacts a real controller, device or AI endpoint. Only the publish job
+# reads the DOCKERHUB_USERNAME and DOCKERHUB_TOKEN secrets.
 name: CI
 
 on:
@@ -13,7 +17,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded pull request runs are cancelled; a push to main always finishes publishing.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   UV_VERSION: "0.12.19"
@@ -110,3 +115,59 @@ jobs:
             apps/web/playwright-report
             apps/web/test-results
           retention-days: 7
+
+  release:
+    name: Release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [api, web, e2e]
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  image:
+    name: Publish Docker image
+    if: needs.release.outputs.created == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    needs: [release]
+    env:
+      IMAGE: dendlomm/fabric-warden
+      VERSION: ${{ needs.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check version files
+        run: |
+          api=$(sed -n 's/^version = "\(.*\)"$/\1/p' apps/api/pyproject.toml | head -1)
+          web=$(node -p "require('./apps/web/package.json').version")
+          if [ "$api" != "$VERSION" ] || [ "$web" != "$VERSION" ]; then
+            echo "::error::Release $VERSION but pyproject.toml has '$api' and package.json '$web'"; exit 1
+          fi
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ env.VERSION }}
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ env.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

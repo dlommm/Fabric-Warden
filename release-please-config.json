@@ -1,0 +1,33 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "112631cdfd20cbe8467c6e2c249a260067373a00",
+  "include-v-in-tag": true,
+  "include-component-in-tag": false,
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "fabric-warden",
+      "changelog-path": "docs/CHANGELOG.md",
+      "extra-files": [
+        { "type": "toml", "path": "apps/api/pyproject.toml", "jsonpath": "$.project.version" },
+        { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" },
+        "apps/api/src/warden/__init__.py",
+        "deploy/docker-compose.yml"
+      ],
+      "changelog-sections": [
+        { "type": "feat", "section": "Added" },
+        { "type": "fix", "section": "Fixed" },
+        { "type": "perf", "section": "Performance" },
+        { "type": "revert", "section": "Reverted" },
+        { "type": "security", "section": "Security" },
+        { "type": "docs", "section": "Documentation", "hidden": true },
+        { "type": "refactor", "section": "Changed", "hidden": true },
+        { "type": "ci", "section": "CI", "hidden": true },
+        { "type": "build", "section": "Build", "hidden": true },
+        { "type": "test", "section": "Tests", "hidden": true },
+        { "type": "chore", "section": "Chores", "hidden": true },
+        { "type": "style", "section": "Style", "hidden": true }
+      ]
+    }
+  }
+}

@@ -83,3 +83,7 @@ Thumbs.db
 /docs/PROXMOX.md
 /docs/RACK_MANAGEMENT.md
 /docs/UNRAID.md
+
+# -- local agent tooling ----
+/.agents/
+/skills-lock.json
