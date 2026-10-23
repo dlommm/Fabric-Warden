@@ -11,6 +11,8 @@ from warden import __version__
 from warden.events import (
     ALERT_FIRING,
     ALERT_RESOLVED,
+    CABLING_FINDING_OPENED,
+    CABLING_FINDING_RESOLVED,
     CLIENT_CONNECTED,
     CLIENT_DISCONNECTED,
     CLIENT_MOVED,
@@ -306,7 +308,10 @@ CABLING = ModuleManifest(
     version=VERSION,
     name="Cabling & Fiber Documentation",
     category=C.INFRASTRUCTURE,
-    description="Cables between device ports, patch panels and outlets; end-to-end path tracing, cable schedule export and label text.",
+    description=(
+        "Cables between device ports, patch panels and outlets; end-to-end path tracing, cable schedule export and label text; "
+        "suggested cables from observed uplinks, and cabling drift published as events for automation."
+    ),
     maturity=Maturity.AVAILABLE,
     roadmap_phase=4,
     requires=["core", "dcim"],
@@ -314,9 +319,12 @@ CABLING = ModuleManifest(
     nav=[NavEntry(label="Cabling", href="/dcim/cables", icon="cable", section="Infrastructure")],
     resources=ResourceEstimate(memory_mb=8),
     data_ownership=["dcim_cables", "dcim_cable_ends"],
+    publishes=[CABLING_FINDING_OPENED, CABLING_FINDING_RESOLVED],
+    subscribes=[CONTROLLER_SYNC_COMPLETED],
     warnings=[
         "The official API exposes no LLDP neighbours or uplink port numbers, so cables cannot be discovered; "
-        "documented paths are only checked against which device each device reports as its uplink."
+        "documented paths are only checked against which device each device reports as its uplink, and a cable "
+        "suggested from an uplink is planned with both ports left to confirm."
     ],
 )
 

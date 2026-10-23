@@ -68,6 +68,8 @@ CHANGE_PROPOSED = "change.proposed"
 CHANGE_DECIDED = "change.decided"  # approved, rejected or cancelled
 CHANGE_APPLIED = "change.applied"
 CHANGE_FINISHED = "change.finished"  # succeeded, failed, reverted or conflict
+CABLING_FINDING_OPENED = "cabling.finding.opened"  # documented cabling disagrees with what the controller reports
+CABLING_FINDING_RESOLVED = "cabling.finding.resolved"
 
 Handler = Callable[[Event], Awaitable[None]]
 

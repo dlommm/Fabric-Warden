@@ -48,6 +48,8 @@ TRIGGER_EVENTS: dict[str, str] = {
     ev.CLIENT_MOVED: "A client changed address or attachment",
     ev.CONTROLLER_STATUS_CHANGED: "A controller's connection status changed",
     ev.CONFIG_CHANGED: "The controller configuration changed",
+    ev.CABLING_FINDING_OPENED: "Documented cabling disagrees with the controller",
+    ev.CABLING_FINDING_RESOLVED: "A cabling disagreement cleared",
     ev.CHANGE_FINISHED: "A change finished (notify only)",
 }
 NOTIFY_ONLY = {ev.CHANGE_FINISHED}

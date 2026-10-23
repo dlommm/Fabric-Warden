@@ -131,7 +131,8 @@ class Plant:
 
 def _summary(d: dict[str, Any]) -> str:
     if d["kind"] == "device_port":
-        return f"{d['name']} port {d['port_idx']}"
+        # A cable accepted from an observed uplink has its ports still to confirm.
+        return f"{d['name']} port {d['port_idx']}" if d["port_idx"] is not None else f"{d['name']} (port to confirm)"
     if d["kind"] == "panel_port":
         return f"{d['name']} port {d['port_idx']} ({d['side']})"
     return d["name"]
@@ -450,7 +451,11 @@ async def labels(
 @router.get("/findings")
 async def findings(db: DB, principal: Reader) -> dict:
     """Documented cabling compared with what the controller reports."""
-    plant = await load_plant(db)
+    return {"items": compute_findings(await load_plant(db))}
+
+
+def compute_findings(plant: Plant) -> list[dict[str, Any]]:
+    """Installed cables whose port reports link down, and documented device paths that are not an observed uplink."""
     by_ext = {d.external_id: d for d in plant.devices.values()}
     out: list[dict[str, Any]] = []
     seen_paths: set[frozenset[str]] = set()
@@ -499,4 +504,94 @@ async def findings(db: DB, principal: Reader) -> dict:
                     "cable_id": c.id,
                 }
             )
-    return {"items": out}
+    return out
+
+
+def _documented_pairs(plant: Plant) -> set[frozenset[str]]:
+    """Device pairs joined end to end by a live (planned or installed) cable path."""
+    pairs: set[frozenset[str]] = set()
+    for cid, ends in plant.ends.items():
+        c = plant.cables.get(cid)
+        if c is None or not plant.live(c):
+            continue
+        for e in ends.values():
+            if e.kind != "device_port":
+                continue
+            a, b = _endpoints(trace_from(plant, _point(e)))
+            if a and b and a.get("kind") == b.get("kind") == "device_port" and a.get("device_id") and b.get("device_id"):
+                pairs.add(frozenset({a["device_id"], b["device_id"]}))
+    return pairs
+
+
+def undocumented_uplinks(plant: Plant) -> list[dict[str, Any]]:
+    """Observed uplinks (device → the device it reports as its uplink) with no documented cable between them.
+
+    The official API names the uplink device but not the port on either side, so these can only become
+    planned cables with their ports left to confirm.
+    """
+    by_ext = {d.external_id: d for d in plant.devices.values()}
+    documented = _documented_pairs(plant)
+    out: list[dict[str, Any]] = []
+    for d in sorted(plant.devices.values(), key=lambda d: d.name):
+        up = by_ext.get(d.uplink_device_external_id or "")
+        if not (d.present and up and up.present and up.id != d.id):
+            continue
+        if frozenset({d.id, up.id}) in documented:
+            continue
+        out.append(
+            {
+                "key": f"uplink_undocumented:{d.id}:{up.id}",
+                "kind": "uplink_undocumented",
+                "severity": "info",
+                "title": f"{d.name} uplinks to {up.name}, but no cable is documented between them",
+                "device": {"id": d.id, "name": d.name, "model": d.model},
+                "uplink": {"id": up.id, "name": up.name, "model": up.model},
+                "is_demo": d.is_demo,
+            }
+        )
+    return out
+
+
+class AcceptSuggestions(BaseModel):
+    keys: list[str] = Field(min_length=1, max_length=200)
+    type: CableType = "cat6"
+
+
+@router.get("/suggestions")
+async def suggestions(db: DB, principal: Reader) -> dict:
+    """Cables the observed uplinks imply but nobody has documented yet."""
+    return {"items": undocumented_uplinks(await load_plant(db))}
+
+
+@router.post("/suggestions/accept", status_code=status.HTTP_201_CREATED)
+async def accept_suggestions(body: AcceptSuggestions, db: DB, principal: Editor) -> dict:
+    """Document suggested uplinks as planned cables, numbered in order, with both ports still to confirm."""
+    plant = await load_plant(db)
+    open_ = {s["key"]: s for s in undocumented_uplinks(plant)}
+    missing = [k for k in body.keys if k not in open_]
+    if missing:
+        raise HTTPException(status.HTTP_409_CONFLICT, f"No longer suggested: {', '.join(missing)}")
+    created = []
+    for key in dict.fromkeys(body.keys):
+        s = open_[key]
+        label = await _next_label(db)
+        c = Cable(
+            label=label,
+            type=body.type,
+            status="planned",
+            description=f"From the observed uplink {s['device']['name']} → {s['uplink']['name']}; confirm both ports.",
+        )
+        db.add(c)
+        await db.flush()
+        ends = {
+            "a": CableEnd(cable_id=c.id, end="a", kind="device_port", device_id=s["device"]["id"], port_idx=None, text=""),
+            "b": CableEnd(cable_id=c.id, end="b", kind="device_port", device_id=s["uplink"]["id"], port_idx=None, text=""),
+        }
+        db.add_all(ends.values())
+        await db.flush()
+        plant.cables[c.id] = c
+        plant.ends[c.id] = ends
+        detail = {"label": c.label, "from_suggestion": key}
+        await audit.record(db, principal.actor, "cabling.cable.create", target_type="cable", target_id=c.id, detail=detail)
+        created.append(_cable(c, plant))
+    return {"items": created}

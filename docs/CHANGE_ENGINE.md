@@ -68,7 +68,7 @@ A change proposed by an AI agent at autonomy "act after approval" carries `apply
 
 Module `automation`, code `warden/automation.py`, API `/api/automation`.
 
-- **Rule** = trigger (one event type from the event log, or every N ≥ 15 minutes) + conditions on the event (`severity`, `entity_type`, `entity_id`, `site_id`, `source`, `payload.<key>`; is, is not, one of, contains, at least, at most, present) + one action.
+- **Rule** = trigger (one event type from the event log, including `cabling.finding.opened`/`resolved`, or every N ≥ 15 minutes) + conditions on the event (`severity`, `entity_type`, `entity_id`, `site_id`, `source`, `payload.<key>`; is, is not, one of, contains, at least, at most, present) + one action.
 - **Actions:** *propose* one of the bulk operations above, for the event's object (a device, policy or network the event names) or a fixed target; or *notify* through the Notifications module's channels. **A rule never approves or applies.** Its proposals are made as `Automation: <rule name>`, so approving them is never self-approval.
 - **Evaluation:** the `automation.evaluate` job (30 s) reads new events from the persisted event log by sequence number. Enabling a rule starts from that moment; old events are never replayed. Change events cannot trigger proposals (a finished change can only notify). A per-rule, per-target quiet period (default 60 minutes) and the engine's one-open-change rule stop repeats.
 - **Dry run** (saved or unsaved rule): replays up to 50 matching events from the last 7 days (or one scheduled run) and says what would happen — would propose (with the title), would be refused (and why), would notify, skipped, or no match. It reads only the inventory; nothing is stored, proposed or sent.

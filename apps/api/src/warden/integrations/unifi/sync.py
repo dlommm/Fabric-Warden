@@ -12,7 +12,7 @@ from typing import Any, TypeVar
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from warden import config_history, metrics
+from warden import cabling_drift, config_history, metrics
 from warden import events as ev
 from warden.app_state import AppState
 from warden.db import Base, utcnow
@@ -410,6 +410,8 @@ async def sync_job(ctx: JobContext) -> dict[str, Any]:
                 payload={"status": controller.status},
             ),
         )
+    if inventory and await ctx.state.modules.is_enabled(ctx.db, "cabling"):
+        await cabling_drift.publish_drift(ctx.db, ctx.state)
     return {"controllers": results}
 
 

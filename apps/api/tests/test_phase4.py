@@ -361,3 +361,56 @@ async def test_item_listing_and_reference_preview(infra, owner):
     refs = (await owner.post("/api/wiki/references", json={"body": "[[rack:Rack P]] and [[device:Nope]]"})).json()["references"]
     assert [r["resolved"] for r in refs] == [True, False]
     assert (await owner.get("/api/wiki/pages")).json()["items"] == []  # preview saves nothing
+
+
+async def test_cable_suggestions_from_observed_uplinks(infra, owner):
+    dev = await _devices(owner)
+    # The PoE switch's uplink to Core Aggregation is documented, so it is not suggested.
+    await _cable(owner, _port(dev["Core Aggregation"], 1), _port(dev["Rack PoE Switch"], 17))
+    items = (await owner.get("/api/cabling/suggestions")).json()["items"]
+    pairs = {(s["device"]["name"], s["uplink"]["name"]) for s in items}
+    assert ("Rack PoE Switch", "Core Aggregation") not in pairs
+    assert ("Core Aggregation", "Gateway") in pairs
+    key = next(s["key"] for s in items if s["device"]["name"] == "Core Aggregation")
+
+    r = await owner.post("/api/cabling/suggestions/accept", json={"keys": [key]})
+    assert r.status_code == 201, r.text
+    c = r.json()["items"][0]
+    assert c["status"] == "planned" and c["label"] == "C-0002"
+    assert c["a"]["summary"] == "Core Aggregation (port to confirm)"
+    # Accepted: no longer suggested, and accepting it again is refused.
+    after = {s["key"] for s in (await owner.get("/api/cabling/suggestions")).json()["items"]}
+    assert key not in after
+    assert (await owner.post("/api/cabling/suggestions/accept", json={"keys": [key]})).status_code == 409
+    # A planned cable is not checked against port state.
+    kinds = {f["kind"] for f in (await owner.get("/api/cabling/findings")).json()["items"]}
+    assert "cabled_port_down" not in kinds
+
+
+async def test_cabling_drift_publishes_opened_and_resolved(infra, owner, app):
+    from warden import cabling_drift
+
+    dev = await _devices(owner)
+    cable = (await _cable(owner, _port(dev["Rack PoE Switch"], 11), _port(dev["Office Switch"], 3))).json()
+    state = app.state.warden
+    async with state.db.sessionmaker() as db:
+        first = await cabling_drift.publish_drift(db, state)
+        await db.commit()
+        again = await cabling_drift.publish_drift(db, state)
+        await db.commit()
+        open_ = await cabling_drift.open_findings(db)
+    assert first["opened"] >= 2 and again == {"opened": 0, "resolved": 0}
+    assert any(p["kind"] == "path_not_observed" for p in open_.values())
+    assert any(p["kind"] == "uplink_undocumented" for p in open_.values())
+
+    assert (await owner.delete(f"/api/cabling/cables/{cable['id']}")).status_code == 204
+    async with state.db.sessionmaker() as db:
+        cleared = await cabling_drift.publish_drift(db, state)
+        await db.commit()
+        open_ = await cabling_drift.open_findings(db)
+    assert cleared["resolved"] >= 2
+    assert not any(p["kind"] in ("path_not_observed", "cabled_port_down") for p in open_.values())
+    r = await owner.post("/api/modules/automation/enable", json={"with_dependencies": True})
+    assert r.status_code == 200, r.text
+    triggers = (await owner.get("/api/automation/meta")).json()
+    assert "cabling.finding.opened" in str(triggers)

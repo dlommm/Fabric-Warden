@@ -12,6 +12,7 @@ The official UniFi Integration API does not expose physical location, LLDP neigh
 
 - Racks, cables and power chains cannot be discovered; they are entered by hand.
 - A documented cable path is only checked against which device each device reports as its uplink.
+- The official API names a device's uplink device but not the port on either side, so a cable suggested from an uplink is planned with both ports left to confirm.
 - Power figures are documented typical draw, not measurements.
 
 ## Permissions
@@ -44,6 +45,10 @@ Reading needs `inventory:read`. Every write is audited (`dcim.*`, `cabling.*`, `
 **Outputs.** Cable schedule as CSV (`/api/cabling/schedule.csv`); label text with one label per cable naming both ends (`/api/cabling/labels`, printable from the Cabling page); a patch panel port map (`/api/cabling/panels/{id}`) drawn in the rack item panel; documented cables per port on the device detail page.
 
 **Findings** (`GET /api/cabling/findings`): `path_not_observed` (warning) when a device-to-device path connects two devices and neither reports the other as its uplink (it may be a standby or aggregated link, or stale documentation); `cabled_port_down` (info) when an installed cable lands on a port that reports link down.
+
+**Suggested cables** (`GET /api/cabling/suggestions`): every observed uplink (a device and the device it reports as its uplink, both present) that no planned or installed cable path connects. `POST /api/cabling/suggestions/accept` with `keys` documents the chosen suggestions as **planned** cables, each with the next free `C-NNNN` label and both device-port ends marked *port to confirm*; each is audited as `cabling.cable.create` with the suggestion it came from. A cable with an unconfirmed port is not traced or checked against port state; the Cabling page asks for both ports when you open it, and the cable then traces like any other.
+
+**Drift events.** After each sync, when the cabling module is on, the findings above plus every undocumented uplink are compared with the ones already open. A new one publishes `cabling.finding.opened` and one that has cleared publishes `cabling.finding.resolved` (payload: `key`, `kind`, `title`, and `cable_id` or `device_id`/`uplink_id`). Which findings are open is read back from those events, so nothing else is stored. Both are Automation Studio triggers, so a rule can notify when documented cabling stops matching the network. Nothing here writes to a controller.
 
 ## Power & Environment (`power`)
 
