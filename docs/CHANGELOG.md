@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.0](https://github.com/dlommm/Fabric-Warden/compare/v1.0.0...v1.1.0) (2026-10-23)
+
+
+### Added
+
+* **cabling:** suggest missing cables and publish cabling drift as automation triggers ([9abf3ae](https://github.com/dlommm/Fabric-Warden/commit/9abf3aeebfa56f30a6932e6cf05cbf689f2528ea))
+* **docker:** ship the API and web app as one image ([9d28f67](https://github.com/dlommm/Fabric-Warden/commit/9d28f6785be595efe8602308d7ad01d65fe4755f))
+* **web:** redesign the web UI as a live network schematic ([659b257](https://github.com/dlommm/Fabric-Warden/commit/659b2577af71d8ee14931d2e412e2b1245834748))
+
 ## 1.0.0
 
 First public version.
