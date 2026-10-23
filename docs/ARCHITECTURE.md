@@ -2,7 +2,7 @@
 
 ## Shape
 
-A **modular monolith**: one FastAPI process (`apps/api`, package `warden`) owns the domain, plus one Next.js app (`apps/web`) that serves the UI and proxies `/api/*` to the backend so the browser only ever talks to one origin. Optional heavy modules (flow collector, ClickHouse, AI workers) will run as extra containers started only when enabled.
+A **modular monolith**: one FastAPI process (`apps/api`, package `warden`) owns the domain, plus one Next.js app (`apps/web`) that serves the UI and proxies `/api/*` to the backend so the browser only ever talks to one origin. Both ship in one container image: the web app is the published port and the API listens on the container's loopback behind it.
 
 ```
 browser ──► web (Next.js, :3000) ──/api/*──► api (FastAPI, :8000) ──► PostgreSQL

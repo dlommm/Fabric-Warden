@@ -13,7 +13,7 @@ Open **AI providers** (needs `ai:manage` to add or change; `ai:use` to view). Ev
 | Anthropic Claude | `https://api.anthropic.com` | required | `GET /v1/models`, `POST /v1/messages` (`anthropic-version: 2023-06-01`) |
 | Offline demo model | built in | none | in-process; deterministic, not a language model, labelled demo |
 
-The model must support tool (function) calling; agents depend on it. With Ollama, use a model tagged for tools. In Docker Compose, `localhost` is the API container itself: use the host's LAN address or a service name.
+The model must support tool (function) calling; agents depend on it. With Ollama, use a model tagged for tools. In Docker Compose, `localhost` is the Fabric Warden container itself: use the host's LAN address or a service name.
 
 Current Claude model ids: `claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`. The default model is the first one the provider lists unless you choose one.
 
@@ -40,7 +40,7 @@ If Claude declines a request (`stop_reason: refusal`) the run fails with "declin
 | Result | Meaning |
 |---|---|
 | auth | The key was rejected. |
-| unreachable | Nothing answered at that URL and port from the API container. |
+| unreachable | Nothing answered at that URL and port from the Fabric Warden container. |
 | tls | The certificate could not be verified. |
 | not_found | The server answered but lacks the endpoint (check the `/v1` part for OpenAI-compatible servers). |
 | rate_limited | The provider is throttling; try later. |

@@ -26,7 +26,7 @@ Your UniFi controller stays in charge. Fabric Warden reads it through Ubiquiti's
 - Gateway restarts, default networks and the controller's own network are protected paths that need explicit acknowledgement.
 
 **Infrastructure**
-- Locations and racks with front and rear elevations, cables traced through patch panels, power chains with UPS runtime, asset lifecycle, and topology with a VLAN overlay.
+- Locations and racks with front and rear elevations, cables traced through patch panels with suggestions from observed uplinks and drift events for automation, power chains with UPS runtime, asset lifecycle, and topology with a VLAN overlay.
 - A versioned wiki whose `[[device:…]]` references stay live.
 - Read-only Proxmox VE, Unraid, Docker and node_exporter inventory, with each host matched to its network client.
 
@@ -55,6 +55,15 @@ git clone https://github.com/dlommm/Fabric-Warden.git && cd Fabric-Warden
 cp deploy/.env.example deploy/.env    # set POSTGRES_PASSWORD and WARDEN_SECRET_KEY (openssl rand -base64 32)
 docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 ```
+
+Or run the published image on its own, with SQLite in a volume:
+
+```bash
+docker run -d --name fabric-warden --restart unless-stopped -p 8080:3000 \
+  -v fabric-warden-data:/data -e WARDEN_COOKIE_SECURE=false dendlomm/fabric-warden:latest
+```
+
+`WARDEN_COOKIE_SECURE=false` is for plain HTTP on a trusted LAN; behind a TLS proxy leave it out. Images are on Docker Hub as [`dendlomm/fabric-warden`](https://hub.docker.com/r/dendlomm/fabric-warden) for `linux/amd64` and `linux/arm64`, tagged `latest` and by version.
 
 Open `http://<host>:8080` and create the owner account. Then add your controller with an API key (UniFi Network → Settings → Control Plane → Integrations), or choose **Use the demo controller**.
 

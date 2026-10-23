@@ -1,0 +1,24 @@
+# The image needs only the two apps' sources and the entrypoint.
+*
+!apps/api/pyproject.toml
+!apps/api/uv.lock
+!apps/api/src
+!apps/web
+!deploy/entrypoint.sh
+
+**/__pycache__
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.fwbk
+**/*.db
+apps/web/node_modules
+apps/web/.next
+apps/web/.next-*
+apps/web/test-results
+apps/web/playwright-report
+apps/web/.e2e-data
+apps/web/.impeccable
+apps/web/e2e
+apps/web/tsconfig.tsbuildinfo

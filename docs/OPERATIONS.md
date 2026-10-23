@@ -7,17 +7,17 @@ Day-two tasks for a running installation: health, backups and restore, upgrades 
 | Endpoint | Auth | Meaning |
 |---|---|---|
 | `GET /api/health/live` | none | The API process answers. |
-| `GET /api/health/ready` | none | The API can query its database. Used by the API container's `HEALTHCHECK` and by compose `depends_on`. |
+| `GET /api/health/ready` | none | The API can query its database. The image's `HEALTHCHECK` fetches it through the web app's `/api` proxy. |
 | `GET /api/system/health` | `system:read` | Database, Redis, scheduler and audit-chain status, failed job runs, version. Shown on the System page. |
 
-The web container's `HEALTHCHECK` fetches `/login`. The API starts answering only after migrations have run, so readiness also means the schema is current.
+A healthy container therefore means the web app and the API both answer. The API starts answering only after migrations have run, so readiness also means the schema is current.
 
 ## Forgotten password
 
 From the server, reset any account's password; you are prompted for the new one, every session for that account is signed out, and the reset is audited (`auth.password.reset`, actor `warden-admin`). Add `--clear-mfa` if the authenticator is lost too.
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec api warden-admin reset-password admin
+docker compose -f deploy/docker-compose.yml exec app warden-admin reset-password admin
 ```
 
 Anyone who can run this already controls the database, so it adds no new way in.
@@ -42,12 +42,12 @@ curl -fsS -X POST https://warden.example/api/backup/export \
   -d "{\"passphrase\": \"$BACKUP_PASSPHRASE\"}" -o "warden-$(date +%F).fwbk"
 ```
 
-CLI inside the API container (works while the API is running; the export is one read transaction):
+CLI inside the container (works while Fabric Warden is running; the export is one read transaction):
 
 ```bash
-docker compose -f deploy/docker-compose.yml exec -e WARDEN_BACKUP_PASSPHRASE api \
+docker compose -f deploy/docker-compose.yml exec -e WARDEN_BACKUP_PASSPHRASE app \
   warden-backup export /data/backups/warden.fwbk
-docker compose -f deploy/docker-compose.yml cp api:/data/backups/warden.fwbk ./
+docker compose -f deploy/docker-compose.yml cp app:/data/backups/warden.fwbk ./
 warden-backup inspect ./warden.fwbk   # decrypts and prints the summary (row counts, version, revision)
 ```
 
@@ -60,13 +60,13 @@ To back up on a schedule, run the API call or CLI from cron or a systemd timer o
 Restore **replaces every row** in this installation's database with the backup's, in one transaction, then signs everyone out.
 
 - The backup's schema revision must equal this installation's. Restore into the same Fabric Warden version the backup was made with, then upgrade (migrations run at start).
-- Over the API (`POST /api/backup/restore`, owner session only, never a token): body `{archive_b64, passphrase, current_password, confirm: "RESTORE"}`. Scheduled jobs pause during the restore. Afterwards sign in with an account from the backup and **restart the API** so in-memory state (module enablement, scheduler) is rebuilt. Size limit: `WARDEN_MAX_RESTORE_BYTES` (512 MiB).
-- From the CLI (recommended for disaster recovery; stop the API first):
+- Over the API (`POST /api/backup/restore`, owner session only, never a token): body `{archive_b64, passphrase, current_password, confirm: "RESTORE"}`. Scheduled jobs pause during the restore. Afterwards sign in with an account from the backup and **restart the `app` container** so in-memory state (module enablement, scheduler) is rebuilt. Size limit: `WARDEN_MAX_RESTORE_BYTES` (512 MiB).
+- From the CLI (recommended for disaster recovery; stop Fabric Warden first):
 
   ```bash
-  docker compose -f deploy/docker-compose.yml stop api web
+  docker compose -f deploy/docker-compose.yml stop app
   docker compose -f deploy/docker-compose.yml run --rm -e WARDEN_BACKUP_PASSPHRASE \
-    -v "$PWD/warden.fwbk:/restore.fwbk:ro" api warden-backup restore /restore.fwbk --yes
+    -v "$PWD/warden.fwbk:/restore.fwbk:ro" app warden-backup restore /restore.fwbk --yes
   docker compose -f deploy/docker-compose.yml up -d
   ```
 
@@ -92,7 +92,7 @@ A `pg_dump` contains credentials encrypted with the vault key but **not** the ke
 1. Make a backup (above) and note the current version (System page or `/api/system/health`).
 2. Pull the new release (`git pull` / new tag) and read `docs/CHANGELOG.md` for breaking changes.
 3. `docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build`.
-4. The API applies Alembic migrations at start (`WARDEN_RUN_MIGRATIONS_ON_START=true`), inside a transaction on PostgreSQL. Watch `docker compose logs -f api` until it reports `Fabric Warden … started` and the container is `healthy`.
+4. The API applies Alembic migrations at start (`WARDEN_RUN_MIGRATIONS_ON_START=true`), inside a transaction on PostgreSQL. Watch `docker compose logs -f app` until it reports `Fabric Warden … started` and the container is `healthy`.
 5. Check the System page: database ok, audit chain intact, no new failed job runs.
 
 Rollback: migrations are not written to be downgraded in production. To go back, stop the stack, restore the pre-upgrade backup into the previous version (same schema revision), then start the previous images.
@@ -110,7 +110,7 @@ One `docker stats` snapshot of the development stack (demo controller and simula
 | PostgreSQL | ~180 MB incl. cache | Metric samples and log events dominate disk growth |
 | Redis | ~10 MB | Locks only, no persistence |
 
-Images: API about 350 MB, web about 340 MB.
+Image: about 620 MB unpacked (API and web app together).
 
 Plan for 1 vCPU and 1–2 GB RAM for a home lab (a few switches/APs, <200 clients), 2 vCPU / 4 GB for a small office or MSP pilot. Disk: a few GB; log management keeps `WARDEN_LOG_RETENTION_DAYS` (14) days capped at `WARDEN_LOG_MAX_ROWS` (2 M) rows, metrics follow the tiered retention in [ANALYTICS.md](ANALYTICS.md). These figures are estimates, not load-tested limits (see [TESTING.md](TESTING.md)).
 

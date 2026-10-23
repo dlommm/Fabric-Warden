@@ -38,10 +38,14 @@ services:
       timeout: 3s
       retries: 10
 
-  api:
+  # The API and the web app run in one container; only the web port is published
+  # and the API listens on the container's loopback behind it.
+  app:
     <<: *hardening
-    build: ../apps/api
-    image: fabric-warden/api:1.0.0
+    build:
+      context: ..
+      args: { VERSION: 1.0.0 } # x-release-please-version
+    image: dendlomm/fabric-warden:1.0.0 # x-release-please-version
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
@@ -57,28 +61,13 @@ services:
     volumes:
       - data:/data
     read_only: true
-    tmpfs: ["/tmp"]
+    tmpfs: ["/tmp", "/app/web/.next/cache:uid=10001,mode=0700"]
     cap_drop: [ALL]
-    # The HTTP API is not published: only the web container talks to it.
     # Syslog (UDP) is published on localhost only; set WARDEN_SYSLOG_BIND=0.0.0.0
     # in deploy/.env to receive logs from your gateway and servers.
     ports:
-      - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
-
-  web:
-    <<: *hardening
-    build:
-      context: ../apps/web
-      args:
-        WARDEN_API_URL: http://api:8000
-    image: fabric-warden/web:1.0.0
-    depends_on:
-      api: { condition: service_healthy }
-    read_only: true
-    tmpfs: ["/tmp", "/app/.next/cache:uid=10001,mode=0700"]
-    cap_drop: [ALL]
-    ports:
       - "${WARDEN_HTTP_PORT:-8080}:3000"
+      - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
 
 volumes:
   db:
