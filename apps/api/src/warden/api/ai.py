@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from warden import audit
 from warden.ai import agents as A
 from warden.ai import tools as T
-from warden.ai.providers import ADAPTERS, BUILTIN_PRICES, HINTS, KINDS, ProviderError
+from warden.ai.providers import ADAPTERS, BUILTIN_PRICES, HINTS, KINDS, PRESETS, ProviderError, is_local_url
 from warden.ai.simulator import DEMO_BASE_URL, DEMO_MODEL
 from warden.api.deps import DB, Allowed, State, require_module
 from warden.db import utcnow
@@ -78,7 +78,7 @@ async def _provider_out(db: AsyncSession, p: AiProvider) -> dict[str, Any]:
         "price_input_per_mtok": p.price_input_per_mtok,
         "price_output_per_mtok": p.price_output_per_mtok,
         "refusal_fallback": bool((p.options or {}).get("refusal_fallback", True)) if p.kind == "anthropic" else None,
-        "local": p.kind in ("ollama", "openai_compatible", "demo"),
+        "local": p.is_demo or is_local_url(p.base_url),
         "usage": {"since": A.month_start(), "tokens": tokens, "cost_usd": round(cost, 6)},
         "is_demo": p.is_demo,
     }
@@ -150,6 +150,7 @@ async def _probe(
 async def kinds(principal: User) -> dict:
     return {
         "kinds": [{"id": k, **v} for k, v in KINDS.items()],
+        "presets": PRESETS,
         "prices": [{"model": m, "input_per_mtok": i, "output_per_mtok": o} for m, (i, o) in BUILTIN_PRICES.items()],
     }
 

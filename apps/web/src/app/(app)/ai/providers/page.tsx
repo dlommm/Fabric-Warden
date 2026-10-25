@@ -14,10 +14,11 @@ import { type Column, DataTable } from "@/components/ui/table";
 import { ApiError, del, get, patch, post } from "@/lib/api";
 import { ago, dateTime } from "@/lib/format";
 import { useSession } from "@/lib/session";
-import type { AiProbe, AiProvider, AiProviderKindInfo, AiUsageReport } from "@/lib/types";
+import type { AiProbe, AiProvider, AiProviderKindInfo, AiProviderPreset, AiUsageReport } from "@/lib/types";
 
 interface Kinds {
   kinds: AiProviderKindInfo[];
+  presets: AiProviderPreset[];
   prices: { model: string; input_per_mtok: number; output_per_mtok: number }[];
 }
 
@@ -33,6 +34,19 @@ function DataPath({ p }: { p: AiProvider }) {
   if (p.is_demo) return <Chip className="whitespace-nowrap">Stays in Fabric Warden</Chip>;
   if (p.local) return <Chip className="whitespace-nowrap">Your server · {hostOf(p.base_url)}</Chip>;
   return <Chip className="border-ink-3 whitespace-nowrap text-ink">Sent to {hostOf(p.base_url)}</Chip>;
+}
+
+/** Mirrors the API's check: loopback, private or link-local addresses and LAN-only names stay on your network. */
+function isLocalUrl(url: string): boolean {
+  let host: string;
+  try {
+    host = new URL(url).hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  } catch {
+    return false;
+  }
+  if (host === "localhost" || /^(127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host) || /^(::1$|f[cd]|fe[89ab])/.test(host)) return true;
+  if (/^[\d.]+$/.test(host) || host.includes(":")) return false;
+  return !host.includes(".") || /\.(local|lan|home\.arpa|internal|localdomain)$/.test(host);
 }
 
 function hostOf(url: string): string {
@@ -115,7 +129,7 @@ export default function AiProvidersPage() {
       {(list.error || demo.error) && <Notice tone="crit" className="mb-4">{((list.error || demo.error) as Error).message}</Notice>}
       {test.data && !test.data.ok && <Notice tone="crit" className="mb-4" title={test.data.error ?? "The test failed"}>{test.data.hint}</Notice>}
       <div className="flex flex-col gap-[var(--gap)]">
-        {adding && kinds.data && <ProviderForm kinds={kinds.data.kinds} onDone={() => setAdding(false)} />}
+        {adding && kinds.data && <ProviderForm kinds={kinds.data.kinds} presets={kinds.data.presets} onDone={() => setAdding(false)} />}
         <Panel bodyClassName="p-0">
           <DataTable
             caption="AI providers"
@@ -136,13 +150,18 @@ export default function AiProvidersPage() {
   );
 }
 
-function ProviderForm({ kinds, onDone }: { kinds: AiProviderKindInfo[]; onDone: () => void }) {
+function ProviderForm({ kinds, presets, onDone }: { kinds: AiProviderKindInfo[]; presets: AiProviderPreset[]; onDone: () => void }) {
   const qc = useQueryClient();
-  const [kind, setKind] = useState<AiProviderKindInfo["id"]>("ollama");
-  const info = kinds.find((k) => k.id === kind)!;
+  // "kind:<id>" for a provider kind, "preset:<id>" for a hosted service on the OpenAI-compatible kind.
+  const [service, setService] = useState("kind:ollama");
+  const preset = service.startsWith("preset:") ? presets.find((p) => `preset:${p.id}` === service) : undefined;
+  const kind: AiProviderKindInfo["id"] = preset ? preset.kind : (service.slice(5) as AiProviderKindInfo["id"]);
+  const base = kinds.find((k) => k.id === kind)!;
   const [f, setF] = useState({ name: "", base_url: "", api_key: "", default_model: "", token_limit: "", cost_limit: "", price_in: "", price_out: "" });
   const [result, setResult] = useState<AiProbe | null>(null);
-  const url = f.base_url.trim() || info.default_base_url;
+  const url = f.base_url.trim() || preset?.base_url || base.default_base_url;
+  const info = { ...base, needs_key: preset ? true : base.needs_key, local: preset ? false : isLocalUrl(url) };
+  const defaultName = preset?.label ?? PROVIDER_KIND[kind];
   const errorOf = (e: unknown) => {
     if (e instanceof ApiError && e.detail && typeof e.detail === "object" && "error" in (e.detail as object)) setResult(e.detail as AiProbe);
     else setResult({ ok: false, models: [], error: e instanceof ApiError ? e.message : "Couldn't connect." });
@@ -153,7 +172,7 @@ function ProviderForm({ kinds, onDone }: { kinds: AiProviderKindInfo[]; onDone: 
     mutationFn: () =>
       post("/api/ai/providers", {
         kind,
-        name: f.name.trim() || PROVIDER_KIND[kind],
+        name: f.name.trim() || defaultName,
         base_url: url,
         api_key: f.api_key,
         default_model: f.default_model,
@@ -177,18 +196,27 @@ function ProviderForm({ kinds, onDone }: { kinds: AiProviderKindInfo[]; onDone: 
   return (
     <Panel title="Add a provider">
       <form onSubmit={submit} noValidate className="grid gap-4 md:grid-cols-2 xl:grid-cols-4 xl:items-start">
-        <Field label="Kind">
+        <Field label="Service" hint={preset ? "Saved as an OpenAI-compatible connection" : undefined}>
           {(p) => (
-            <Select {...p} value={kind} onChange={(e) => { setKind(e.target.value as AiProviderKindInfo["id"]); setResult(null); }}>
-              {kinds.map((k) => <option key={k.id} value={k.id}>{k.label}</option>)}
+            <Select {...p} value={service} onChange={(e) => { setService(e.target.value); setF({ ...f, base_url: "" }); setResult(null); }}>
+              <optgroup label="Hosted">
+                {kinds.filter((k) => !k.local).map((k) => <option key={k.id} value={`kind:${k.id}`}>{k.label}</option>)}
+                {presets.map((pr) => <option key={pr.id} value={`preset:${pr.id}`}>{pr.label}</option>)}
+              </optgroup>
+              <optgroup label="Your server">
+                {kinds.filter((k) => k.local).map((k) => <option key={k.id} value={`kind:${k.id}`}>{k.label}</option>)}
+              </optgroup>
             </Select>
           )}
         </Field>
-        <Field label="Name" hint="Optional">{(p) => <Input {...p} value={f.name} maxLength={128} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={PROVIDER_KIND[kind]} />}</Field>
+        <Field label="Name" hint="Optional">{(p) => <Input {...p} value={f.name} maxLength={128} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={defaultName} />}</Field>
         <Field label="URL" className="xl:col-span-2" hint={info.local ? "The server must be reachable from Fabric Warden's container" : "The official endpoint; change it only for a proxy you run"}>
-          {(p) => <Input {...p} className="font-mono" value={f.base_url} onChange={(e) => { setF({ ...f, base_url: e.target.value }); setResult(null); }} placeholder={info.default_base_url} />}
+          {(p) => <Input {...p} className="font-mono" value={f.base_url} onChange={(e) => { setF({ ...f, base_url: e.target.value }); setResult(null); }} placeholder={preset?.base_url ?? base.default_base_url} />}
         </Field>
-        <Field label={info.needs_key ? "API key" : "API key (optional)"} hint="Stored encrypted; only a fingerprint is shown afterwards">
+        <Field
+          label={info.needs_key ? "API key" : "API key (optional)"}
+          hint={preset ? <>Stored encrypted. <a href={preset.keys_url} target="_blank" rel="noreferrer" className="font-semibold text-accent hover:underline">Create a {preset.label} key</a></> : "Stored encrypted; only a fingerprint is shown afterwards"}
+        >
           {(p) => <Input {...p} type="password" autoComplete="off" className="font-mono" value={f.api_key} onChange={(e) => setF({ ...f, api_key: e.target.value })} />}
         </Field>
         <Field label="Default model" hint={models.length ? `${models.length} listed by the provider` : "Test the connection to list the models"}>
@@ -207,7 +235,7 @@ function ProviderForm({ kinds, onDone }: { kinds: AiProviderKindInfo[]; onDone: 
         </Field>
         {kind !== "anthropic" && (
           <>
-            <Field label="Price per million input tokens (USD)" hint="Leave empty for a free local model">
+            <Field label="Price per million input tokens (USD)" hint={info.local ? "Leave empty for a free local model" : "From the service's price list; counts towards the cost limit"}>
               {(p) => <Input {...p} inputMode="decimal" className="tabular" value={f.price_in} onChange={(e) => setF({ ...f, price_in: e.target.value.replace(/[^0-9.]/g, "") })} placeholder="0" />}
             </Field>
             <Field label="Price per million output tokens (USD)">

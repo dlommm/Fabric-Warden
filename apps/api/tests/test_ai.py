@@ -261,3 +261,34 @@ def test_ai_package_has_no_path_to_approve_or_apply():
     assert set(re.findall(r"\bengine\.(\w+)", text)) == {"propose"}
     assert "warden.integrations" not in text and "warden.api.changes" not in text and "warden.api import changes" not in text
     assert "approve(" not in text and ".apply(" not in text
+
+
+def test_hosted_presets_and_versioned_urls():
+    from warden.ai.providers import PRESETS, OpenAICompatibleAdapter, is_local_url
+
+    ids = {p["id"] for p in PRESETS}
+    assert {"openrouter", "groq", "gemini", "openai", "mistral"} <= ids
+    assert all(p["kind"] == "openai_compatible" and p["needs_key"] and p["base_url"].startswith("https://") for p in PRESETS)
+    v1 = lambda u: OpenAICompatibleAdapter(u)._v1()  # noqa: E731
+    assert v1("https://generativelanguage.googleapis.com/v1beta/openai/") == "https://generativelanguage.googleapis.com/v1beta/openai"
+    assert v1("https://api.groq.com/openai/v1") == "https://api.groq.com/openai/v1"
+    assert v1("https://api.fireworks.ai/inference/v1") == "https://api.fireworks.ai/inference/v1"
+    assert v1("http://localhost:1234") == "http://localhost:1234/v1"
+    assert v1("http://vllm.lan:8000/") == "http://vllm.lan:8000/v1"
+    # Where prompts go: hosted services are not "your server".
+    assert not any(is_local_url(p["base_url"]) for p in PRESETS)
+    for url in (
+        "http://localhost:11434",
+        "http://10.0.30.5:1234/v1",
+        "http://ollama:11434",
+        "http://box.local:1234",
+        "http://[fd00::5]:8000",
+    ):
+        assert is_local_url(url), url
+
+
+async def test_kinds_lists_presets_and_hosted_url_is_not_local(ai, owner):
+    kinds = (await owner.get("/api/ai/providers/kinds")).json()
+    assert {p["id"] for p in kinds["presets"]} >= {"openrouter", "groq", "gemini"}
+    listed = (await owner.get("/api/ai/providers")).json()["items"]
+    assert all(p["local"] == (p["is_demo"] or ".local" in p["base_url"]) for p in listed)
