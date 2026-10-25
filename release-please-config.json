@@ -12,7 +12,8 @@
         { "type": "toml", "path": "apps/api/pyproject.toml", "jsonpath": "$.project.version" },
         { "type": "json", "path": "apps/web/package.json", "jsonpath": "$.version" },
         "apps/api/src/warden/__init__.py",
-        "deploy/docker-compose.yml"
+        "deploy/docker-compose.yml",
+        "deploy/unraid/docker-compose.yml"
       ],
       "changelog-sections": [
         { "type": "feat", "section": "Added" },
