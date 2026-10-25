@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0](https://github.com/dlommm/Fabric-Warden/compare/v1.1.0...v1.2.0) (2026-10-25)
+
+
+### Added
+
+* **ai:** add hosted provider presets for OpenAI, Gemini, OpenRouter, Groq and more ([72928a9](https://github.com/dlommm/Fabric-Warden/commit/72928a9d184076d0e786061e92936fa8106c10f8))
+* **deploy:** add a Docker Compose stack for Unraid ([1fde476](https://github.com/dlommm/Fabric-Warden/commit/1fde476a24b2968e29122c4426003f1a101b3a9b))
+* **flows:** collect NetFlow v5, v9 and IPFIX with top talkers, ports and conversations ([42e7501](https://github.com/dlommm/Fabric-Warden/commit/42e750110849e85a370bca4a8bbaf9049fbb427d))
+
 ## [1.1.0](https://github.com/dlommm/Fabric-Warden/compare/v1.0.0...v1.1.0) (2026-10-24)
 
 

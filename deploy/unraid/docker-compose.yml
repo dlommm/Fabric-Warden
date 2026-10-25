@@ -42,7 +42,7 @@ services:
 
   # Docker creates a missing bind-mount directory as root; hand it to PUID:PGID before app starts.
   data-owner:
-    image: dendlomm/fabric-warden:1.1.0 # x-release-please-version
+    image: dendlomm/fabric-warden:1.2.0 # x-release-please-version
     user: "0:0"
     entrypoint: ["chown", "-R", "${PUID:-99}:${PGID:-100}", "/data"]
     volumes:
@@ -57,7 +57,7 @@ services:
   # and the API listens on the container's loopback behind it.
   app:
     <<: *hardening
-    image: dendlomm/fabric-warden:1.1.0 # x-release-please-version
+    image: dendlomm/fabric-warden:1.2.0 # x-release-please-version
     user: "${PUID:-99}:${PGID:-100}"
     depends_on:
       db: { condition: service_healthy }
