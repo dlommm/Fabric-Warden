@@ -12,6 +12,7 @@ Your UniFi controller stays in charge. Fabric Warden reads it through Ubiquiti's
 - Client 360: route to the client, address and attachment history, and identity you own.
 - IPAM: documented prefixes, reservations and VLANs checked against the live network (conflicts, duplicates, VLAN mismatches, pool overlaps).
 - SNMP port counters (read-only IF-MIB): throughput, utilisation, errors and discards per port.
+- NetFlow v5/v9 and IPFIX collector: top talkers, conversations and service ports, matched to clients and devices.
 - WAN health, with an opt-in latency and loss probe.
 
 **Monitoring and security**
@@ -64,6 +65,8 @@ docker run -d --name fabric-warden --restart unless-stopped -p 8080:3000 \
 ```
 
 `WARDEN_COOKIE_SECURE=false` is for plain HTTP on a trusted LAN; behind a TLS proxy leave it out. Images are on Docker Hub as [`dendlomm/fabric-warden`](https://hub.docker.com/r/dendlomm/fabric-warden) for `linux/amd64` and `linux/arm64`, tagged `latest` and by version.
+
+On Unraid, use `deploy/unraid/docker-compose.yml` with the Compose Manager plugin ([DEPLOYMENT.md](docs/DEPLOYMENT.md#unraid)).
 
 Open `http://<host>:8080` and create the owner account. Then add your controller with an API key (UniFi Network → Settings → Control Plane → Integrations), or choose **Use the demo controller**.
 

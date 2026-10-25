@@ -9,9 +9,28 @@ Open **AI providers** (needs `ai:manage` to add or change; `ai:use` to view). Ev
 | Kind | Default URL | Key | Endpoints used |
 |---|---|---|---|
 | Ollama | `http://localhost:11434` | optional (for a proxy) | `GET /api/tags`, `POST /api/chat` (stream off, tools in function format) |
-| OpenAI-compatible (LM Studio, vLLM, llama.cpp server, OpenAI) | `http://localhost:1234/v1` | optional | `GET /v1/models`, `POST /v1/chat/completions` with `tools` |
+| OpenAI-compatible (LM Studio, vLLM, llama.cpp server, any hosted service below) | `http://localhost:1234/v1` | optional | `GET /v1/models`, `POST /v1/chat/completions` with `tools` |
 | Anthropic Claude | `https://api.anthropic.com` | required | `GET /v1/models`, `POST /v1/messages` (`anthropic-version: 2023-06-01`) |
 | Offline demo model | built in | none | in-process; deterministic, not a language model, labelled demo |
+
+### Hosted services
+
+**Service** in the form also lists hosted services that speak the OpenAI chat-completions API. Picking one fills in its published endpoint and links to the page where you create a key; it is saved as an OpenAI-compatible provider and its models are listed from the service.
+
+| Service | URL |
+|---|---|
+| OpenAI | `https://api.openai.com/v1` |
+| Google Gemini | `https://generativelanguage.googleapis.com/v1beta/openai` |
+| OpenRouter | `https://openrouter.ai/api/v1` |
+| Groq | `https://api.groq.com/openai/v1` |
+| Mistral AI | `https://api.mistral.ai/v1` |
+| DeepSeek | `https://api.deepseek.com/v1` |
+| xAI Grok | `https://api.x.ai/v1` |
+| Together AI | `https://api.together.xyz/v1` |
+| Fireworks AI | `https://api.fireworks.ai/inference/v1` |
+| Cerebras | `https://api.cerebras.ai/v1` |
+
+A URL whose path already names an API version (`/v1`, `/v1beta/openai`) is used as given; otherwise `/v1` is added. Set the per-token prices from the service's price list so the monthly cost limit applies.
 
 The model must support tool (function) calling; agents depend on it. With Ollama, use a model tagged for tools. In Docker Compose, `localhost` is the Fabric Warden container itself: use the host's LAN address or a service name.
 
@@ -23,7 +42,7 @@ API keys go into the credential vault (Fernet, master key outside the database).
 
 ## What leaves the network
 
-A local provider keeps everything on your network. With an API provider, each agent run sends the agent's instructions, your question and the results of the tools it calls (device and client names, addresses, metrics, log lines, firewall policies) to that provider. The provider list states where prompts go for each provider.
+A local provider (a loopback, private or link-local address, or a LAN-only name such as `ollama` or `box.local`) keeps everything on your network. With an API provider, each agent run sends the agent's instructions, your question and the results of the tools it calls (device and client names, addresses, metrics, log lines, firewall policies) to that provider. The provider list states where prompts go for each provider.
 
 ## Budgets and cost
 
