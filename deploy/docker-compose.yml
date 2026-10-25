@@ -44,8 +44,8 @@ services:
     <<: *hardening
     build:
       context: ..
-      args: { VERSION: 1.1.0 } # x-release-please-version
-    image: dendlomm/fabric-warden:1.1.0 # x-release-please-version
+      args: { VERSION: 1.2.0 } # x-release-please-version
+    image: dendlomm/fabric-warden:1.2.0 # x-release-please-version
     depends_on:
       db: { condition: service_healthy }
       redis: { condition: service_healthy }
