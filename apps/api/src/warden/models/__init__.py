@@ -14,6 +14,7 @@ from warden.models.changes import ChangeBatch, ChangeRequest
 from warden.models.config import ComplianceResult, ConfigSnapshot
 from warden.models.dcim import Asset, Cable, CableEnd, DocPage, DocVersion, Location, PowerFeed, PowerLink, Rack, RackItem
 from warden.models.ecosystem import HaEntity, IntegrationConnection, ProtectDevice
+from warden.models.flows import FlowRollup
 from warden.models.inventory import (
     Client,
     ClientSighting,
@@ -67,6 +68,7 @@ __all__ = [
     "DocVersion",
     "EventRecord",
     "FirewallPolicy",
+    "FlowRollup",
     "FirewallZone",
     "Host",
     "HostConnection",

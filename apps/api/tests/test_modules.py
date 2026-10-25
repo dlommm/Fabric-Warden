@@ -33,7 +33,7 @@ async def test_enable_requires_dependencies(owner):
 
 
 async def test_planned_module_cannot_be_enabled(owner):
-    r = await owner.post("/api/modules/flows/enable", json={"with_dependencies": True})
+    r = await owner.post("/api/modules/ndr/enable", json={"with_dependencies": True})
     assert r.status_code == 409
     assert "not yet implemented" in r.json()["detail"]["message"]
 
@@ -87,6 +87,7 @@ async def test_full_preset_reports_unavailable(owner):
         "config-history",
         "compliance",
         "logs",
+        "flows",
         "soc",
         "investigations",
         "unifi-protect",
@@ -95,7 +96,7 @@ async def test_full_preset_reports_unavailable(owner):
         "ai-providers",
         "ai-agents",
     }
-    assert "flows" in r["unavailable"] and "ndr" in r["unavailable"]
+    assert "ndr" in r["unavailable"] and "flows" not in r["unavailable"]
 
 
 async def test_module_listing_shape(owner):

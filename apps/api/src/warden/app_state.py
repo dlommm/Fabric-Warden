@@ -47,6 +47,7 @@ class AppState:
     _sim_app: FastAPI | None = None
     host_sim: HostSimState = field(default_factory=HostSimState)
     syslog: Any = None  # warden.syslog.Ingest, created in build_state
+    flows: Any = None  # warden.flows.Collector, created in build_state
     snmp_sim: SnmpSimState = field(default_factory=SnmpSimState)
     _host_sim_apps: dict[str, FastAPI] = field(default_factory=dict)
     protect_sim: ProtectSimState = field(default_factory=ProtectSimState)

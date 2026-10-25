@@ -44,6 +44,16 @@ class Settings(BaseSettings):
     log_retention_days: int = 14
     log_max_rows: int = 2_000_000
 
+    # Flow collector (Traffic & Flow Analytics): NetFlow v5, v9 and IPFIX over UDP. 0 disables it.
+    flow_port: int = 0
+    flow_bind: str = "0.0.0.0"  # noqa: S104 - a collector must listen on the LAN; set 127.0.0.1 to restrict
+    # Exporter addresses or CIDRs accepted; empty accepts any sender.
+    flow_allowed_exporters: list[str] = Field(default_factory=list)
+    # Packet sampling rate to assume when an exporter does not report one (0 = treat its counts as unsampled).
+    flow_sampling_rate: int = 0
+    flow_retention_days: int = 7
+    flow_max_rows: int = 5_000_000
+
     # Outbound connections to user-supplied addresses (see security/outbound.py).
     # Private and loopback ranges are allowed (equipment lives there); link-local and
     # metadata addresses are refused unless allowed here.

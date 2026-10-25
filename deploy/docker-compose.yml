@@ -58,16 +58,18 @@ services:
       # 1 only behind a TLS reverse proxy that sets X-Forwarded-For (DEPLOYMENT.md).
       WARDEN_FORWARDED_HOPS: ${WARDEN_FORWARDED_HOPS:-0}
       WARDEN_SYSLOG_PORT: "5514"
+      WARDEN_FLOW_PORT: "2055"
     volumes:
       - data:/data
     read_only: true
     tmpfs: ["/tmp", "/app/web/.next/cache:uid=10001,mode=0700"]
     cap_drop: [ALL]
-    # Syslog (UDP) is published on localhost only; set WARDEN_SYSLOG_BIND=0.0.0.0
-    # in deploy/.env to receive logs from your gateway and servers.
+    # Syslog and NetFlow/IPFIX (UDP) are published on localhost only; set WARDEN_SYSLOG_BIND
+    # and WARDEN_FLOW_BIND to 0.0.0.0 in deploy/.env to receive from your gateway and servers.
     ports:
       - "${WARDEN_HTTP_PORT:-8080}:3000"
       - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
+      - "${WARDEN_FLOW_BIND:-127.0.0.1}:${WARDEN_FLOW_HOST_PORT:-2055}:2055/udp"
 
 volumes:
   db:
