@@ -638,6 +638,26 @@ LOGS = ModuleManifest(
     ],
 )
 
+FLOWS = ModuleManifest(
+    id="flows",
+    version=VERSION,
+    name="Traffic & Flow Analytics",
+    category=C.OBSERVABILITY,
+    description="NetFlow v5, v9 and IPFIX collector with top talkers, conversations, service ports and traffic over time.",
+    maturity=Maturity.AVAILABLE,
+    roadmap_phase=5,
+    requires=["core", "inventory"],
+    nav=[NavEntry(label="Flows", href="/flows", icon="activity", section="Network")],
+    jobs=[JobDecl(id="flows.retention", title="Expire old flow rollups", default_interval_seconds=3600)],
+    resources=ResourceEstimate(memory_mb=64, disk_mb_per_day=150),
+    data_ownership=["flow_rollups"],
+    warnings=[
+        "The collector listens only when WARDEN_FLOW_PORT is set (UDP). A gateway exports only traffic it routes: "
+        "traffic between two devices on the same network never reaches it. NetFlow v5 carries IPv4 only. "
+        "Byte counts are scaled by the sampling rate the exporter reports, so sampled figures are estimates."
+    ],
+)
+
 SOC = ModuleManifest(
     id="soc",
     version=VERSION,
@@ -819,15 +839,6 @@ PLANNED: list[ModuleManifest] = [
         "Optics inventory, FEC state, optical power and physical-layer errors where hardware exposes them.",
         ["switching"],
     ),
-    _planned(
-        "flows",
-        "Traffic & Flow Analytics",
-        C.OBSERVABILITY,
-        5,
-        "IPFIX/NetFlow collection, top talkers and conversations.",
-        memory_mb=512,
-        containers=["flow-collector", "clickhouse"],
-    ),
 ]
 
 CATALOG: dict[str, ModuleManifest] = {
@@ -858,6 +869,7 @@ CATALOG: dict[str, ModuleManifest] = {
         CONFIG_HISTORY,
         COMPLIANCE,
         LOGS,
+        FLOWS,
         SOC,
         INVESTIGATIONS,
         UNIFI_PROTECT,

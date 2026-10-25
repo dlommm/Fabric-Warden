@@ -53,12 +53,17 @@ from warden.api import (
     users,
     wan,
 )
+from warden.api import (
+    flows as flows_api,
+)
 from warden.app_state import AppState
 from warden.changes.batches import advance_job as bulk_advance_job
 from warden.changes.engine import verify_job as changes_verify_job
 from warden.config import Settings, get_settings
 from warden.db import Base, Database, utcnow
 from warden.events import EventBus
+from warden.flows import Collector
+from warden.flows import retention_job as flow_retention_job
 from warden.integrations.ecosystem import home_assistant_sync_job, protect_sync_job
 from warden.integrations.hosts.sync import sync_job as servers_sync_job
 from warden.integrations.probe import probe_job
@@ -107,6 +112,8 @@ def build_state(settings: Settings) -> AppState:
     state.scheduler.register(JobSpec("wan.probe", "wan", "Probe latency and loss", probe_job, 60))
     state.syslog = Ingest(state)
     state.scheduler.register(JobSpec("logs.retention", "logs", "Expire old log events", retention_job, 3600))
+    state.flows = Collector(state)
+    state.scheduler.register(JobSpec("flows.retention", "flows", "Expire old flow rollups", flow_retention_job, 3600))
     state.scheduler.register(JobSpec("servers.sync", "servers", "Poll servers and hypervisors", servers_sync_job, 60))
     state.scheduler.register(JobSpec("unifi-protect.sync", "unifi-protect", "Poll UniFi Protect", protect_sync_job, 60))
     state.scheduler.register(JobSpec("home-assistant.sync", "home-assistant", "Poll Home Assistant", home_assistant_sync_job, 60))
@@ -153,12 +160,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             state.scheduler.start(settings.scheduler_tick_seconds)
         if settings.syslog_port:
             await state.syslog.start(settings.syslog_bind, settings.syslog_port)
+        if settings.flow_port:
+            await state.flows.start(settings.flow_bind, settings.flow_port)
         log.info("Fabric Warden %s started", __version__)
         yield
         await state.scheduler.stop()
         for task in list(state.ai_tasks.values()):  # background agent runs; the schedules job marks them interrupted later
             task.cancel()
         await state.syslog.stop()
+        await state.flows.stop()
         await state.db.dispose()
 
     app = FastAPI(
@@ -218,6 +228,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         config_history.router,
         compliance.router,
         logs.router,
+        flows_api.router,
         soc.router,
         investigate.router,
         system.router,

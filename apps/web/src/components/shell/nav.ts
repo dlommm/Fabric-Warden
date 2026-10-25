@@ -1,5 +1,6 @@
 import {
   Activity,
+  ArrowLeftRight,
   BellRing,
   Blocks,
   Bot,
@@ -63,6 +64,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
       { label: "Topology", href: "/topology", icon: Waypoints, module: "topology", permission: "inventory:read" },
       { label: "WAN", href: "/wan", icon: Globe, module: "wan", permission: "inventory:read" },
       { label: "Port counters", href: "/snmp", icon: Activity, module: "snmp", permission: "inventory:read" },
+      { label: "Flows", href: "/flows", icon: ArrowLeftRight, module: "flows", permission: "inventory:read" },
       { label: "IP plan", href: "/ipam", icon: Grid3x3, module: "ipam", permission: "inventory:read" },
       { label: "VLANs", href: "/ipam/vlans", icon: Layers, module: "ipam", permission: "inventory:read" },
     ],
