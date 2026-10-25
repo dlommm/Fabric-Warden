@@ -1,0 +1,88 @@
+# Fabric Warden for Unraid (Docker Compose Manager plugin).
+#   1. Plugins > Compose Manager > Add New Stack, name it fabric-warden.
+#   2. Paste this file as the stack's compose file and deploy/unraid/.env.example as its env file,
+#      then set POSTGRES_PASSWORD and WARDEN_SECRET_KEY (openssl rand -base64 32).
+#   3. Compose Up, then open http://<unraid-ip>:${WARDEN_HTTP_PORT:-8080} and complete first-run setup.
+# State lives under APPDATA (default /mnt/user/appdata/fabric-warden), owned by PUID:PGID
+# (default nobody:users), so the Unraid appdata backup picks it up.
+name: fabric-warden
+
+x-hardening: &hardening
+  restart: unless-stopped
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  db:
+    <<: *hardening
+    image: postgres:17.11-alpine@sha256:1bcc18d81671b02906296aad470ec9778a6b71016ce953092024b680bad007b0
+    environment:
+      POSTGRES_DB: warden
+      POSTGRES_USER: warden
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in the stack env file}
+    volumes:
+      - ${APPDATA:-/mnt/user/appdata/fabric-warden}/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U warden -d warden"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    <<: *hardening
+    image: redis:7.4.11-alpine@sha256:892022f9f18c26c92c30e15194d132f90044af87b94a491a75429bbc3982eab1
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  # Docker creates a missing bind-mount directory as root; hand it to PUID:PGID before app starts.
+  data-owner:
+    image: dendlomm/fabric-warden:1.1.0 # x-release-please-version
+    user: "0:0"
+    entrypoint: ["chown", "-R", "${PUID:-99}:${PGID:-100}", "/data"]
+    volumes:
+      - ${APPDATA:-/mnt/user/appdata/fabric-warden}/data:/data
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: ["no-new-privileges:true"]
+    restart: "no"
+
+  # The API and the web app run in one container; only the web port is published
+  # and the API listens on the container's loopback behind it.
+  app:
+    <<: *hardening
+    image: dendlomm/fabric-warden:1.1.0 # x-release-please-version
+    user: "${PUID:-99}:${PGID:-100}"
+    depends_on:
+      db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      data-owner: { condition: service_completed_successfully }
+    environment:
+      WARDEN_DATABASE_URL: postgresql+asyncpg://warden:${POSTGRES_PASSWORD}@db:5432/warden
+      WARDEN_REDIS_URL: redis://redis:6379/0
+      WARDEN_SECRET_KEY: ${WARDEN_SECRET_KEY:?set WARDEN_SECRET_KEY in the stack env file}
+      WARDEN_COOKIE_SECURE: ${WARDEN_COOKIE_SECURE:-true}
+      WARDEN_DEMO_CONTROLLER_ENABLED: ${WARDEN_DEMO_CONTROLLER_ENABLED:-true}
+      # 1 only behind a TLS reverse proxy that sets X-Forwarded-For (DEPLOYMENT.md).
+      WARDEN_FORWARDED_HOPS: ${WARDEN_FORWARDED_HOPS:-0}
+      WARDEN_SYSLOG_PORT: "5514"
+      WARDEN_FLOW_PORT: "2055"
+      TZ: ${TZ:-Etc/UTC}
+    volumes:
+      - ${APPDATA:-/mnt/user/appdata/fabric-warden}/data:/data
+    read_only: true
+    tmpfs: ["/tmp", "/app/web/.next/cache:uid=${PUID:-99},mode=0700"]
+    cap_drop: [ALL]
+    ports:
+      - "${WARDEN_HTTP_PORT:-8080}:3000"
+      - "${WARDEN_SYSLOG_BIND:-127.0.0.1}:${WARDEN_SYSLOG_HOST_PORT:-5514}:5514/udp"
+      - "${WARDEN_FLOW_BIND:-127.0.0.1}:${WARDEN_FLOW_HOST_PORT:-2055}:2055/udp"
+    labels:
+      net.unraid.docker.webui: "http://[IP]:${WARDEN_HTTP_PORT:-8080}/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/dlommm/Fabric-Warden/main/apps/web/public/icon.svg"
