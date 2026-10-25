@@ -11,6 +11,16 @@ docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 
 Open `http://<host>:8080` (or `WARDEN_HTTP_PORT`) and complete setup. Services: `db` (PostgreSQL 17), `redis` (job coordination, no persistence) and `app` (Fabric Warden: the web app on the published port, the API on the container's loopback behind it). `--build` builds the image from this checkout; without it, compose uses the published `dendlomm/fabric-warden` image of the same version.
 
+## Unraid
+
+`deploy/unraid/docker-compose.yml` runs the same stack under the Docker Compose Manager plugin, using the published image:
+
+1. **Plugins → Compose Manager → Add New Stack**, named `fabric-warden`.
+2. Paste `deploy/unraid/docker-compose.yml` as the compose file and `deploy/unraid/.env.example` as the env file. Set `POSTGRES_PASSWORD` and `WARDEN_SECRET_KEY` (`openssl rand -base64 32`).
+3. **Compose Up**, then open the WebUI from the Docker tab (`http://<unraid-ip>:8080`).
+
+PostgreSQL and the app data are bind-mounted under `APPDATA` (default `/mnt/user/appdata/fabric-warden`), so the appdata backup includes them. Putting that path on a cache-only share keeps the database off the array. A one-shot `data-owner` service gives `APPDATA/data` to `PUID:PGID` (default `99:100`, nobody:users), and the app runs as that user instead of uid 10001. The env file sets `WARDEN_COOKIE_SECURE=false` for plain HTTP on the LAN; set it to `true` when you reach Fabric Warden only through an HTTPS reverse proxy (and `WARDEN_FORWARDED_HOPS=1`, see TLS below).
+
 ## Single container
 
 The published image runs on its own, with SQLite and the vault key in `/data`:
@@ -22,7 +32,7 @@ docker run -d --name fabric-warden --restart unless-stopped \
   dendlomm/fabric-warden:latest
 ```
 
-Keep `WARDEN_COOKIE_SECURE=false` only for plain HTTP on a trusted LAN (see TLS below). Add `-e WARDEN_SYSLOG_PORT=5514 -p 5514:5514/udp` to receive syslog. Every `WARDEN_*` variable in the table below works the same way; point `WARDEN_DATABASE_URL` and `WARDEN_REDIS_URL` at PostgreSQL and Redis to use them instead of SQLite.
+Keep `WARDEN_COOKIE_SECURE=false` only for plain HTTP on a trusted LAN (see TLS below). Add `-e WARDEN_SYSLOG_PORT=5514 -p 5514:5514/udp` to receive syslog. Add `-e WARDEN_FLOW_PORT=2055 -p 2055:2055/udp` to receive NetFlow or IPFIX. Every `WARDEN_*` variable in the table below works the same way; point `WARDEN_DATABASE_URL` and `WARDEN_REDIS_URL` at PostgreSQL and Redis to use them instead of SQLite.
 
 Images are published for `linux/amd64` and `linux/arm64`. Every release has its own tag (`1.1.0`), and `latest` is the newest release.
 
@@ -85,6 +95,10 @@ Back up, pull the new release, `up -d --build`; migrations run at API start. Det
 | `OUTBOUND_BLOCKED_CIDRS` | `[]` | JSON list of extra networks to refuse, e.g. the Docker bridge |
 | `SYSLOG_PORT` / `SYSLOG_BIND` | `0` / `0.0.0.0` | Syslog receiver (compose uses 5514) |
 | `LOG_RETENTION_DAYS` / `LOG_MAX_ROWS` | `14` / `2000000` | Log Management retention |
+| `FLOW_PORT` / `FLOW_BIND` | `0` / `0.0.0.0` | NetFlow/IPFIX collector (compose uses 2055) |
+| `FLOW_ALLOWED_EXPORTERS` | empty (any) | Addresses or CIDRs allowed to send flows, as a JSON list |
+| `FLOW_SAMPLING_RATE` | `0` | Sampling rate to assume when an exporter reports none (0 = counts as exported) |
+| `FLOW_RETENTION_DAYS` / `FLOW_MAX_ROWS` | `7` / `5000000` | Flow retention |
 
 Outbound policy: Fabric Warden connects to equipment on your network, so private and loopback addresses are allowed. Link-local and cloud-metadata destinations (169.254.169.254, `metadata.google.internal`, …), unspecified, multicast and reserved addresses are refused for controllers, servers, Protect/Home Assistant, AI providers, notification webhooks/ntfy/SMTP, WAN probe targets and SNMP targets when they are saved. HTTP(S) connections are checked again at connect time after DNS resolution, so a name that resolves to a blocked address (or a redirect to one) is refused too; SMTP hosts are re-checked by literal address only, and WAN probe and SNMP hosts only when saved.
 

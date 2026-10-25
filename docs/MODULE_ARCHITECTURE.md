@@ -41,6 +41,7 @@ From `apps/api/src/warden/modules/catalog.py`. `core` is always on.
 | `config-history` | Configuration History & Backup |
 | `compliance` | Policy & Compliance |
 | `logs` | Log Management |
+| `flows` | Traffic & Flow Analytics |
 | `soc` | Security Operations Center |
 | `investigations` | Investigation Workbench |
 | `unifi-protect` | UniFi Protect |

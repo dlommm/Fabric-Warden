@@ -186,6 +186,18 @@ ifAlias carries the operator's own port name on these switches ("SFP28 1", a cus
 
 Not published, so not assumed: which MIBs each model implements, how `ifName`/`ifDescr` map to front-panel ports (Fabric Warden matches "Port N" names and labels the match inferred), and any optics or FEC MIB.
 
+## NetFlow and IPFIX
+
+The Flows module receives what a gateway exports; it never asks the controller for anything. Wire formats come from the published specifications: Cisco's NetFlow v5 record, [RFC 3954](https://www.rfc-editor.org/rfc/rfc3954) (NetFlow v9), [RFC 7011](https://www.rfc-editor.org/rfc/rfc7011) (IPFIX) and the [IANA IPFIX information element registry](https://www.iana.org/assignments/ipfix/ipfix.xhtml).
+
+What Ubiquiti publishes ([Traffic Flows and Traffic Logging in UniFi Network](https://help.ui.com/hc/en-us/articles/32201256219799-Traffic-Flows-and-Traffic-Logging-in-UniFi-Network); the page refuses automated fetches, so it was read from a search engine's index of it on 2026-10-24):
+
+- NetFlow (IPFIX) export is set under **Settings › CyberSecure › Traffic Logging** and sends sampled traffic data to a collector.
+- It needs UniFi Network 9.1 or later and UniFi OS 4.2.8 or later, on most gateways; the article excludes UDR, UDR7, UDR 5G Max, Express, Express 7, UDM, UCG-Ultra and UXG-Lite.
+- The settings are networks to export, version (v5, v9, v10 and IPFIX), collector address and port, engine ID, timeout and refresh rates, sampling mode and sampling rate. NetFlow v5 does not support IPv6.
+
+Fabric Warden decodes v10 and IPFIX identically (both are IPFIX version 10 on the wire). Not published, so not assumed: which information elements UniFi's templates carry, whether addresses are before or after NAT, and whether the sampling rate is exported in options records. The Flows page lists, per exporter, the fields its templates actually carry and the sampling rate it reported.
+
 ## UniFi Protect
 
 The Cameras module reads the **UniFi Protect Integration API** (`https://<console>/proxy/protect/integration`, `X-API-KEY`). Checked on 2026-10-21 against the OpenAPI documents published at developer.ui.com, via the automated mirror `opastorello/unifi-api-docs` (36 Protect versions, 5.3.38 to 7.3.70). The list with fields used is `apps/api/src/warden/integrations/protect/official_api_matrix.json`; details in [PROTECT.md](PROTECT.md).
