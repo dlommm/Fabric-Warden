@@ -10,7 +10,9 @@ tool results to append.
 
 from __future__ import annotations
 
+import ipaddress
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlsplit
@@ -40,7 +42,7 @@ KINDS: dict[str, dict[str, Any]] = {
         "suggested_models": ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5"],
     },
     "openai_compatible": {
-        "label": "OpenAI-compatible (LM Studio, vLLM, llama.cpp, OpenAI)",
+        "label": "OpenAI-compatible (any server or service)",
         "default_base_url": "http://localhost:1234/v1",
         "needs_key": False,
         "local": True,
@@ -54,6 +56,61 @@ KINDS: dict[str, dict[str, Any]] = {
         "suggested_models": [],
     },
 }
+
+# Hosted services that speak the OpenAI chat-completions API, with their published base URLs.
+# Each is saved as an ordinary openai_compatible provider; models are listed from the service itself.
+PRESETS: list[dict[str, Any]] = [
+    {"id": "openai", "label": "OpenAI", "base_url": "https://api.openai.com/v1", "keys_url": "https://platform.openai.com/api-keys"},
+    {
+        "id": "gemini",
+        "label": "Google Gemini",
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "keys_url": "https://aistudio.google.com/apikey",
+    },
+    {
+        "id": "openrouter",
+        "label": "OpenRouter",
+        "base_url": "https://openrouter.ai/api/v1",
+        "keys_url": "https://openrouter.ai/settings/keys",
+    },
+    {"id": "groq", "label": "Groq", "base_url": "https://api.groq.com/openai/v1", "keys_url": "https://console.groq.com/keys"},
+    {"id": "mistral", "label": "Mistral AI", "base_url": "https://api.mistral.ai/v1", "keys_url": "https://console.mistral.ai/api-keys"},
+    {
+        "id": "deepseek",
+        "label": "DeepSeek",
+        "base_url": "https://api.deepseek.com/v1",
+        "keys_url": "https://platform.deepseek.com/api_keys",
+    },
+    {"id": "xai", "label": "xAI Grok", "base_url": "https://api.x.ai/v1", "keys_url": "https://console.x.ai"},
+    {
+        "id": "together",
+        "label": "Together AI",
+        "base_url": "https://api.together.xyz/v1",
+        "keys_url": "https://api.together.ai/settings/api-keys",
+    },
+    {
+        "id": "fireworks",
+        "label": "Fireworks AI",
+        "base_url": "https://api.fireworks.ai/inference/v1",
+        "keys_url": "https://fireworks.ai/account/api-keys",
+    },
+    {"id": "cerebras", "label": "Cerebras", "base_url": "https://api.cerebras.ai/v1", "keys_url": "https://cloud.cerebras.ai"},
+]
+PRESETS = [{**p, "kind": "openai_compatible", "needs_key": True} for p in PRESETS]
+LOCAL_SUFFIXES = (".local", ".lan", ".home.arpa", ".internal", ".localdomain")
+
+
+def is_local_url(url: str) -> bool:
+    """True when the host is on this machine or the LAN: loopback, private or link-local addresses, or a LAN-only name."""
+    host = (urlsplit(url).hostname or "").lower()
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return host == "localhost" or "." not in host or host.endswith(LOCAL_SUFFIXES)
+    return ip.is_private or ip.is_loopback or ip.is_link_local
+
 
 HINTS = {
     "auth": "The provider rejected the key. Paste a valid API key; Anthropic keys are created in the Claude Console.",
@@ -241,11 +298,12 @@ class AnthropicAdapter(Adapter):
 
 
 class OpenAICompatibleAdapter(Adapter):
-    """POST /v1/chat/completions and GET /v1/models, as served by LM Studio, vLLM, llama.cpp and OpenAI."""
+    """POST /v1/chat/completions and GET /v1/models, as served by LM Studio, vLLM, llama.cpp, OpenAI and the hosted presets."""
 
     def _v1(self) -> str:
+        """The base URL as given when it already names an API version (/v1, /v1beta/openai), else with /v1 added."""
         b = self.base_url.rstrip("/")
-        return b if b.endswith("/v1") else f"{b}/v1"
+        return b if re.search(r"/v\d+[a-z0-9]*(/|$)", urlsplit(b).path) else f"{b}/v1"
 
     def _headers(self) -> dict[str, str]:
         h = {"content-type": "application/json"}

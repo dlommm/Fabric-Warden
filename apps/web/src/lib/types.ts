@@ -1513,6 +1513,16 @@ export interface AiProviderKindInfo {
   suggested_models: string[];
 }
 
+/** A hosted service saved as an ordinary openai_compatible provider. */
+export interface AiProviderPreset {
+  id: string;
+  label: string;
+  kind: "openai_compatible";
+  base_url: string;
+  keys_url: string;
+  needs_key: true;
+}
+
 export interface AiProbe {
   ok: boolean;
   models: AiModel[];
